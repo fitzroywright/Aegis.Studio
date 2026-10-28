@@ -25,7 +25,7 @@ public sealed class AttachmentStore
         Directory.CreateDirectory(deliveryCacheRoot);
 
         int maximumMegabytes = Math.Clamp(
-            configuration.GetValue<int?>("Storage:MaxAttachmentMegabytes") ?? 100,
+            configuration.GetValue<int?>("Storage:MaxAttachmentMegabytes") ?? 512,
             1,
             1024);
         maximumBytes = maximumMegabytes * 1024L * 1024L;

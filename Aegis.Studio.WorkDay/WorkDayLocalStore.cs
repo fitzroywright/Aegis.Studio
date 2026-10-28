@@ -462,9 +462,10 @@ public sealed class WorkDayLocalStore
     public async Task<LocalWorkSession?> ActiveSessionAsync()=>await db.Table<LocalWorkSession>().Where(x=>x.EndedAtUtc==null).OrderByDescending(x=>x.StartedAtUtc).FirstOrDefaultAsync();
 
     public async Task QueueUploadAsync(LocalUpload upload){await InitializeAsync();await db.InsertOrReplaceAsync(upload);}
-    public async Task<List<LocalUpload>> PendingUploadsAsync()=>await db.Table<LocalUpload>().Where(x=>x.State==nameof(LocalUploadState.Pending)||x.State==nameof(LocalUploadState.Failed)||x.State==nameof(LocalUploadState.Retrying)).OrderBy(x=>x.CreatedAtUtc).ToListAsync();
+    public async Task<List<LocalUpload>> PendingUploadsAsync()=>await db.Table<LocalUpload>().Where(x=>x.State==nameof(LocalUploadState.Pending)||x.State==nameof(LocalUploadState.Failed)||x.State==nameof(LocalUploadState.Retrying)||x.State==nameof(LocalUploadState.Uploading)).OrderBy(x=>x.CreatedAtUtc).ToListAsync();
+    public async Task<List<LocalUpload>> UploadsForAssignmentAsync(Guid assignment){await InitializeAsync();return await db.Table<LocalUpload>().Where(x=>x.AssignmentId==assignment).ToListAsync();}
     public Task SaveUploadAsync(LocalUpload upload)=>db.InsertOrReplaceAsync(upload);
-    public async Task<int> PendingUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State!=nameof(LocalUploadState.Uploaded)).CountAsync();
+    public async Task<int> PendingUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State!=nameof(LocalUploadState.Uploaded)&&x.State!=nameof(LocalUploadState.Cancelled)).CountAsync();
     public async Task<int> FailedUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State==nameof(LocalUploadState.Failed)).CountAsync();
     public async Task ReplaceCachedThreadsAsync(IEnumerable<MessageThreadDto> threads)
     {

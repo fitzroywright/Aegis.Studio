@@ -75,25 +75,29 @@ public static class MediaProductionRules
         using var output = new MemoryStream(); output.Write(bytes, 0, offset); output.Write([0xff, 0xe1, (byte)(length >> 8), (byte)length]); output.Write(packet); output.Write(bytes, offset + removed, bytes.Length - offset - removed); return output.ToArray();
     }
     public static Guid? ReadExportToken(byte[] bytes)
+    {using var source=new MemoryStream(bytes,false);return ReadExportToken(source);}
+    public static Guid? ReadExportToken(Stream source)
     {
-        if (bytes.Length < 4 || bytes[0] != 0xff || bytes[1] != 0xd8) return null;
-        var tokens = new HashSet<Guid>(); int offset = 2;
-        while (offset + 4 <= bytes.Length && bytes[offset] == 0xff)
+        if(source.ReadByte()!=0xff||source.ReadByte()!=0xd8)return null;
+        var tokens=new HashSet<Guid>();long consumed=2;
+        while(consumed<8*1024*1024)
         {
-            int marker = bytes[offset + 1]; if (marker == 0xda || marker == 0xd9) break;
-            int length = (bytes[offset + 2] << 8) | bytes[offset + 3]; if (length < 2 || offset + 2 + length > bytes.Length) break;
-            if (marker == 0xe1)
+            if(source.ReadByte()!=0xff)return tokens.Count==1?tokens.Single():null;
+            int marker=source.ReadByte();if(marker<0||marker==0xda||marker==0xd9)break;
+            int hi=source.ReadByte(),lo=source.ReadByte();if(hi<0||lo<0)return null;
+            int length=(hi<<8)|lo;if(length<2)return null;
+            byte[] segment=new byte[length-2];if(source.ReadAtLeast(segment,segment.Length,false)!=segment.Length)return null;
+            consumed+=length+2;
+            if(marker==0xe1)
             {
-                string text = Encoding.UTF8.GetString(bytes, offset + 4, length - 2);
-                const string prefix="http://ns.adobe.com/xap/1.0/\0";
+                string text=Encoding.UTF8.GetString(segment);const string prefix="http://ns.adobe.com/xap/1.0/\0";
                 if(text.StartsWith(prefix,StringComparison.Ordinal))try{
                     var document=XDocument.Parse(text[prefix.Length..]);XNamespace studio="urn:aegis:studio:editing";
                     foreach(string value in document.Descendants().Attributes(studio+"ExportToken").Select(x=>x.Value).Concat(document.Descendants(studio+"ExportToken").Select(x=>x.Value)))
                         if(Guid.TryParse(value,out Guid token))tokens.Add(token);
                 }catch(System.Xml.XmlException){return null;}
             }
-            offset += 2 + length;
         }
-        return tokens.Count == 1 ? tokens.Single() : null;
+        return tokens.Count==1?tokens.Single():null;
     }
 }

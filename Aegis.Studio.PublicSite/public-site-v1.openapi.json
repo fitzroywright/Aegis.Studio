@@ -17,6 +17,12 @@
         "type": "http",
         "scheme": "bearer",
         "description": "Dedicated secret of at least 32 characters; required scope is x-required-scope on each operation."
+      },
+      "WorkDaySession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "aegis_workday_session",
+        "description": "Active employee WorkDay session; mobile may use X-Aegis-WorkDay-Token. Every upload operation rechecks published assignment membership."
       }
     },
     "schemas": {
@@ -837,6 +843,104 @@
           },
           "importStatus": {
             "const": "Pending"
+          }
+        }
+      },
+      "WorkDayPhotoDeclaration": {
+        "type": "object",
+        "required": [
+          "uploadId",
+          "fileName",
+          "sizeBytes",
+          "sha256"
+        ],
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 536870912
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional subject present in the assignment fieldTargets; omitted means Unclassified."
+          }
+        }
+      },
+      "WorkDayPhotoSession": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "Receiving",
+              "Ready",
+              "Acknowledged",
+              "Purged",
+              "Cancelled"
+            ]
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 536870912
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "chunkBytes": {
+            "type": "integer",
+            "const": 4194304
+          },
+          "receivedChunks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "chunkIndex": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "sizeBytes": {
+                  "type": "integer"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-fA-F0-9]{64}$"
+                }
+              }
+            }
+          },
+          "previewState": {
+            "type": "string",
+            "enum": [
+              "Pending",
+              "Ready",
+              "Unavailable"
+            ]
+          },
+          "format": {
+            "type": [
+              "object",
+              "null"
+            ]
           }
         }
       }
@@ -3212,6 +3316,407 @@
           },
           "404": {
             "description": "Snapshot not found."
+          }
+        }
+      }
+    },
+    "/workday/assignments/{id}/upload-sessions": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Declare or resume a private camera-original upload",
+        "security": [
+          {
+            "WorkDaySession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Idempotent session status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkDayPhotoSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid declaration or bounds"
+          },
+          "401": {
+            "description": "Active WorkDay authentication required"
+          },
+          "403": {
+            "description": "Assignment or subject is not allowed"
+          },
+          "409": {
+            "description": "Conflicting identity, incomplete transfer or completed original retained"
+          },
+          "413": {
+            "description": "Chunk exceeds declared size"
+          },
+          "415": {
+            "description": "Invalid photo container or content type"
+          },
+          "422": {
+            "description": "Checksum verification failed; original not queued"
+          },
+          "503": {
+            "description": "Validation/processing temporarily unavailable; retry retained chunks"
+          },
+          "507": {
+            "description": "Reserved private-storage quota exceeded"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkDayPhotoDeclaration"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workday/assignments/{id}/upload-sessions/{uploadId}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "uploadId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Read durable chunk receipts for resume",
+        "security": [
+          {
+            "WorkDaySession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session status"
+          },
+          "400": {
+            "description": "Invalid declaration or bounds"
+          },
+          "401": {
+            "description": "Active WorkDay authentication required"
+          },
+          "403": {
+            "description": "Assignment or subject is not allowed"
+          },
+          "409": {
+            "description": "Conflicting identity, incomplete transfer or completed original retained"
+          },
+          "413": {
+            "description": "Chunk exceeds declared size"
+          },
+          "415": {
+            "description": "Invalid photo container or content type"
+          },
+          "422": {
+            "description": "Checksum verification failed; original not queued"
+          },
+          "503": {
+            "description": "Validation/processing temporarily unavailable; retry retained chunks"
+          },
+          "507": {
+            "description": "Reserved private-storage quota exceeded"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Cancel an incomplete transfer; completed originals are retained",
+        "security": [
+          {
+            "WorkDaySession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled"
+          },
+          "400": {
+            "description": "Invalid declaration or bounds"
+          },
+          "401": {
+            "description": "Active WorkDay authentication required"
+          },
+          "403": {
+            "description": "Assignment or subject is not allowed"
+          },
+          "409": {
+            "description": "Conflicting identity, incomplete transfer or completed original retained"
+          },
+          "413": {
+            "description": "Chunk exceeds declared size"
+          },
+          "415": {
+            "description": "Invalid photo container or content type"
+          },
+          "422": {
+            "description": "Checksum verification failed; original not queued"
+          },
+          "503": {
+            "description": "Validation/processing temporarily unavailable; retry retained chunks"
+          },
+          "507": {
+            "description": "Reserved private-storage quota exceeded"
+          }
+        }
+      }
+    },
+    "/workday/assignments/{id}/upload-sessions/{uploadId}/chunks/{index}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "uploadId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "index",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      ],
+      "put": {
+        "summary": "Stream one chunk; identical duplicates and reordering are supported",
+        "security": [
+          {
+            "WorkDaySession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable size/SHA-256 chunk receipt"
+          },
+          "400": {
+            "description": "Invalid declaration or bounds"
+          },
+          "401": {
+            "description": "Active WorkDay authentication required"
+          },
+          "403": {
+            "description": "Assignment or subject is not allowed"
+          },
+          "409": {
+            "description": "Conflicting identity, incomplete transfer or completed original retained"
+          },
+          "413": {
+            "description": "Chunk exceeds declared size"
+          },
+          "415": {
+            "description": "Invalid photo container or content type"
+          },
+          "422": {
+            "description": "Checksum verification failed; original not queued"
+          },
+          "503": {
+            "description": "Validation/processing temporarily unavailable; retry retained chunks"
+          },
+          "507": {
+            "description": "Reserved private-storage quota exceeded"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Chunk-SHA256",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "Exactly four MiB except the final chunk; no whole-file request."
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workday/assignments/{id}/upload-sessions/{uploadId}/complete": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "uploadId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Verify whole-file SHA-256 and container, then queue a metadata-only Studio pull",
+        "security": [
+          {
+            "WorkDaySession": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Pending import receipt including sizeBytes and sha256; preview failure cannot discard original"
+          },
+          "400": {
+            "description": "Invalid declaration or bounds"
+          },
+          "401": {
+            "description": "Active WorkDay authentication required"
+          },
+          "403": {
+            "description": "Assignment or subject is not allowed"
+          },
+          "409": {
+            "description": "Conflicting identity, incomplete transfer or completed original retained"
+          },
+          "413": {
+            "description": "Chunk exceeds declared size"
+          },
+          "415": {
+            "description": "Invalid photo container or content type"
+          },
+          "422": {
+            "description": "Checksum verification failed; original not queued"
+          },
+          "503": {
+            "description": "Validation/processing temporarily unavailable; retry retained chunks"
+          },
+          "507": {
+            "description": "Reserved private-storage quota exceeded"
+          }
+        }
+      }
+    },
+    "/admin/workday/uploads/{uploadId}/original": {
+      "parameters": [
+        {
+          "name": "uploadId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Studio-only streaming private original",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "workday:sync",
+        "responses": {
+          "200": {
+            "description": "Private, no-store; never a public gallery route",
+            "headers": {
+              "X-Content-SHA256": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[a-fA-F0-9]{64}$"
+                }
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration authentication required"
+          },
+          "404": {
+            "description": "Original unavailable or already purged"
+          }
+        }
+      }
+    },
+    "/admin/workday/upload-retention": {
+      "post": {
+        "summary": "Purge only verified-ACK originals after their configured grace period",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "workday:sync",
+        "responses": {
+          "200": {
+            "description": "Count purged; metadata and generated thumbnails remain"
+          },
+          "401": {
+            "description": "Integration authentication required"
           }
         }
       }

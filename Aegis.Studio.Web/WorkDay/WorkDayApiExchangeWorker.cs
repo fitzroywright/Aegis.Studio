@@ -121,6 +121,13 @@ public sealed class WorkDayApiExchangeWorker(
         StudioInAppMessageStore messages=services.GetRequiredService<StudioInAppMessageStore>();
         NotificationService notifications=services.GetRequiredService<NotificationService>();
         PhotographerStore photographers=new(database);
+        System.Text.Json.Nodes.JsonObject[] PhotoContexts(IEnumerable<WorkDayAssignment> assignments)=>assignments.Select(assignment=>
+        {
+            var context=JsonSerializer.SerializeToNode(assignment,JsonOptions)!.AsObject();
+            // Share import's authoritative session mapping; no upload receipt exists while publishing a snapshot.
+            context["sessionId"]=assignment.JobId is Guid job?WorkDayPhotoImport.SessionForAssignment(database,job,assignment.Id,Guid.Empty):null;
+            return context;
+        }).ToArray();
         DateTimeOffset now=DateTimeOffset.UtcNow;
         WorkDayTimePolicy policy=WorkDayTimeSemantics.FromConfiguration(config);
         foreach(PhotographerProfile profile in photographers.GetAll().Where(x=>x.IsActive))
@@ -156,7 +163,8 @@ public sealed class WorkDayApiExchangeWorker(
             }
             var snapshot=new
             {
-                bootstrap.UserName,bootstrap.DisplayName,bootstrap.ServerTimeUtc,bootstrap.Today,bootstrap.Upcoming,
+                bootstrap.UserName,bootstrap.DisplayName,bootstrap.ServerTimeUtc,
+                today=PhotoContexts(bootstrap.Today),upcoming=PhotoContexts(bootstrap.Upcoming),
                 sendingIdentities,
                 bootstrap.ActiveWorkSession,bootstrap.LocationTrackingEnabled,bootstrap.LocationTrackingMode,
                 bootstrap.GeneratedAtUtc,bootstrap.FieldTargets,
@@ -305,8 +313,7 @@ public sealed class WorkDayApiExchangeWorker(
                 Guid uploadId=update.Payload.GetProperty("uploadId").GetGuid();
                 string fileName=update.Payload.GetProperty("fileName").GetString()??"upload";
                 string contentType=update.Payload.GetProperty("contentType").GetString()??"application/octet-stream";
-                byte[] bytes=Convert.FromBase64String(update.Payload.GetProperty("contentBase64").GetString()??"");
-                if(bytes.Length is 0 or >25_000_000)throw new InvalidOperationException("WorkDay upload size is invalid.");
+                bool streamed=update.Payload.TryGetProperty("largeUpload",out var large)&&large.ValueKind==JsonValueKind.True;
                 ClaimsPrincipal principal=CreateFieldPrincipal(update.UserName);
                 using IServiceScope scope=scopes.CreateScope();
                 IServiceProvider services=scope.ServiceProvider;
@@ -322,12 +329,15 @@ public sealed class WorkDayApiExchangeWorker(
                 Guid? jobId=entry is null?null:WorkDayEndpoints.ResolveAssignmentJobId(entry,database);
                 if(jobId is not Guid id||studio.GetJob(id) is not { } job)
                     throw new InvalidOperationException("Assignment no longer belongs to an active Studio Job.");
-                await using MemoryStream content=new(bytes);
+                await using Stream content=streamed
+                    ?await WorkDayOriginalDownload.FetchAsync(http,uploadId,update.Payload.GetProperty("sizeBytes").GetInt64(),update.Payload.GetProperty("sha256").GetString()!,ct)
+                    :new MemoryStream(Convert.FromBase64String(update.Payload.GetProperty("contentBase64").GetString()??""));
+                if(!streamed&&content.Length is 0 or >25_000_000)throw new InvalidOperationException("WorkDay upload size is invalid.");
                 FormFile file=new(content,0,content.Length,"file",Path.GetFileName(fileName))
                 {Headers=new HeaderDictionary(),ContentType=contentType};
                 string correlation=uploadId.ToString("D");
                 flows.TryEnqueueWorkDayUpload(correlation,"Upload",assignmentId.ToString("D"));
-                WorkDayUploadResult imported=await WorkDayPhotoImport.ImportAsync(database,services.GetRequiredService<IFileStorage>(),attachments,studio,job,assignmentId,uploadId,file,principal,ct);
+                WorkDayUploadResult imported=await WorkDayPhotoImport.ImportAsync(database,services.GetRequiredService<IFileStorage>(),attachments,studio,job,assignmentId,uploadId,file,principal,ct,streamed?update.Payload.GetProperty("sha256").GetString():null,update.Payload.TryGetProperty("subjectId",out var subject)&&subject.ValueKind==JsonValueKind.String?subject.GetGuid():null);
                 flows.TryEnqueueWorkDayUpload(correlation,"Storage",imported.AttachmentId.ToString("D"));
                 flows.TryEnqueueWorkDayUpload(correlation,"MetadataAssociation",imported.AssetId?.ToString("D"));
                 flows.TryEnqueueWorkDayUpload(correlation,"Acknowledged",imported.AttachmentId.ToString("D"));
@@ -335,6 +345,8 @@ public sealed class WorkDayApiExchangeWorker(
             }
             catch(Exception ex) when(ex is InvalidOperationException or ArgumentException or UnauthorizedAccessException){state="Conflict";message=ex is UnauthorizedAccessException?"The upload identity is not authorized.":ex.Message;}
             catch(FormatException){state="Conflict";message="WorkDay upload payload is invalid.";}
+            catch(Exception error) when(error is IOException or HttpRequestException)
+            {logger.LogWarning("WorkDay original transfer {UploadId} could not be verified; no acknowledgment sent; retrying later.",update.OperationId);continue;}
             using var ack=await http.PostAsJsonAsync(
                 $"admin/workday/updates/{update.OperationId:D}/result",
                 new{state,message,result=uploadResult,acknowledgedAtUtc=DateTimeOffset.UtcNow},ct);

@@ -12,6 +12,8 @@ public sealed class AssignmentPage:ContentPage
     private readonly WorkDayUploadService uploads;
     private readonly Label status=new();
     private readonly Label roster=new();
+    private readonly Label uploadStatus=new();
+    private readonly ProgressBar uploadProgress=new();
     private bool reporting;
     private readonly Label syncStatus=new();
     private bool observing;
@@ -19,6 +21,9 @@ public sealed class AssignmentPage:ContentPage
     public AssignmentPage(LocalAssignment assignment,WorkDayLocalStore store,WorkDaySyncEngine sync,WorkDayDeviceIdentity device,WorkDayApiClient api,WorkDayUploadService uploads)
     {
         this.assignment=assignment;this.store=store;this.sync=sync;this.device=device;this.api=api;this.uploads=uploads;Title=assignment.Title;
+        var pauseUpload=new Button{Text="PAUSE CURRENT UPLOAD"};pauseUpload.Clicked+=(_,_)=>uploads.Pause();
+        var cancelUpload=new Button{Text="CANCEL UNSENT UPLOADS"};
+        cancelUpload.Clicked+=async(_,_)=>{try{if(await DisplayAlertAsync("Cancel uploads","Cancel incomplete transfers? Completed originals remain until Studio acknowledges them.","Cancel transfers","Keep"))await uploads.CancelAssignmentAsync(assignment.Id);}catch(Exception ex){uploadStatus.Text=ex.Message;}};
         Button communication=Action("CLIENT COMMUNICATION",async()=>
         {
             if(assignment.ConversationId is Guid conversationId)
@@ -41,6 +46,8 @@ public sealed class AssignmentPage:ContentPage
             Action("ADD NOTE",async()=>{string? text=await DisplayPromptAsync("Operational note","Note for the Job Owner and Workspace Manager");if(!string.IsNullOrWhiteSpace(text))await ReportAsync("AddNote",text);}),
             Action("REPORT A PROBLEM",async()=>{string? text=await DisplayPromptAsync("Report a problem","Describe the problem");if(!string.IsNullOrWhiteSpace(text))await ReportAsync("RecordException",text,"Other");}),
             Action("NAVIGATE",NavigateAsync),Action("CONTACT",ContactAsync),
+            pauseUpload,cancelUpload,uploadStatus,uploadProgress,
+            Action("RETRY / RESUME UPLOADS",()=>uploads.ResumeAssignmentAsync(assignment.Id)),
             Action("UPLOAD FILE",async()=>
             {
                 LocalUpload? upload=await uploads.PickAndQueueAsync(assignment.Id);
@@ -49,7 +56,7 @@ public sealed class AssignmentPage:ContentPage
                 {
                     await sync.SynchronizeAsync();
                     await uploads.ProcessAsync();
-                    await DisplayAlertAsync("Upload","The file was saved to Studio.","OK");
+                    await DisplayAlertAsync("Upload","The original stays on this device until Studio verifies and acknowledges it. Use Retry / Resume uploads after interruption.","OK");
                 }
                 catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
                 {
@@ -61,8 +68,9 @@ public sealed class AssignmentPage:ContentPage
         }}};
     }
 
-    protected override async void OnAppearing(){base.OnAppearing();if(!observing){sync.Changed+=SyncChanged;observing=true;}await sync.LoadStatusAsync();await RefreshStatusAsync();}
-    protected override void OnDisappearing(){if(observing){sync.Changed-=SyncChanged;observing=false;}base.OnDisappearing();}
+    protected override async void OnAppearing(){base.OnAppearing();if(!observing){sync.Changed+=SyncChanged;uploads.Progress+=UploadProgressChanged;observing=true;}await sync.LoadStatusAsync();await RefreshStatusAsync();}
+    protected override void OnDisappearing(){if(observing){sync.Changed-=SyncChanged;uploads.Progress-=UploadProgressChanged;observing=false;}base.OnDisappearing();}
+    private void UploadProgressChanged(PhotoTransferProgress value)=>MainThread.BeginInvokeOnMainThread(()=>{uploadProgress.Progress=value.Total>0?(double)value.Bytes/value.Total:0;uploadStatus.Text=$"{value.State}: {value.Bytes:N0} / {value.Total:N0} bytes. Local original retained until verified Studio receipt.";});
     private void SyncChanged()=>MainThread.BeginInvokeOnMainThread(async()=>{try{await RefreshStatusAsync();}catch(Exception ex){syncStatus.Text=ex.Message;}});
     private Button Action(string text,Func<Task> action)
     {

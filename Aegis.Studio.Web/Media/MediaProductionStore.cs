@@ -275,7 +275,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
     }
     public object Ingest(Guid job,IFormFile file,bool returned,Guid? explicitAsset,string user,string? note,string? collection=null,Guid? uploadId=null)
     {
-        if(file.Length<=0||file.Length>100_000_000)throw new ArgumentException("Files must be between 1 byte and 100 MB.");
+        if(file.Length<=0||file.Length>536_870_912)throw new ArgumentException("Files must be between 1 byte and 512 MiB.");
         if(!string.IsNullOrWhiteSpace(collection))ValidateCollection(collection);
         Sync(job);
         if(uploadId.HasValue)
@@ -284,11 +284,18 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             using var q=new NpgsqlCommand("select id from studio_media_unmatched where id=$1 and job_id=$2",existing);q.Parameters.AddWithValue(uploadId.Value);q.Parameters.AddWithValue(job);
             if(q.ExecuteScalar() is Guid unmatchedId)return new{unmatched=true,id=unmatchedId,reused=true};
         }
-        using var memory=new MemoryStream();using(var source=file.OpenReadStream())source.CopyTo(memory);
-        byte[] bytes=memory.ToArray();string hash=Convert.ToHexString(SHA256.HashData(bytes));Guid? asset=explicitAsset;Guid? sourceVersion=null;
+        var options=new FileStreamOptions{Mode=FileMode.CreateNew,Access=FileAccess.ReadWrite,Share=FileShare.Read,BufferSize=65536,Options=FileOptions.DeleteOnClose};
+        if(!OperatingSystem.IsWindows())options.UnixCreateMode=UnixFileMode.UserRead|UnixFileMode.UserWrite;
+        using var original=new FileStream(Path.Combine(Path.GetTempPath(),"studio-ingest-"+Guid.NewGuid().ToString("N")),options);
+        using(var source=file.OpenReadStream())source.CopyTo(original,65536);
+        if(original.Length!=file.Length)throw new ArgumentException("The source length changed during ingestion.");
+        original.Flush();
+        if(PhotoContainerProbe.RequiresValidation(file.FileName))
+            PhotoContainerProbe.InspectPathAsync(original.Name,file.FileName,CancellationToken.None).GetAwaiter().GetResult();
+        original.Position=0;string hash=Convert.ToHexString(SHA256.HashData(original));original.Position=0;Guid? asset=explicitAsset;Guid? sourceVersion=null;
         using(var c=database.OpenConnection())
         {
-            Guid? token=MediaProductionRules.ReadExportToken(bytes);
+            Guid? token=MediaProductionRules.ReadExportToken(original);
             returned=returned||token.HasValue;
             if(returned&&token.HasValue&&asset is null)
             {using var cmd=new NpgsqlCommand("select i.asset_id,i.source_version_id from studio_media_edit_items i join studio_media_edit_batches b on b.id=i.batch_id where i.token=$1 and b.job_id=$2",c);cmd.Parameters.AddWithValue(token.Value);cmd.Parameters.AddWithValue(job);using var r=cmd.ExecuteReader();if(r.Read()){asset=r.GetGuid(0);sourceVersion=r.GetGuid(1);}}
@@ -296,7 +303,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         if(returned&&asset is null)
         {
             using var c=database.OpenConnection();using var tx=c.BeginTransaction();StudioVersionStore.LockJobForMediaChange(c,tx,job);Guid id=uploadId??Guid.NewGuid();
-            string key="unmatched/"+id.ToString("N");memory.Position=0;var version=versions.Add(c,tx,job,key,file.FileName,file.ContentType,memory,user,note);
+            string key="unmatched/"+id.ToString("N");original.Position=0;var version=versions.Add(c,tx,job,key,file.FileName,file.ContentType,original,user,note);
             Execute(c,tx,"insert into studio_media_unmatched(id,job_id,staging_key,version_id,reason) values($1,$2,$3,$4,'No unique retained export identity. Select the original image.')",id,job,key,version.Id);
             CommitUploadReceipt(c,tx,uploadId,version.Id,null,true);Audit(c,tx,job,"UnmatchedUpload",user,"Returned file requires manual matching.");tx.Commit();return new{unmatched=true,id};
         }
@@ -314,13 +321,13 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             if(asset.HasValue&&Scalar(c,tx,"select version_id from studio_media_returns where job_id=$1 and sha256=$2 and asset_id=$3",job,hash,asset.Value) is Guid prior){CommitUploadReceipt(c,tx,uploadId,prior,asset,false);tx.Commit();return new{unmatched=false,id=prior,reused=true};}
             if(sourceVersion.HasValue && Scalar(c,tx,"select id from studio_asset_versions where job_id=$1 and asset_key=$2 order by version_number desc limit 1",job,key) is Guid latest && latest != sourceVersion.Value)
             {
-                Guid unmatched=uploadId??Guid.NewGuid();string staging="unmatched/"+unmatched.ToString("N");memory.Position=0;
-                var staged=versions.Add(c,tx,job,staging,file.FileName,file.ContentType,memory,user,note,sourceVersion);
+                Guid unmatched=uploadId??Guid.NewGuid();string staging="unmatched/"+unmatched.ToString("N");original.Position=0;
+                var staged=versions.Add(c,tx,job,staging,file.FileName,file.ContentType,original,user,note,sourceVersion);
                 Execute(c,tx,"insert into studio_media_unmatched(id,job_id,staging_key,version_id,reason) values($1,$2,$3,$4,'The editing batch is older than the current version. Review and explicitly match to promote this return.')",unmatched,job,staging,staged.Id);
                 CommitUploadReceipt(c,tx,uploadId,staged.Id,null,true);Audit(c,tx,job,"StaleEditingReturn",user,"Older editing batch requires explicit matching.");tx.Commit();return new{unmatched=true,id=unmatched};
             }
             // Existing immutable store serializes version counters; never overwrite its files.
-            memory.Position=0;var version=versions.Add(c,tx,job,key,file.FileName,file.ContentType,memory,user,note,sourceVersion);
+            original.Position=0;var version=versions.Add(c,tx,job,key,file.FileName,file.ContentType,original,user,note,sourceVersion);
             Guid mediaId=asset??Guid.NewGuid();
             Execute(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key) values($1,$2,$2,$3) on conflict(job_id,asset_key) do nothing",mediaId,job,key);
             if(!asset.HasValue)

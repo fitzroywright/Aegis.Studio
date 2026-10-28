@@ -75,7 +75,7 @@ public sealed record WorkDayBootstrap(
     DateTimeOffset GeneratedAtUtc,
     IReadOnlyDictionary<Guid,IReadOnlyList<WorkDayFieldTarget>>? FieldTargets=null);
 
-public sealed record WorkDayUploadResult(Guid UploadId,Guid AttachmentId,Guid AssignmentId,string FileName,long SizeBytes,string StorageStatus,DateTimeOffset AcknowledgedAtUtc,Guid? JobId=null,Guid? AssetId=null,Guid? VersionId=null,Guid? MessageId=null);
+public sealed record WorkDayUploadResult(Guid UploadId,Guid AttachmentId,Guid AssignmentId,string FileName,long SizeBytes,string StorageStatus,DateTimeOffset AcknowledgedAtUtc,Guid? JobId=null,Guid? AssetId=null,Guid? VersionId=null,Guid? MessageId=null,string? Sha256=null);
 public sealed record WorkDayDiagnosticsSnapshot(
     string Connectivity,
     string SynchronizationState,

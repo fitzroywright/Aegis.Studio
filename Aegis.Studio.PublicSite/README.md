@@ -20,7 +20,7 @@ See [the API guide](../docs/public-site-v1/INTEGRATION.md), [OpenAPI](public-sit
 
 Use a persistent writable volume for `INTAKE_DB_PATH`, including SQLite WAL files. The database stores intake, replay keys, roster drafts, attachment quarantine, payment events, gallery metadata, media, selection drafts and durable submitted selection snapshots. Back it up using SQLite's online backup mechanism or while the service is stopped. Do not copy only the main database file from an active WAL database. Restrict volume access and protect backups.
 
-The Dockerfile uses Node 24 and runs as the unprivileged node user, listens on `0.0.0.0:8080`, and installs from the committed lockfile. Build the image on the MacBook, then deploy the resulting image behind HTTPS with a persistent `/app/data` volume. Pin deployment image tags to the reviewed revision.
+The Dockerfile uses Node 24 and runs as the unprivileged node user, listens on `0.0.0.0:8080`, and installs from the committed lockfile. Build from the repository root with `docker build -f Aegis.Studio.PublicSite/Dockerfile .` on the MacBook, then deploy the resulting image behind HTTPS with a persistent `/app/data` volume. Pin deployment image tags to the reviewed revision.
 
 ## Identity and payment boundaries
 
@@ -81,3 +81,5 @@ node --test tests/ui/workday-web.test.cjs
 ~~~
 
 Then verify live with test accounts: drop and multi-select files, upload a mixed batch, retry a connection interruption, reload the gallery, switch assignments, refresh Studio acknowledgment, sign out, and confirm another photographer cannot view the first account's thumbnails. Verify keyboard controls and desktop/mobile layouts. These checks do not run automatically by adding this section.
+
+Camera originals use private resumable storage and the shared PR #101 RAW decoder. See [WorkDay RAW ingestion](../docs/WORKDAY-RAW-INGESTION.md) before packaging or enabling large uploads.

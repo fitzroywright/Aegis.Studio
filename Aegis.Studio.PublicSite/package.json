@@ -11,8 +11,9 @@
     "test": "node --test"
   },
   "dependencies": {
-    "exceljs": "4.4.0",
     "@aws-sdk/client-s3": "3.1156.0",
+    "@noble/hashes": "2.4.0",
+    "exceljs": "4.4.0",
     "sharp": "0.35.5"
   },
   "overrides": {

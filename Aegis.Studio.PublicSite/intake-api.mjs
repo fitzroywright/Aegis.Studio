@@ -1,3 +1,4 @@
+import { WorkDayLargeUploads } from './workday-large-uploads.mjs';
 import { randomUUID, randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
 import { readRosterFile } from './roster-file.mjs';
@@ -48,6 +49,7 @@ export function createIntakeApi(env,readBody,json) {
   retentionTimer.unref?.();
   queueMicrotask(()=>{purgeExpiredGalleryMedia().catch(error=>console.error('Gallery retention startup cleanup error',error));});
   const workdayStore=new WorkDayExchangeStore(env.WORKDAY_EXCHANGE_DB_PATH||env.INTAKE_DB_PATH||'./data/intake.sqlite');
+  const largeUploads=new WorkDayLargeUploads(env,workdayStore);
   function workdayToken(req){
     const header=String(req.headers['x-aegis-workday-token']||'');
     if(header)return header;
@@ -58,8 +60,9 @@ export function createIntakeApi(env,readBody,json) {
   function requireAssignment(user,assignmentId){
     const snapshot=workdayStore.snapshot(user.user_name);
     const allowed=[...(snapshot?.today||snapshot?.Today||[]),...(snapshot?.upcoming||snapshot?.Upcoming||[])]
-      .some(x=>String(x.id||x.Id||'').toLowerCase()===assignmentId.toLowerCase());
+      .find(x=>String(x.id||x.Id||'').toLowerCase()===assignmentId.toLowerCase());
     if(!allowed)fail(403,'assignment_forbidden','This assignment is not in your current WorkDay schedule.');
+    return allowed;
   }
   let activeWorkdayPreviews=0;
   const workdayPreviewWaiters=[];
@@ -107,7 +110,7 @@ export function createIntakeApi(env,readBody,json) {
     try{const path=join(dir,'upload');await writeFile(path,bytes,{mode:0o600});await run(env.MALWARE_SCANNER_PATH,['--no-summary',path],{timeout:30000,maxBuffer:4096});return {state:'Clean',type};}
     catch{return {state:'Quarantined',type};}finally{await rm(dir,{recursive:true,force:true});}
   }
-  return {store,workdayStore,mediaStorage,async handle(req,res,url){
+  return {store,workdayStore,mediaStorage,largeUploads,async handle(req,res,url){
     const route=url.pathname, method=req.method;
     if(route==='/api/v1/auth/login'&&method==='POST'){
       const p=await input(req,8192);
@@ -143,7 +146,10 @@ export function createIntakeApi(env,readBody,json) {
     }
     const workdayResult=route.match(/^\/api\/v1\/admin\/workday\/updates\/([0-9a-f-]{36})\/result$/i);
     if(workdayResult&&method==='POST'){
-      authenticate(req,'workday:sync');json(res,200,workdayStore.completeUpdate(workdayResult[1],await input(req,65536)));return true;
+      authenticate(req,'workday:sync');const result=await input(req,65536);
+      workdayStore.db.exec('BEGIN IMMEDIATE');
+      try{const saved=workdayStore.completeUpdate(workdayResult[1],result);largeUploads.acknowledge(workdayResult[1],saved.result);workdayStore.db.exec('COMMIT');json(res,200,saved);}
+      catch(error){workdayStore.db.exec('ROLLBACK');throw error;}return true;
     }
     if(route==='/api/v1/workday/device-session'&&method==='POST'){
       const user=requireWorkday(req),p=await input(req,8192);
@@ -219,11 +225,37 @@ export function createIntakeApi(env,readBody,json) {
       }
       return true;
     }
+    const uploadSession=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/upload-sessions(?:\/([0-9a-f-]{36}))?(?:\/(chunks)\/(\d{1,6})|\/(complete))?$/i);
+    if(uploadSession){
+      const user=requireWorkday(req),assignment=uploadSession[1],context=requireAssignment(user,assignment),id=uploadSession[2];
+      if(method==='POST'&&!id){json(res,201,await largeUploads.create(user.user_name,assignment,await input(req,4096),{jobId:context.jobId||context.JobId,sessionId:context.sessionId||context.SessionId,subjectIds:(workdayStore.snapshot(user.user_name)?.fieldTargets?.[assignment]||[]).map(x=>String(x.targetId||'')).filter(x=>x.startsWith('subject:')).map(x=>x.slice(8))}));return true;}
+      if(method==='GET'&&id&&!uploadSession[3]&&!uploadSession[5]){json(res,200,largeUploads.status(user.user_name,assignment,id));return true;}
+      if(method==='PUT'&&id&&uploadSession[3]){
+        if(req.headers['content-type']!=='application/octet-stream')fail(415,'invalid_chunk_type','Upload chunks as application/octet-stream.');
+        json(res,200,await largeUploads.writeChunk(user.user_name,assignment,id,Number(uploadSession[4]),req.headers['x-chunk-sha256'],req));return true;
+      }
+      if(method==='POST'&&id&&uploadSession[5]){json(res,202,await largeUploads.complete(user.user_name,assignment,id));return true;}
+      if(method==='DELETE'&&id&&!uploadSession[3]&&!uploadSession[5]){json(res,200,await largeUploads.cancel(user.user_name,assignment,id));return true;}
+      fail(405,'method_not_allowed','Unsupported upload session operation.');
+    }
+    const privateOriginal=route.match(/^\/api\/v1\/admin\/workday\/uploads\/([0-9a-f-]{36})\/original$/i);
+    if(privateOriginal&&method==='GET'){
+      authenticate(req,'workday:sync');const original=await largeUploads.original(privateOriginal[1]);
+      res.writeHead(200,{'Content-Type':'application/octet-stream','Content-Length':original.sizeBytes,'X-Content-SHA256':original.sha256,
+        'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});await pipeline(original.stream,res);return true;
+    }
+    if(route==='/api/v1/admin/workday/upload-retention'&&method==='POST'){authenticate(req,'workday:sync');json(res,200,await largeUploads.purge());return true;}
     const assignmentPhotos=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/uploads(?:\/([0-9a-f-]{36})\/thumbnail)?$/i);
     if(assignmentPhotos&&method==='GET'){
       const user=requireWorkday(req),assignmentId=assignmentPhotos[1];
       requireAssignment(user,assignmentId);
       if(assignmentPhotos[2]){
+        const uploaded=workdayStore.assignmentUpload(user.user_name,assignmentId,assignmentPhotos[2]);
+        if(uploaded?.largeUpload){
+          const preview=await largeUploads.preview(user.user_name,assignmentId,assignmentPhotos[2]);
+          res.writeHead(200,{'Content-Type':'image/jpeg','Content-Length':preview.sizeBytes,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});
+          await pipeline(preview.stream,res);return true;
+        }
         const thumbnail=await withWorkdayPreview(async()=>{
           const photo=workdayStore.assignmentUpload(user.user_name,assignmentId,assignmentPhotos[2]);
           if(!photo)fail(404,'not_found','Uploaded photograph not found.');

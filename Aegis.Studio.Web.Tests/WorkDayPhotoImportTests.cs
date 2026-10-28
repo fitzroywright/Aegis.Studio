@@ -116,6 +116,64 @@ public sealed class WorkDayPhotoImportTests
         Assert.Equal(0L,f.Count("studio_messages"));Assert.Equal(0L,f.Count("studio_asset_versions"));Assert.Equal(0L,f.Count("studio_attachments"));
     }
 
+    [StudioPostgresFact]
+    public void DirectStudioImportRejectsInvalidRawBeforeCreatingVersion()
+    {
+        using var f=new Fixture();var media=new MediaProductionStore(f.Context.Database,f.Context.Versions);
+        byte[] bytes=System.Text.Encoding.UTF8.GetBytes("not a valid RAW container");
+        var file=new FormFile(new MemoryStream(bytes),0,bytes.Length,"file","capture.nef"){Headers=new HeaderDictionary(),ContentType="image/x-nikon-nef"};
+        Assert.Throws<ArgumentException>(()=>media.Ingest(f.Job.Id,file,false,null,"photographer.one",null));
+        Assert.Equal(0L,f.Count("studio_asset_versions"));
+    }
+
+    [StudioPostgresFact]
+    public async Task RawOriginalIsDurableBeforeReceiptAndWrongChecksumCannotImport()
+    {
+        using var f=new Fixture();byte[] raw=new byte[256];
+        using(var writer=new BinaryWriter(new MemoryStream(raw)))
+        {
+            writer.Write((byte)'I');writer.Write((byte)'I');writer.Write((ushort)42);writer.Write(8u);writer.Write((ushort)6);
+            foreach(var entry in new (ushort Tag,ushort Type,uint Count,uint Value)[]{(256,4,1,1),(257,4,1,1),(262,3,1,32803),(273,4,1,200),(279,4,1,1),(50706,1,4,0x401)})
+            {writer.Write(entry.Tag);writer.Write(entry.Type);writer.Write(entry.Count);writer.Write(entry.Value);}
+        }
+        raw[200]=99;
+        IFormFile Input()=>new FormFile(new MemoryStream(raw),0,raw.Length,"file","capture.dng"){Headers=new HeaderDictionary(),ContentType="text/html"};
+        string hash=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(raw));Guid id=Guid.NewGuid();
+        await Assert.ThrowsAsync<InvalidDataException>(()=>f.Import(id,file:Input(),sha256:new string('0',64)));
+        Assert.Equal(0L,f.Count("studio_asset_versions"));Assert.Equal(0L,f.Count("studio_attachments"));
+        var result=await f.Import(id,file:Input(),sha256:hash);
+        Assert.Equal(hash,result.Sha256);Assert.NotNull(result.VersionId);Assert.Equal("Stored",result.StorageStatus);
+        Assert.Equal(1L,f.Count("studio_asset_versions"));Assert.Equal(1L,f.Count("studio_attachments"));Assert.Equal(1L,f.Count("studio_messages"));
+        var retry=await f.Import(id,file:Input(),sha256:hash);Assert.Equal(result.VersionId,retry.VersionId);Assert.Equal(result.AttachmentId,retry.AttachmentId);
+    }
+
+    [StudioPostgresFact]
+    public async Task TwoHundredFiftyMiBRawImportsByteExactlyWithoutMemoryBuffering()
+    {
+        using var f=new Fixture();string path=Path.GetTempFileName();
+        try
+        {
+            await using var source=new FileStream(path,FileMode.Open,FileAccess.ReadWrite,FileShare.Read);
+            source.SetLength(250L*1024*1024);
+            using(var writer=new BinaryWriter(source,System.Text.Encoding.UTF8,true))
+            {
+                writer.Write((byte)'I');writer.Write((byte)'I');writer.Write((ushort)42);writer.Write(8u);writer.Write((ushort)6);
+                foreach(var e in new (ushort Tag,ushort Type,uint Count,uint Value)[]{(256,4,1,1),(257,4,1,1),(262,3,1,32803),(273,4,1,200),(279,4,1,1),(50706,1,4,0x401)})
+                {writer.Write(e.Tag);writer.Write(e.Type);writer.Write(e.Count);writer.Write(e.Value);}
+                source.Position=200;writer.Write((byte)99);writer.Flush();
+            }
+            source.Position=0;string hash=Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(source));source.Position=0;
+            var file=new FormFile(source,0,source.Length,"file","large.dng"){Headers=new HeaderDictionary(),ContentType="application/octet-stream"};
+            var result=await f.Import(Guid.NewGuid(),file:file,sha256:hash);Assert.Equal(source.Length,result.SizeBytes);Assert.NotNull(result.VersionId);
+            var attachment=f.Attachments.GetForConversation(f.Job.ConversationId).Single(x=>x.Id==result.AttachmentId);
+            await using var stored=await f.Attachments.OpenReadAsync(attachment,CancellationToken.None);
+            Assert.Equal(hash,Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(stored)));
+            await using var version=f.Context.Versions.Open(f.Job.Id,result.VersionId!.Value,out _);
+            Assert.Equal(hash,Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(version)));
+        }
+        finally{System.IO.File.Delete(path);}
+    }
+
     private sealed class Fixture : IDisposable
     {
         public IntegratedWorkflowTests.WorkflowContext Context {get;}=new();
@@ -141,8 +199,8 @@ public sealed class WorkDayPhotoImportTests
             using var q=new NpgsqlCommand("select conversation_id from studio_jobs where id=$1",Context.Connection);q.Parameters.AddWithValue(Context.Job);
             Job=new StudioJob(Context.Job,Context.Workspace,(Guid)q.ExecuteScalar()!,"Test Job","Client","In Production",null,DateTimeOffset.UtcNow);
         }
-        public Task<WorkDayUploadResult> Import(Guid upload,string actor="photographer.one",Guid? assignment=null,IFormFile? file=null)
-            =>WorkDayPhotoImport.ImportAsync(Context.Database,Storage,Attachments,Studio,Job,assignment??this.assignment,upload,file??File(),User(actor),CancellationToken.None);
+        public Task<WorkDayUploadResult> Import(Guid upload,string actor="photographer.one",Guid? assignment=null,IFormFile? file=null,string? sha256=null)
+            =>WorkDayPhotoImport.ImportAsync(Context.Database,Storage,Attachments,Studio,Job,assignment??this.assignment,upload,file??File(),User(actor),CancellationToken.None,expectedSha256:sha256);
         public long Count(string table)
         {using var q=new NpgsqlCommand("select count(*) from "+table,Context.Connection);return (long)q.ExecuteScalar()!;}
         public void Dispose()=>Context.Dispose();

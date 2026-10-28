@@ -20,7 +20,7 @@ public static class WorkDayPhotoImport
 
     public static async Task<WorkDayUploadResult> ImportAsync(
         StudioDatabase database,IFileStorage storage,AttachmentStore attachments,StudioStore studio,
-        StudioJob job,Guid assignmentId,Guid uploadId,IFormFile file,ClaimsPrincipal user,CancellationToken ct)
+        StudioJob job,Guid assignmentId,Guid uploadId,IFormFile file,ClaimsPrincipal user,CancellationToken ct,string? expectedSha256=null,Guid? subjectId=null)
     {
         if(uploadId==Guid.Empty||assignmentId==Guid.Empty)throw new ArgumentException("A stable upload and assignment identity are required.");
         if(file.Length<1||file.Length>attachments.MaximumBytes)throw new ArgumentException("The file exceeds the configured WorkDay attachment limit.");
@@ -40,11 +40,18 @@ public static class WorkDayPhotoImport
             photograph=jpeg||png||webp;
             if(photograph)contentType=jpeg?"image/jpeg":png?"image/png":"image/webp";
         }
+        if(PhotoContainerProbe.RequiresValidation(name))
+        {
+            var probe=await PhotoContainerProbe.InspectAsync(file,ct);
+            photograph=true;contentType=probe;
+        }
         await using var normalizedSource=file.OpenReadStream();
         file=new FormFile(normalizedSource,0,file.Length,"file",name){Headers=new HeaderDictionary(),ContentType=contentType};
         ct.ThrowIfCancellationRequested();
         string hash;
         await using(var source=file.OpenReadStream())hash=Convert.ToHexString(await SHA256.HashDataAsync(source,ct));
+        if(expectedSha256 is not null&&!hash.Equals(expectedSha256,StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("WorkDay original SHA-256 verification failed before import.");
         // Recover earlier attachment-only imports without storing a second attachment.
         StudioAttachment? stored=attachments.GetForConversation(job.ConversationId).FirstOrDefault(a=>
             a.Visibility=="Internal"&&a.FileName==name&&a.Size==file.Length&&
@@ -59,7 +66,7 @@ public static class WorkDayPhotoImport
             Guid? session=SessionForAssignment(database,job.Id,assignmentId,uploadId);
             // A one-file batch uses the upload UUID for deterministic retry and normal session/crew gates.
             receipts.Create(job.Id,new UploadBatchDeclaration(uploadId,session,
-                [new UploadFileDeclaration(uploadId,name,file.Length)],Note:$"Uploaded via WorkDay assignment {assignmentId:D}."),actor,false);
+                [new UploadFileDeclaration(uploadId,name,file.Length)],SubjectId:subjectId,Note:$"Uploaded via WorkDay assignment {assignmentId:D}."),actor,false);
             JsonElement result=JsonSerializer.SerializeToElement(receipts.Receive(job.Id,uploadId,file,actor),Json);
             if(result.GetProperty("unmatched").GetBoolean())
                 throw new InvalidOperationException("The returned photo needs matching in the Job's unmatched media before it can be acknowledged.");
@@ -82,10 +89,10 @@ public static class WorkDayPhotoImport
             $"{description}: {displayName}\nUploaded by {actor} via WorkDay. {destination}",true),user,messageId);
         // Acknowledge only after the gallery, attachment and Job message have all been persisted.
         return new WorkDayUploadResult(uploadId,stored.Id,assignmentId,stored.FileName,stored.Size,stored.StorageStatus,
-            DateTimeOffset.UtcNow,job.Id,assetId,versionId,messageId);
+            DateTimeOffset.UtcNow,job.Id,assetId,versionId,messageId,hash);
     }
 
-    private static Guid? SessionForAssignment(StudioDatabase database,Guid jobId,Guid assignmentId,Guid uploadId)
+    internal static Guid? SessionForAssignment(StudioDatabase database,Guid jobId,Guid assignmentId,Guid uploadId)
     {
         using var c=database.OpenConnection();
         using(var prior=new NpgsqlCommand("select session_id from studio_media_upload_batches where id=$1 and job_id=$2",c))

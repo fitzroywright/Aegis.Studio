@@ -21,7 +21,7 @@
     <ProjectReference Include="$(CommonRoot)\Common.Registration\Common.Registration.csproj" AdditionalProperties="Configuration=$(Configuration)" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="Media/raw_preview.py;Media/raw-preview-requirements.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="Media/raw_preview.py;Media/photo_probe.py;Media/raw-preview-requirements.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Demo/portrait-catalogue.json" />
     <Content Include="Demo/Prepare-Kratos-Demo-Photo-Library.sh" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Workflow/WorkflowSchema.sql" />

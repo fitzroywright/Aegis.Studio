@@ -130,7 +130,7 @@ public sealed class MediaUploadReceipts(StudioDatabase database,MediaProductionS
     {
         if(declaration.BatchId==Guid.Empty||declaration.Files is null||declaration.Files.Count is <1 or >10000||declaration.Files.Select(f=>f.UploadId).Distinct().Count()!=declaration.Files.Count)
             throw new ArgumentException("Declare between 1 and 10,000 distinct upload identities.");
-        if(declaration.Files.Any(f=>f.UploadId==Guid.Empty||string.IsNullOrWhiteSpace(f.FileName)||Path.GetFileName(f.FileName).Length>255||f.SizeBytes is <1 or >100_000_000))throw new ArgumentException("Each declared file needs a stable ID, filename and size between 1 byte and 100 MB.");
+        if(declaration.Files.Any(f=>f.UploadId==Guid.Empty||string.IsNullOrWhiteSpace(f.FileName)||Path.GetFileName(f.FileName).Length>255||f.SizeBytes is <1 or >536_870_912))throw new ArgumentException("Each declared file needs a stable ID, filename and size between 1 byte and 512 MiB.");
         if((declaration.Note?.Length??0)>4000)throw new ArgumentException("Upload notes may contain at most 4000 characters.");
     }
 }

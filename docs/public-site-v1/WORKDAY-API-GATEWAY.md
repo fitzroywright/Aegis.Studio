@@ -45,7 +45,7 @@ Confirm that the exchange worker is running, a provisioned account receives its 
 
 ## Job gallery and upload message
 
-JPEG, PNG and WebP uploads from the public WorkDay site are imported through Studio's existing media upload receipts into the assignment's Job photo gallery. The corresponding photography session is resolved from the schedule/shoot/workflow-session relationship; normal required-session and crew validation still apply. Assignment ownership and AddAttachments remain checked by both WorkDay upload entry points before importing.
+JPEG, PNG, WebP and validated camera RAW/TIFF/HEIC uploads from the public WorkDay site are imported through Studio's existing media upload receipts into the assignment's Job photo gallery. The corresponding photography session is resolved from the schedule/shoot/workflow-session relationship; normal required-session and crew validation still apply. Assignment ownership and AddAttachments remain checked by both WorkDay upload entry points before importing.
 
 Each completed upload creates one internal Job conversation message:
 
@@ -76,3 +76,7 @@ python3 tools/test_repair_workday_gallery.py
 ~~~
 
 Then exercise the deployed test account: upload a photo, confirm it in the Job gallery, check the internal filename/uploader message, retry the same upload, and verify there is one photo and one message. Run a preview and controlled legacy recovery before any bulk repair. These are required acceptance steps, not claims that tests have already run.
+
+## Large camera originals
+
+[WorkDay RAW ingestion](../WORKDAY-RAW-INGESTION.md) defines resumable sessions, private streaming pull, verified SHA-256 receipts, retention, deployment limits and acceptance checks. Studio must support these descriptors before enabling new large transfers. Existing multipart and shoot-completion contracts remain supported.

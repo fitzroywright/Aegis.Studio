@@ -86,7 +86,7 @@ public static class MediaProductionEndpoints
             Guid? asset=Guid.TryParse(form["assetId"],out var parsed)?parsed:null;
             if(!Guid.TryParse(form["uploadId"],out var uploadId))return Results.BadRequest(new{error="Declare an upload batch and send its stable upload ID."});
             return Write(jobId,user,access,()=>Results.Ok(new MediaUploadReceipts(db,Store(db,storage)).Receive(jobId,uploadId,form.Files[0],Name(user))));
-        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(101_000_000)).DisableAntiforgery().RequireAuthorization();
+        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(537_919_488),new Microsoft.AspNetCore.Mvc.RequestFormLimitsAttribute{MultipartBodyLengthLimit=536_870_912}).DisableAntiforgery().RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/unmatched/{id:guid}/match",(Guid jobId,Guid id,MatchUploadRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>{Store(db,storage).Resolve(jobId,id,request.AssetId,Name(user));return Results.NoContent();})).RequireAuthorization();
         app.MapGet("/api/workspaces/{workspaceId:guid}/appearance",(Guid workspaceId,ClaimsPrincipal user,WorkspaceAccessService access,StudioDatabase db)=>
         {

@@ -1,7 +1,7 @@
 namespace Aegis.Studio.WorkDay.Core;
 
 public enum LocalSyncState { Pending, Sending, Acknowledged, Failed, Conflict, Resolved }
-public enum LocalUploadState { Pending, Uploading, Uploaded, Failed, Retrying, Conflict }
+public enum LocalUploadState { Pending, Uploading, Uploaded, Failed, Retrying, Conflict, Paused, Cancelled }
 
 public static class WorkDayClientRules
 {
