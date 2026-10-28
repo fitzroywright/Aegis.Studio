@@ -23,6 +23,10 @@ function verifyToken(token,metadata,keys,clientId,nonce,provider,msTenant){
   if(!verify('sha256',Buffer.from(parts[0]+'.'+parts[1]),params,Buffer.from(parts[2],'base64url')))
     throw reject(401,'Invalid identity signature.');
   const now=Math.floor(Date.now()/1000);
+  if(provider==='google'&&(typeof claims.sub!=='string'||!claims.sub||
+      !Number.isFinite(claims.exp)||!Number.isFinite(claims.iat)||
+      (claims.azp!==undefined&&claims.azp!==clientId)))
+    throw reject(401,'Invalid Google identity claims.');
   if(!claims.sub||claims.aud!==clientId||claims.exp<=now||claims.iat>now+60||!equal(claims.nonce,nonce))
     throw reject(401,'Invalid identity claims.');
   if(provider==='microsoft'){
@@ -48,6 +52,10 @@ function verifyToken(token,metadata,keys,clientId,nonce,provider,msTenant){
     // Microsoft sub is tenant-scoped. Include tid to prevent linking identities across tenants.
     // Keep the legacy personal-account subject for existing single-consumer deployments.
     return {...claims,verifiedSubject:msTenant==='common'&&tenant!==MICROSOFT_CONSUMER_TENANT?tenant+':'+claims.sub:claims.sub};
+  }else if(provider==='google'){
+    if(metadata.issuer!=='https://accounts.google.com'||
+       !['https://accounts.google.com','accounts.google.com'].includes(claims.iss))
+      throw reject(401,'Invalid Google identity issuer.');
   }else if(claims.iss!==metadata.issuer)throw reject(401,'Invalid identity issuer.');
   return claims;
 }
@@ -66,6 +74,7 @@ export class ClientAuthentication {
       microsoft:{id:env.MICROSOFT_CLIENT_ID,secret:env.MICROSOFT_CLIENT_SECRET,
         discovery:'https://login.microsoftonline.com/'+this.msTenant+'/v2.0/.well-known/openid-configuration'},
       yahoo:{id:env.YAHOO_CLIENT_ID,secret:env.YAHOO_CLIENT_SECRET,discovery:'https://api.login.yahoo.com/.well-known/openid-configuration'},
+      google:{id:env.GOOGLE_CLIENT_ID,secret:env.GOOGLE_CLIENT_SECRET,discovery:'https://accounts.google.com/.well-known/openid-configuration'},
       facebook:{id:env.FACEBOOK_APP_ID,secret:env.FACEBOOK_APP_SECRET}
     };
     store.db.exec("CREATE TABLE IF NOT EXISTS client_auth_states(state_hash TEXT PRIMARY KEY,provider TEXT NOT NULL,verifier TEXT NOT NULL,nonce TEXT NOT NULL,expires_at INTEGER NOT NULL)");
@@ -84,11 +93,17 @@ export class ClientAuthentication {
   async discovery(provider){
     const old=this.cache.get(provider);if(old&&old.until>Date.now())return old.value;
     const metadata=await requestJson(this.config[provider].discovery);
+    // Google uses distinct hosts for authorization, tokens and signing keys.
+    const googleEndpoints={authorization_endpoint:'https://accounts.google.com/o/oauth2/v2/auth',
+      token_endpoint:'https://oauth2.googleapis.com/token',jwks_uri:'https://www.googleapis.com/oauth2/v3/certs'};
     const host=provider==='microsoft'?'login.microsoftonline.com':'api.login.yahoo.com';
     for(const k of ['authorization_endpoint','token_endpoint','jwks_uri']){
-      if(!metadata[k]||new URL(metadata[k]).hostname!==host||!metadata[k].startsWith('https://'))
+      if(provider==='google'?metadata[k]!==googleEndpoints[k]:
+         !metadata[k]||new URL(metadata[k]).hostname!==host||!metadata[k].startsWith('https://'))
         throw reject(502,'Untrusted identity provider metadata.');
     }
+    if(provider==='google'&&metadata.issuer!=='https://accounts.google.com')
+      throw reject(502,'Untrusted Google discovery issuer.');
     const value={metadata,keys:await requestJson(metadata.jwks_uri)};
     this.cache.set(provider,{value,until:Date.now()+3600000});return value;
   }
@@ -144,7 +159,8 @@ export class ClientAuthentication {
       });
       const claims=verifyToken(token.id_token,metadata,keys,c.id,row.nonce,provider,this.msTenant);
       identity={subject:String(claims.verifiedSubject||claims.sub),name:String(claims.name||claims.preferred_username||'Client'),
-        email:claims.email||claims.preferred_username||null};
+        email:provider==='google'?(claims.email_verified===true&&typeof claims.email==='string'?claims.email:null):
+          claims.email||claims.preferred_username||null};
     }
     if(identity.subject.length>300||identity.name.length>200)throw reject(401,'Invalid provider profile.');
     const token=rand();
@@ -162,8 +178,8 @@ export class ClientAuthentication {
   }
   async handle(req,res,url,host,json){
     if(req.method==='GET'&&url.pathname==='/api/auth/providers'){json(res,200,{providers:this.providers()});return true;}
-    const start=url.pathname.match(/^\/auth\/(facebook|microsoft|yahoo)$/);
-    const done=url.pathname.match(/^\/auth\/(facebook|microsoft|yahoo)\/callback$/);
+    const start=url.pathname.match(/^\/auth\/(facebook|microsoft|yahoo|google)$/);
+    const done=url.pathname.match(/^\/auth\/(facebook|microsoft|yahoo|google)\/callback$/);
     if(!start&&!done)return false;
     if(host!==this.host)throw reject(404,'Sign-in is available on the web hostname only.');
     if(req.method!=='GET')throw reject(405,'Method not allowed.');

@@ -55,6 +55,22 @@ export function createIntakeApi(env,readBody,json) {
     return cookie?cookie.slice('aegis_workday_session='.length):'';
   }
   function requireWorkday(req){const identity=workdayStore.authenticate(workdayToken(req));if(!identity)fail(401,'workday_unauthorized','Sign in to WorkDay again.');return identity;}
+  function requireAssignment(user,assignmentId){
+    const snapshot=workdayStore.snapshot(user.user_name);
+    const allowed=[...(snapshot?.today||snapshot?.Today||[]),...(snapshot?.upcoming||snapshot?.Upcoming||[])]
+      .some(x=>String(x.id||x.Id||'').toLowerCase()===assignmentId.toLowerCase());
+    if(!allowed)fail(403,'assignment_forbidden','This assignment is not in your current WorkDay schedule.');
+  }
+  let activeWorkdayPreviews=0;
+  const workdayPreviewWaiters=[];
+  async function withWorkdayPreview(operation){
+    if(activeWorkdayPreviews>=2){
+      if(workdayPreviewWaiters.length>=20)fail(503,'preview_busy','Preview processing is busy. Try again shortly.');
+      await new Promise(resolve=>workdayPreviewWaiters.push(resolve));
+    }else activeWorkdayPreviews++;
+    try{return await operation();}
+    finally{const next=workdayPreviewWaiters.shift();if(next)next();else activeWorkdayPreviews--;}
+  }
 
   let credentials;try{credentials=JSON.parse(env.PUBLIC_API_KEYS_JSON || '[]');}catch{throw Error('Invalid PUBLIC_API_KEYS_JSON');}
   if(!Array.isArray(credentials)||credentials.some(c=>!c.id||typeof c.id!=='string'||typeof c.secret!=='string'||c.secret.length<32||!Array.isArray(c.scopes))||new Set(credentials.map(c=>c.id)).size!==credentials.length)throw Error('Configure unique integration credential IDs, secrets of at least 32 characters, and scopes.');
@@ -187,14 +203,36 @@ export function createIntakeApi(env,readBody,json) {
       const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
       json(res,200,snapshot?.timeSummary||null,{'Cache-Control':'private, no-store'});return true;
     }
+    const assignmentPhotos=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/uploads(?:\/([0-9a-f-]{36})\/thumbnail)?$/i);
+    if(assignmentPhotos&&method==='GET'){
+      const user=requireWorkday(req),assignmentId=assignmentPhotos[1];
+      requireAssignment(user,assignmentId);
+      if(assignmentPhotos[2]){
+        const thumbnail=await withWorkdayPreview(async()=>{
+          const photo=workdayStore.assignmentUpload(user.user_name,assignmentId,assignmentPhotos[2]);
+          if(!photo)fail(404,'not_found','Uploaded photograph not found.');
+          try{
+            const sharp=(await import('sharp')).default;
+            return await sharp(Buffer.from(photo.contentBase64,'base64'),{limitInputPixels:90_000_000})
+              .rotate().resize({width:360,height:270,fit:'inside',withoutEnlargement:true}).jpeg({quality:70}).toBuffer();
+          }catch{fail(422,'preview_unavailable','A preview could not be generated for this photograph.');}
+        });
+        res.writeHead(200,{'Content-Type':'image/jpeg','Content-Length':thumbnail.length,
+          'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}).end(thumbnail);return true;
+      }
+      const cursor=url.searchParams.get('before');
+      if(cursor!==null&&(!/^\d+$/.test(cursor)||!Number.isSafeInteger(Number(cursor))||Number(cursor)<1))
+        fail(400,'invalid_cursor','Invalid photograph page.');
+      const page=workdayStore.assignmentUploads(user.user_name,assignmentId,cursor===null?Number.MAX_SAFE_INTEGER:Number(cursor));
+      json(res,200,{...page,items:page.items.map(item=>({...item,
+        thumbnailUrl:'/api/v1/workday/assignments/'+assignmentId+'/uploads/'+item.uploadId+'/thumbnail'}))},
+        {'Cache-Control':'private, no-store'});return true;
+    }
     const assignmentUpload=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/uploads$/i);
     if(assignmentUpload&&method==='POST'){
       const user=requireWorkday(req);
       // Studio also independently verifies AddAttachments when consuming this queue.
-      const snapshot=workdayStore.snapshot(user.user_name);
-      const allowed=[...(snapshot?.today||snapshot?.Today||[]),...(snapshot?.upcoming||snapshot?.Upcoming||[])]
-        .some(x=>String(x.id||x.Id||'').toLowerCase()===assignmentUpload[1].toLowerCase());
-      if(!allowed)fail(403,'assignment_forbidden','This assignment is not in your current WorkDay schedule.');
+      requireAssignment(user,assignmentUpload[1]);
       if(!String(req.headers['content-type']||'').toLowerCase().startsWith('multipart/form-data;'))
         fail(415,'invalid_media_type','Use multipart/form-data for photograph uploads.');
       const bytes=await readBody(req,26_000_000);
@@ -502,5 +540,3 @@ export function createIntakeApi(env,readBody,json) {
     fail(404,'not_found','Operation not found.');
   }};
 }
-
-

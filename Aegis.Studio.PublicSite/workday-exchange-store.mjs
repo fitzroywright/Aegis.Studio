@@ -18,6 +18,7 @@ export class WorkDayExchangeStore {
       CREATE TABLE IF NOT EXISTS workday_snapshots(user_key TEXT PRIMARY KEY REFERENCES workday_accounts(user_key),revision INTEGER NOT NULL,payload TEXT NOT NULL,updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS workday_updates(sequence INTEGER PRIMARY KEY AUTOINCREMENT,operation_id TEXT NOT NULL UNIQUE,user_key TEXT NOT NULL REFERENCES workday_accounts(user_key),kind TEXT NOT NULL,payload TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'Pending',result TEXT,created_at TEXT NOT NULL,processed_at TEXT);
       CREATE INDEX IF NOT EXISTS ix_workday_updates_pending ON workday_updates(state,sequence);
+      CREATE INDEX IF NOT EXISTS ix_workday_updates_user_kind ON workday_updates(user_key,kind,sequence);
       CREATE TABLE IF NOT EXISTS workday_client_observations(device_id TEXT PRIMARY KEY,user_key TEXT NOT NULL,payload TEXT NOT NULL,observed_at TEXT NOT NULL); `);
   }
   provisionAccount(input) {
@@ -108,6 +109,21 @@ export class WorkDayExchangeStore {
   updateStatus(userName,operationId) {
     const row=this.db.prepare('SELECT state,result,created_at FROM workday_updates WHERE user_key=? AND operation_id=?').get(String(userName||'').toLowerCase(),operationId);
     return row?{operationId,state:row.state,result:row.result?JSON.parse(row.result):null,createdAt:row.created_at}:null;
+  }
+  assignmentUploads(userName,assignmentId,before=Number.MAX_SAFE_INTEGER,limit=40) {
+    const rows=this.db.prepare(`SELECT sequence,operation_id AS uploadId,state,created_at AS createdAt,
+      json_extract(payload,'$.fileName') AS fileName FROM workday_updates
+      WHERE user_key=? AND kind='AssignmentUpload' AND lower(json_extract(payload,'$.assignmentId'))=?
+      AND sequence<? ORDER BY sequence DESC LIMIT ?`)
+      .all(String(userName||'').trim().toLowerCase(),assignmentId.toLowerCase(),before,limit+1);
+    const items=rows.slice(0,limit);
+    return {items:items.map(({sequence,...item})=>item),nextCursor:rows.length>limit?items.at(-1).sequence:null};
+  }
+  assignmentUpload(userName,assignmentId,uploadId) {
+    const row=this.db.prepare(`SELECT payload FROM workday_updates WHERE user_key=? AND kind='AssignmentUpload'
+      AND lower(operation_id)=? AND lower(json_extract(payload,'$.assignmentId'))=?`)
+      .get(String(userName||'').trim().toLowerCase(),uploadId.toLowerCase(),assignmentId.toLowerCase());
+    return row?JSON.parse(row.payload):null;
   }
   observe(userName,deviceId,payload) {
     this.db.prepare('INSERT INTO workday_client_observations VALUES(?,?,?,?) ON CONFLICT(device_id) DO UPDATE SET user_key=excluded.user_key,payload=excluded.payload,observed_at=excluded.observed_at').run(deviceId,String(userName||'').toLowerCase(),json(payload),this.now().toISOString());
