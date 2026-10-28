@@ -455,7 +455,7 @@ public sealed class WorkDayStore(StudioDatabase database)
         {
             WorkDayOperationKind.AcceptAssignment=>"Accepted",WorkDayOperationKind.DeclineAssignment=>"Declined",
             WorkDayOperationKind.Arrive=>"Arrived",WorkDayOperationKind.StartSession=>"InProgress",
-            WorkDayOperationKind.CompleteSession=>"Completed",
+            WorkDayOperationKind.CompleteSession or WorkDayOperationKind.ConfirmShootComplete=>"Completed",
             WorkDayOperationKind.SetExceptionStatus=>WorkDaySemantics.NormalizeExceptionStatus(request.Category),_=>null
         };
         if(request.Kind==WorkDayOperationKind.SetExceptionStatus&&next is null)
@@ -484,10 +484,37 @@ public sealed class WorkDayStore(StudioDatabase database)
             }
         }
         long? version=currentVersion;
+        bool confirmsUploads=request.Kind==WorkDayOperationKind.ConfirmShootComplete;
+        if(confirmsUploads)
+        {
+            using(var shootExists=new NpgsqlCommand("select exists(select 1 from studio_shoot_sessions where schedule_entry_id=$1 and job_id=$2 and status<>'Cancelled')",c,tx))
+            {
+                shootExists.Parameters.AddWithValue(assignmentId);shootExists.Parameters.AddWithValue(job);
+                if(shootExists.ExecuteScalar() is not true)throw new InvalidOperationException("This assignment has no active shoot. Ask the Job Owner to review its schedule.");
+            }
+            if(request.UploadIds is not {Count: >0 and <=10000} uploads||uploads.Distinct().Count()!=uploads.Count||uploads.Contains(Guid.Empty))
+                throw new InvalidOperationException("Confirm the complete set of imported WorkDay photographs.");
+            using var imported=new NpgsqlCommand("""
+                select count(*) from studio_media_upload_receipts r
+                join studio_media_upload_batches b on b.id=r.batch_id
+                join studio_asset_versions v on v.id=r.version_id and v.job_id=b.job_id
+                join studio_media_assets a on a.id=r.asset_id and a.job_id=b.job_id and a.asset_key=v.asset_key
+                where r.id=any($1) and b.job_id=$2 and lower(b.created_by)=$3
+                  and b.declaration->>'note'=$4 and r.status='Stored'
+                  and a.deleted_at_utc is null and b.cancelled_at_utc is null
+                """,c,tx);
+            imported.Parameters.AddWithValue(uploads.ToArray());imported.Parameters.AddWithValue(job);
+            imported.Parameters.AddWithValue(actor);imported.Parameters.AddWithValue($"Uploaded via WorkDay assignment {assignmentId:D}.");
+            if(Convert.ToInt64(imported.ExecuteScalar())!=uploads.Count)
+                throw new InvalidOperationException("Some photographs have not been imported into this assignment's Job. Refresh and resolve the uploads first.");
+        }
         if(next is not null)
         {
-            if(!WorkDaySemantics.CanTransition(currentStatus,next))
+            bool declaredCompletion=confirmsUploads&&WorkDaySemantics.InitialStatus(currentStatus) is "Assigned" or "Accepted" or "Confirmed" or "Delayed" or "Arrived" or "InProgress" or "Completed";
+            if(!declaredCompletion&&!WorkDaySemantics.CanTransition(currentStatus,next))
                 throw new InvalidOperationException($"Invalid photographer transition from {WorkDaySemantics.InitialStatus(currentStatus)} to {next}.");
+            if(confirmsUploads&&stage is not ("Scheduled" or "Photography In Progress" or "Awaiting Upload"))
+                throw new InvalidOperationException("The Job has advanced beyond photography. Ask the Job Owner to review this confirmation.");
             if(request.Kind is WorkDayOperationKind.Arrive or WorkDayOperationKind.StartSession or WorkDayOperationKind.CompleteSession)
                 if(stage is not ("Scheduled" or "Photography In Progress"))throw new InvalidOperationException("Photography reporting requires a scheduled active Job.");
             version=currentVersion+1;
@@ -499,23 +526,33 @@ public sealed class WorkDayStore(StudioDatabase database)
             using var note=new NpgsqlCommand("insert into studio_workday_notes(id,operation_id,user_name,assignment_id,note_type,category,body,occurred_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8)",c,tx);
             note.Parameters.AddWithValue(Guid.NewGuid());note.Parameters.AddWithValue(request.OperationId);note.Parameters.AddWithValue(actor);note.Parameters.AddWithValue(assignmentId);note.Parameters.AddWithValue(request.Kind.ToString());note.Parameters.AddWithValue((object?)request.Category??DBNull.Value);note.Parameters.AddWithValue(request.Text!);note.Parameters.AddWithValue(request.OccurredAtUtc);note.ExecuteNonQuery();
         }
-        if(request.Kind is WorkDayOperationKind.StartSession or WorkDayOperationKind.CompleteSession)
+        if(request.Kind is WorkDayOperationKind.StartSession or WorkDayOperationKind.CompleteSession or WorkDayOperationKind.ConfirmShootComplete)
         {
             // Completion is per photographer. Every currently assigned photographer must finish.
             using var shoot=new NpgsqlCommand("""
                 update studio_shoot_sessions s set
                   status=case when $2='StartSession' then 'InProgress' else 'ShootComplete' end,
-                  checked_in_at_utc=coalesce(checked_in_at_utc,$3),
-                  checked_out_at_utc=case when $2='CompleteSession' then coalesce(checked_out_at_utc,$3) else checked_out_at_utc end,
+                  checked_in_at_utc=case when $2='ConfirmShootComplete' then checked_in_at_utc else coalesce(checked_in_at_utc,$3) end,
+                  checked_out_at_utc=case when $2 in ('CompleteSession','ConfirmShootComplete') then coalesce(checked_out_at_utc,$3) else checked_out_at_utc end,
                   updated_at_utc=now()
                 where s.schedule_entry_id=$1 and s.status<>'Cancelled' and s.checked_out_at_utc is null
                   and ($2='StartSession' or not exists(
                     select 1 from studio_schedule_entry_resources er join studio_photographers p on p.schedule_resource_id=er.resource_id
-                    where er.entry_id=$1 and not exists(select 1 from studio_workday_photographer_state ps
+                    where er.entry_id=$1 and p.is_active and not exists(select 1 from studio_workday_photographer_state ps
                       where ps.assignment_id=$1 and ps.user_name=lower(p.user_name) and ps.status='Completed')))
                 """,c,tx);
             shoot.Parameters.AddWithValue(assignmentId);shoot.Parameters.AddWithValue(request.Kind.ToString());shoot.Parameters.AddWithValue(request.OccurredAtUtc);shoot.ExecuteNonQuery();
             Aegis.Studio.Web.Production.JobShootLifecycle.Advance(c,tx,job,actor);
+        }
+        if(confirmsUploads)
+        {
+            using var message=new NpgsqlCommand("""
+                insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc)
+                select $1,conversation_id,$2,'Internal',$3,now() from studio_jobs where id=$4
+                """,c,tx);
+            message.Parameters.AddWithValue(request.OperationId);message.Parameters.AddWithValue(actor);
+            message.Parameters.AddWithValue($"{actor} confirmed all {request.UploadIds!.Count} WorkDay photo uploads are imported. Their shoot is done. Other assigned photographers and scheduled shoots must also finish before the Job's photography is complete.");
+            message.Parameters.AddWithValue(job);message.ExecuteNonQuery();
         }
         string body=$"{actor}: {request.Kind} at {request.OccurredAtUtc:O}. {request.Text}"+(recordedBy is null?"":$" Recorded manually by {recordedBy}: {recordingReason}");
         foreach(string audience in new[]{"Owner","Manager"})
@@ -536,4 +573,3 @@ public sealed class WorkDayStore(StudioDatabase database)
     private static Guid? GetActiveSessionId(NpgsqlConnection c,NpgsqlTransaction tx,string user){using NpgsqlCommand q=c.CreateCommand();q.Transaction=tx;q.CommandText="select id from studio_workday_work_sessions where lower(user_name)=lower($1) and ended_at_utc is null limit 1";q.Parameters.AddWithValue(user);return q.ExecuteScalar() is Guid g?g:null;}
     private static void SaveLocation(NpgsqlConnection c,NpgsqlTransaction tx,string user,Guid? session,WorkDayOperationRequest request,Guid? assignment){if(request.Location is not { } l)return;using NpgsqlCommand q=c.CreateCommand();q.Transaction=tx;q.CommandText="insert into studio_workday_location_observations(id,user_name,work_session_id,assignment_id,operation_id,latitude,longitude,accuracy_metres,observed_at_utc,source,mock_location,received_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now()) on conflict(id) do nothing";q.Parameters.AddWithValue(l.ObservationId);q.Parameters.AddWithValue(user);q.Parameters.AddWithValue((object?)session??DBNull.Value);q.Parameters.AddWithValue((object?)assignment??DBNull.Value);q.Parameters.AddWithValue(request.OperationId);q.Parameters.AddWithValue(l.Latitude);q.Parameters.AddWithValue(l.Longitude);q.Parameters.AddWithValue((object?)l.AccuracyMetres??DBNull.Value);q.Parameters.AddWithValue(l.ObservedAtUtc);q.Parameters.AddWithValue((object?)l.Source??DBNull.Value);q.Parameters.AddWithValue((object?)l.MockLocation??DBNull.Value);q.ExecuteNonQuery();}
 }
-

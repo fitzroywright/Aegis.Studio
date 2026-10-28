@@ -5,8 +5,8 @@
   <meta name="theme-color" content="#f7f4ed"><title>Bryan’s Studios — More Than Photographs</title>
   <meta name="description" content="Portraits, weddings, families, generations. A Jamaican legacy since 1927. Book a session, revisit your private gallery, or sign in to WorkDay.">
   <link rel="icon" href="/assets/brand.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css?v=20261028-workday-upload-gallery"><script src="/roster-editor.js" defer></script>
-<script type="module" src="/app.js"></script><script type="module" src="/workday-web.js?v=20261028-upload-gallery"></script>
+  <link rel="stylesheet" href="/styles.css?v=20261028-workday-shoot-confirmation"><script src="/roster-editor.js" defer></script>
+<script type="module" src="/app.js"></script><script type="module" src="/workday-web.js?v=20261028-shoot-confirmation"></script>
 </head>
 <body>
   <div class="site-shell">
@@ -108,6 +108,13 @@
               <p id="workday-gallery-empty">Choose an assigned Job to view and upload photographs.</p>
               <div id="workday-photo-grid" class="workday-photo-grid"></div>
               <button type="button" class="text-button" id="workday-gallery-more" hidden>Show older photographs</button>
+            </section>
+            <section class="track-form" aria-labelledby="workday-finish-title">
+              <h4 id="workday-finish-title">Finish your shoot</h4>
+              <p>Confirm when you have uploaded every photograph for this assignment. Studio must import all files first.</p>
+              <label class="workday-finish-declaration"><input type="checkbox" id="workday-finish-confirm"> I have uploaded all my photographs and my shoot is finished.</label>
+              <button type="button" class="button" id="workday-finish" disabled>All photos uploaded — finish shoot</button>
+              <p id="workday-finish-status" role="status" aria-live="polite"></p>
             </section>
           </div>
           <p id="workday-status" role="status" aria-live="polite"></p>

@@ -5,7 +5,7 @@ public static class WorkDaySemantics
     public static bool IsPhotographerOperation(WorkDayOperationKind kind)=>kind is
         WorkDayOperationKind.AcceptAssignment or WorkDayOperationKind.DeclineAssignment or
         WorkDayOperationKind.Arrive or WorkDayOperationKind.StartSession or
-        WorkDayOperationKind.CompleteSession or WorkDayOperationKind.AddNote or
+        WorkDayOperationKind.CompleteSession or WorkDayOperationKind.ConfirmShootComplete or WorkDayOperationKind.AddNote or
         WorkDayOperationKind.RecordException or WorkDayOperationKind.SetExceptionStatus or
         WorkDayOperationKind.LocationObservation or WorkDayOperationKind.RecordFieldStatus;
 

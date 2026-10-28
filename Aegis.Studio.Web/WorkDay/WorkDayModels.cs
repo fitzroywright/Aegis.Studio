@@ -1,6 +1,6 @@
 namespace Aegis.Studio.Web.WorkDay;
 
-public enum WorkDayOperationKind { AcceptAssignment, Arrive, StartSession, CompleteSession, SetExceptionStatus, AddNote, RecordException, WorkSignIn, WorkSignOut, LocationObservation, DeclineAssignment, RecordFieldStatus }
+public enum WorkDayOperationKind { AcceptAssignment, Arrive, StartSession, CompleteSession, SetExceptionStatus, AddNote, RecordException, WorkSignIn, WorkSignOut, LocationObservation, DeclineAssignment, RecordFieldStatus, ConfirmShootComplete }
 public enum WorkDayOperationState { Pending, Acknowledged, Failed, Conflict }
 public enum WorkDayLocationTrackingMode { Disabled, SignInOutOnly, AssignmentEvents, BackgroundDuringWork }
 
@@ -13,7 +13,9 @@ public sealed record WorkDayOperationRequest(
     string? Text,
     string? Category,
     WorkDayLocationEvidence? Location,
-    long? ExpectedVersion);
+    long? ExpectedVersion,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<Guid>? UploadIds=null);
 
 public sealed record WorkDayLocationEvidence(
     Guid ObservationId,
