@@ -100,7 +100,7 @@ function bindWorkspaceCardEditing(card,item){
                 const appearance=await json('/api/workspaces/'+id+'/appearance');
                 const payload={icon:appearance.icon,color:appearance.color,[key]:value};
                 await json('/api/workspaces/'+id+'/appearance',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-                workspace.iconName=payload.icon;workspace.accentColor=payload.color;
+                workspace.iconName=payload.icon;workspace.accentColor=payload.color;if(key==='color')card.style.setProperty('--workspace-card-accent',payload.color);
             }else if(key==='managers'){
                 const employees=await json('/api/studio-employees?assignable=true'),previous=await json('/api/workspaces/'+id+'/managers');
                 const users=[...new Set(value.split(',').map(name=>name.trim()).filter(Boolean).map(name=>name.toLowerCase()))];
