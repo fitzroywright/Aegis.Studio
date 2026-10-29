@@ -44,6 +44,23 @@ function bindWorkspaceCardEditing(card,item){
         const value=display(key),missing=!value||key==='managers'&&!(item.managers||[]).length;
         node.replaceChildren();node.dataset.empty=String(missing);
         node.classList.remove('workspace-value-danger','workspace-value-warning','workspace-value-caution','workspace-value-success');
+        if(key==='isEnabled'){
+            const toggle=document.createElement('button');toggle.type='button';toggle.className='workspace-enabled-toggle';toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked',String(!!workspace.isEnabled));toggle.setAttribute('aria-label','Enable '+workspace.name+' workspace');toggle.disabled=!card.querySelector('[data-workspace-pencil="name"]');
+            const thumb=document.createElement('span');thumb.className='workspace-enabled-toggle-thumb';thumb.setAttribute('aria-hidden','true');toggle.append(thumb);node.append(toggle);
+            toggle.onclick=async()=>{
+                if(saving||editing)return;
+                saving=true;toggle.disabled=true;status.textContent='Saving…';
+                try{
+                    const latest=await json('/api/workspaces/'+id);
+                    const payload={name:latest.name,emailAddress:latest.emailAddress,routeKey:latest.routeKey,isEnabled:!workspace.isEnabled,sortOrder:latest.sortOrder,defaultJobLead:latest.defaultJobLead};
+                    const saved=await json('/api/workspaces/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+                    Object.assign(workspace,payload,saved||{});paint('isEnabled',node);status.textContent='Saved';
+                    void loadWorkspaces().then(()=>renderWorkspaceMenu()).catch(()=>{});
+                }catch(cause){status.textContent=cause.message||'Could not update workspace.';toggle.disabled=false;}
+                finally{saving=false;}
+            };
+            return;
+        }
         if(key==='color'){
             const swatch=document.createElement('span');swatch.className='workspace-accent-swatch';swatch.style.backgroundColor=/^#[0-9a-f]{6}$/i.test(value)?value:'#b99750';swatch.title=value;swatch.setAttribute('aria-label','Accent color '+value);swatch.setAttribute('role','img');node.append(swatch);return;
         }
