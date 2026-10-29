@@ -205,7 +205,7 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .workspace-card-title-row h2{grid-column:1;grid-row:1;padding-right:0;max-width:100%}
 .workspace-card-routing-row{display:contents}
 .workspace-card-appearance{display:contents}
-.workspace-card-appearance>.workspace-card-field{grid-column:1;grid-row:2;min-width:0}.workspace-accountability-card>.workspace-card-field:nth-of-type(3){grid-column:1;grid-row:3}.workspace-accountability-card>.workspace-card-field:nth-of-type(4){grid-column:2;grid-row:3}.workspace-card-routing-row>.workspace-card-field:first-child{grid-column:1;grid-row:4}.workspace-card-routing-row>.workspace-card-field:last-child{grid-column:2;grid-row:4}
+.workspace-card-appearance>.workspace-card-field{grid-column:1;grid-row:2;min-width:0}.workspace-accountability-card>.workspace-card-field:first-of-type{grid-column:1;grid-row:3}.workspace-accountability-card>.workspace-card-field:last-of-type{grid-column:2;grid-row:3}.workspace-card-routing-row>.workspace-card-field:first-child{grid-column:1;grid-row:4}.workspace-card-routing-row>.workspace-card-field:last-child{grid-column:2;grid-row:4}
 
 
 .workspace-accountability-photo{position:absolute;right:7px;top:7px;width:105px;height:105px;display:grid;place-items:center;background:#edf1f4;color:#8796a3;border-radius:7px;overflow:hidden;font-size:24px}.workspace-accountability-photo img{width:100%;height:100%;object-fit:cover}
