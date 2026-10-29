@@ -5941,6 +5941,7 @@ body[data-studio-view] .user-menu .avatar {
 body[data-studio-view="today"] .user-menu .avatar {
   box-shadow: 0 0 0 1px #cdd9e3,0 2px 5px rgba(26,54,79,.16);
 }
+body[data-studio-view] .studio-user-display-name { display: inline-block; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; color: inherit; }
 body[data-studio-view] .user-menu-caret {
   display: grid;
   place-items: center;
