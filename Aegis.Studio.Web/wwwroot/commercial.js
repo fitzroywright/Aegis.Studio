@@ -9,38 +9,61 @@ function commercialPage(title,body,tools='',summary='',attention='') {
 }
 async function showCommercialCatalog(options={}){
     const current=StudioPage.begin('catalog');
-    let active=options.tab==='booking-sessions'?'booking-sessions':'products',productsRequest,bookingRequest;
-    commercialPage('Products and Services',`<nav class="booking-tabs" aria-label="Products and services sections"><button type="button" data-catalog-tab="products">Products and Services</button><button type="button" data-catalog-tab="booking-sessions">Booking Sessions</button></nav><section class="catalog-panel" data-catalog-panel="products" aria-label="Product catalog" hidden></section><section class="catalog-panel" data-catalog-panel="booking-sessions" aria-label="Booking sessions" hidden></section>`,`<button class="primary" data-add>Add item</button>`,'<p>Manage products, services and public booking session types, prices and opening hours.</p>');
+    let active=['products','hours'].includes(options.tab)?options.tab:'booking-sessions',productsRequest,bookingRequest,bookingController,summary,settings,allowed=null;
+    commercialPage('Products and Services',`<div class="catalog-heading"><div class="catalog-heading-copy"><h1>Products and Services</h1><p>Manage what you sell, what clients can book, and when each studio is open.</p></div><div class="catalog-heading-actions"><a class="action" data-catalog-preview hidden target="_blank" rel="noopener noreferrer">Preview booking page ↗</a><button type="button" class="primary" data-add>＋ Add product</button></div></div><div class="catalog-status-strip" aria-label="Studio opening hours and publication"><span data-catalog-location="BK">Kings Plaza · Loading hours...</span><span data-catalog-location="BE">East Queen Street · Loading hours...</span><span data-catalog-publication>Checking publication settings...</span><button type="button" class="action" data-catalog-hours>View hours</button></div><nav class="booking-tabs" aria-label="Products and services sections"><button type="button" data-catalog-tab="products">Products</button><button type="button" data-catalog-tab="booking-sessions">Services &amp; Sessions</button><button type="button" data-catalog-tab="hours">Opening Hours</button></nav><section class="catalog-panel" data-catalog-panel="products" aria-label="Product catalog" hidden></section><section class="catalog-panel" data-catalog-panel="booking-sessions" aria-label="Services and opening hours" hidden></section>`,'','<p>Manage products, services, public booking and location hours.</p>');
     const page=genericView.querySelector('.st-page'),live=()=>current()&&page.isConnected;
     const products=page.querySelector('[data-catalog-panel="products"]'),bookings=page.querySelector('[data-catalog-panel="booking-sessions"]'),add=page.querySelector('[data-add]');
-    add.onclick=()=>editCommercialItem();
+    function paintSummary(){
+        if(!live())return;
+        const names={BK:'Kings Plaza',BE:'East Queen Street'},days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        const day=days.indexOf(new Intl.DateTimeFormat('en-US',{timeZone:'America/Jamaica',weekday:'long'}).format(new Date()));
+        for(const code of ['BK','BE']){
+            const hours=(summary?.hours||[]).filter(row=>row.locationCode===code&&Number(row.dayOfWeek)===day).sort((a,b)=>a.opensAt.localeCompare(b.opensAt));
+            page.querySelector('[data-catalog-location="'+code+'"]').textContent=names[code]+' · '+(summary?.hoursLoaded?'Today: '+(hours.map(row=>row.opensAt.slice(0,5)+'–'+row.closesAt.slice(0,5)).join(', ')||'No opening hours')+(summary.dirtyHours?' (unsaved)':''):'Hours unavailable');
+        }
+        page.querySelector('[data-catalog-publication]').textContent=settings?(summary?.dirtyHours||summary?.dirtySessions?'Unsaved changes · not published':settings.publishingEnabled?'Automatic publishing enabled':'Automatic publishing disabled'):'Publication status unavailable';
+        const link=page.querySelector('[data-catalog-preview]');
+        try{const url=new URL(settings?.bookingUrl);if(url.protocol!=='https:'||url.username||url.password)throw Error();link.href=url.href;link.hidden=false;}catch{link.hidden=true;}
+    }
+    add.onclick=()=>active==='products'?editCommercialItem():bookingController?.add();
     async function loadProducts(){
-        products.innerHTML='<p role="status">Loading catalog…</p>';
+        products.innerHTML='<p role="status">Loading catalog...</p>';
         try{
             const [items,templates]=await Promise.all([json('/api/admin/pos/catalog/'),json('/api/admin/commercial/templates/WorkOrder')]);if(!live())return;
             commercialItems=items;commercialTemplates=templates;
-            const rows=commercialItems.map(p=>`<tr data-item="${esc(p.id)}" tabindex="0"><td><b>${esc(p.code)}</b></td><td>${esc(p.name)}</td><td>${esc(p.category)}</td><td>${money(p.unitPrice)}</td><td>${money(p.estimatedCost)}</td><td>${p.taxRate}%</td><td>${p.requiresProduction?'Production':'Direct'}</td><td><span class="status-pill">${p.isActive?'Active':'Inactive'}</span></td></tr>`).join('');
-            products.innerHTML=`<input class="commercial-search" placeholder="Search products and services" aria-label="Search catalog"><div class="commercial-grid"><table class="pos-grid"><thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Price before tax</th><th>Estimated cost</th><th>Tax</th><th>Fulfillment</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-            products.querySelectorAll('[data-item]').forEach(row=>{row.onclick=()=>editCommercialItem(commercialItems.find(p=>p.id===row.dataset.item));row.onkeydown=e=>{if(e.key==='Enter')row.click();};});
-            const filter=()=>{const term=products.querySelector('.commercial-search').value.toLowerCase();let count=0;products.querySelectorAll('[data-item]').forEach(row=>{row.hidden=!row.textContent.toLowerCase().includes(term);if(!row.hidden)count++;});if(active==='products')StudioPage.setCount(count+' catalog items');};products.querySelector('.commercial-search').oninput=filter;filter();
+            const categories=[...new Set(items.map(item=>item.category).filter(Boolean))].sort();
+            products.innerHTML=`<div class="catalog-product-toolbar"><input class="commercial-search" type="search" placeholder="Search products..." aria-label="Search catalog"><select data-product-category aria-label="Filter product category"><option value="">All categories</option>${categories.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('')}</select><select data-product-status aria-label="Filter product status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select><span data-product-count></span></div><div class="commercial-grid"><table class="pos-grid"><thead><tr><th>Code</th><th>Product</th><th>Category</th><th>Price · JMD before tax</th><th>Estimated cost</th><th>Tax</th><th>Fulfillment</th><th>Status</th></tr></thead><tbody>${items.map(p=>`<tr data-item="${esc(p.id)}" tabindex="0"><td><b>${esc(p.code)}</b></td><td><strong>${esc(p.name)}</strong><small>${esc(p.description||'')}</small></td><td>${esc(p.category)}</td><td>${money(p.unitPrice)}</td><td>${money(p.estimatedCost)}</td><td>${p.taxRate}%</td><td>${p.requiresProduction?'Production':'Direct'}</td><td><span class="catalog-product-status">${p.isActive?'Active':'Inactive'}</span></td></tr>`).join('')}</tbody></table><p class="booking-empty" data-products-empty hidden>No products match your filters.</p></div><footer class="booking-grid-footer">Select a product to edit its price, tax, options, package components and production template.</footer>`;
+            products.querySelectorAll('[data-item]').forEach(row=>{row.onclick=()=>editCommercialItem(commercialItems.find(p=>p.id===row.dataset.item));row.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();row.click();}};});
+            const filter=()=>{const term=products.querySelector('.commercial-search').value.toLowerCase(),category=products.querySelector('[data-product-category]').value,status=products.querySelector('[data-product-status]').value;let count=0;products.querySelectorAll('[data-item]').forEach(row=>{const item=items.find(p=>p.id===row.dataset.item);row.hidden=!row.textContent.toLowerCase().includes(term)||!!category&&item.category!==category||!!status&&item.isActive!==(status==='active');if(!row.hidden)count++;});products.querySelector('[data-product-count]').textContent=count+' of '+items.length+' products';products.querySelector('[data-products-empty]').hidden=count>0;if(active==='products')StudioPage.setCount(count+' catalog items');};
+            products.querySelector('.commercial-search').oninput=filter;products.querySelector('[data-product-category]').onchange=filter;products.querySelector('[data-product-status]').onchange=filter;filter();
         }catch(error){if(live()){products.innerHTML='<p role="alert">'+esc(error.message)+'</p><button type="button" class="action" data-catalog-retry>Retry</button>';products.querySelector('[data-catalog-retry]').onclick=()=>{productsRequest=loadProducts();};}}
     }
     async function loadBookings(){
-        bookings.innerHTML='<p role="status">Checking access…</p>';
+        bookings.innerHTML='<p role="status">Checking access...</p>';
         try{
             const me=await json('/api/auth/me');if(!live())return;
-            if((me?.user||me)?.isAdministrator!==true){bookings.innerHTML='<p>Administrator access required to manage booking sessions.</p>';return;}
-            bookings.innerHTML=window.StudioBookingSessions.html();await window.StudioBookingSessions.mount(bookings,live);
-        }catch(error){if(live()){bookings.innerHTML='<p role="alert">'+esc(error.message)+'</p><button type="button" class="action" data-bookings-retry>Retry</button>';bookings.querySelector('[data-bookings-retry]').onclick=()=>{bookingRequest=loadBookings();};}}
+            allowed=(me?.user||me)?.isAdministrator===true;
+            if(!allowed){bookings.innerHTML='<p>Administrator access required to manage services and opening hours.</p>';paintSummary();if(active!=='products')add.hidden=true;return;}
+            bookings.innerHTML=window.StudioBookingSessions.html({embedded:true});
+            const settingsRequest=json('/api/admin/public-booking/session-types/settings').then(value=>{settings=value;if(live())paintSummary();}).catch(()=>{settings=null;if(live())paintSummary();});
+            bookingController=await window.StudioBookingSessions.mount(bookings,live,{onSummary:value=>{summary=value;paintSummary();},embedded:true});
+            await settingsRequest;if(!live())return;
+            bookingController?.selectTab(active==='hours'?'hours':'sessions');if(active!=='products'){add.disabled=false;add.hidden=false;}
+        }catch(error){if(live()){bookings.innerHTML='<p role="alert">'+esc(error.message)+'</p><button type="button" class="action" data-bookings-retry>Retry</button>';bookings.querySelector('[data-bookings-retry]').onclick=()=>{bookingRequest=loadBookings();};add.disabled=active!=='products';}}
     }
     async function selectTab(tab){
-        if(!live())return;active=tab;products.hidden=tab!=='products';bookings.hidden=tab!=='booking-sessions';add.hidden=tab!=='products';
+        if(!live()||bookingController?.isSaving())return;
+        if(tab!=='products'&&bookingController?.selectTab(tab==='hours'?'hours':'sessions')===false)return;
+        active=tab;products.hidden=tab!=='products';bookings.hidden=tab==='products';add.hidden=tab!=='products'&&allowed===false;
+        add.disabled=tab!=='products'&&!bookingController;add.textContent=tab==='products'?'＋ Add product':tab==='hours'?'＋ Add opening window':'＋ Add service';
         page.querySelectorAll('[data-catalog-tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.catalogTab===tab)));
         const state={...window.history.state,studioView:'catalog',studioCatalogTab:tab},params=new URLSearchParams(window.location.hash.slice(1));params.set('studio','catalog');params.set('tab',tab);window.history.replaceState(state,'','#'+params);
-        if(tab==='booking-sessions'){StudioPage.setCount('Booking Sessions');await (bookingRequest ||= loadBookings());}else{await (productsRequest ||= loadProducts());if(live()&&active==='products')products.querySelector('.commercial-search')?.dispatchEvent(new Event('input'));}
+        if(tab!=='products'){StudioPage.setCount(tab==='hours'?'Opening Hours':'Services & Sessions');await (bookingRequest ||= loadBookings());if(live()&&active===tab)bookingController?.selectTab(tab==='hours'?'hours':'sessions');}
+        else{await (productsRequest ||= loadProducts());if(live()&&active==='products')products.querySelector('.commercial-search')?.dispatchEvent(new Event('input'));}
     }
     page.querySelectorAll('[data-catalog-tab]').forEach(button=>button.onclick=()=>selectTab(button.dataset.catalogTab));
-    await selectTab(active);
+    page.querySelector('[data-catalog-hours]').onclick=()=>selectTab('hours');
+    await selectTab(active);if(live()&&active==='products')void (bookingRequest ||= loadBookings());
 }
 function editCommercialItem(item){
     const p=item||{code:'',name:'',category:'Photography',unitPrice:0,estimatedCost:0,taxRate:0,isActive:true,options:{},bundle:[]};
@@ -50,7 +73,7 @@ function editCommercialItem(item){
     d.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;try{
         const opts={};for(const line of f.elements.options.value.split('\n').filter(Boolean)){const [name,...values]=line.split(':');if(!values.length)throw Error('Give each option a name followed by a colon and its choices.');opts[name.trim()]=values.join(':').split(',').map(x=>x.trim()).filter(Boolean);}
         const bundle=[...f.querySelectorAll('[data-part]')].filter(x=>Number(x.value)>0).map(x=>({catalogItemId:x.dataset.part,quantity:Number(x.value)}));
-        await json(p.id?`/api/admin/pos/catalog/${p.id}`:'/api/admin/pos/catalog/',{method:p.id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:f.elements.code.value,name:f.elements.name.value,category:f.elements.category.value,description:f.elements.description.value,unitPrice:Number(f.elements.price.value),estimatedCost:Number(f.elements.cost.value),taxRate:Number(f.elements.tax.value),isActive:f.elements.active.checked,requiresProduction:f.elements.production.checked,workOrderTemplateId:f.elements.template.value||null,options:opts,bundle})});d.close();await showCommercialCatalog();
+        await json(p.id?`/api/admin/pos/catalog/${p.id}`:'/api/admin/pos/catalog/',{method:p.id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:f.elements.code.value,name:f.elements.name.value,category:f.elements.category.value,description:f.elements.description.value,unitPrice:Number(f.elements.price.value),estimatedCost:Number(f.elements.cost.value),taxRate:Number(f.elements.tax.value),isActive:f.elements.active.checked,requiresProduction:f.elements.production.checked,workOrderTemplateId:f.elements.template.value||null,options:opts,bundle})});d.close();await showCommercialCatalog({tab:'products'});
     }catch(error){f.querySelector('[role=alert]').textContent=error.message;}};
 }
 function commercialTemplatePage(kind,body,tools){
