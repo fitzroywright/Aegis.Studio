@@ -29,12 +29,12 @@ test('shared shell owns the workspace selector', () => {
 test('shared topbar has one authoritative top-level declaration', () => {
   const rules = css.match(/^body \.topbar \{/gm) || [];
   assert.equal(rules.length, 1);
-  const backgroundOwners = [...css.matchAll(/([^{}]+)\\{([^{}]*)\\}/g)]
-    .filter(([, selector, body]) => /(?:^|\\s)\\.topbar\\s*$/.test(selector.trim()) && /(?:^|;)\\s*background\\s*:/.test(body));
+  const backgroundOwners = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, selector, body]) => /(?:^|\s)\.topbar\s*$/.test(selector.trim()) && /(?:^|;)\s*background\s*:/.test(body));
   assert.equal(backgroundOwners.length, 1, 'the shell banner background must have exactly one owner');
   assert.equal(backgroundOwners[0][1].trim(), 'body .topbar');
-  assert.match(backgroundOwners[0][2], /background:\\s*linear-gradient\\([^;]+aegis-studio-login-background\\.png/);
-  assert.doesNotMatch(css, /body\\[data-studio-view\\] \\.topbar \\{[^}]*background\\s*:/s);
+  assert.match(backgroundOwners[0][2], /background:\s*linear-gradient\([^;]+aegis-studio-login-background\.png/);
+  assert.doesNotMatch(css, /body\[data-studio-view\] \.topbar \{[^}]*background\s*:/s);
 });
 
 test('shell CSS contains no malformed empty declarations', () => {
