@@ -118,6 +118,9 @@ function editCommercialTemplate(current,kind){
     }catch(error){f.querySelector('[role=alert]').textContent=error.message;}};
 }
 let productionBoardController=null;
+let productionBoardSnapshot=null;
+let productionBoardRefreshTimer=null;
+const productionBoardRefreshMs=60000;
 async function showCatalogProduction({preserveFilters=false,workspaceId}={}){
     const previous=window.studioWorkloadSelection||{};
     // Only visible job search and workspace selection scope the board.
@@ -128,12 +131,17 @@ async function showCatalogProduction({preserveFilters=false,workspaceId}={}){
     };
     window.studioProductionScopeRequested=false;
     clearTimeout(window.productionBoardSearchTimer);
-    productionBoardController?.abort();productionBoardController=new AbortController();const signal=productionBoardController.signal;
+    productionBoardController?.abort();clearInterval(productionBoardRefreshTimer);productionBoardController=new AbortController();const signal=productionBoardController.signal;
     const current=StudioPage.begin('production');
-    conversationView.classList.add('hidden');genericView.classList.remove('hidden');genericView.innerHTML='<div class="today-loading">Loading Production…</div>';
-    let workloadData,workspaces;
-    try{[workloadData,workspaces]=await Promise.all([json('/api/production/workload',{signal}),loadWorkspaces()]);}
-    catch(error){if(current()){genericView.innerHTML='<p role="alert">Production could not load: '+esc(error.message)+'</p><button class="action" data-production-retry>Retry</button>';genericView.querySelector('button').onclick=()=>showCatalogProduction({preserveFilters:true});}return;}
+    conversationView.classList.add('hidden');genericView.classList.remove('hidden');
+    const cached=productionBoardSnapshot;
+    if(!cached)genericView.innerHTML='<div class="today-loading">Loading Production…</div>';
+    let workloadData=cached?.workload,workspaces=cached?.workspaces;
+    if(!cached){
+        try{[workloadData,workspaces]=await Promise.all([json('/api/production/workload',{signal}),loadWorkspaces()]);}
+        catch(error){if(current()){genericView.innerHTML='<p role="alert">Production could not load: '+esc(error.message)+'</p><button class="action" data-production-retry>Retry</button>';genericView.querySelector('button').onclick=()=>showCatalogProduction({preserveFilters:true});}return;}
+        if(current())productionBoardSnapshot={workload:workloadData,workspaces};
+    }
     if(!current())return;
     const laneLimits=new Map();
     const jobPhotos=new Map();
@@ -179,7 +187,7 @@ async function showCatalogProduction({preserveFilters=false,workspaceId}={}){
     const reload=()=>{laneLimits.clear();paint();};
     StudioPage.query(genericView,'[data-production-clear-search]').onclick=()=>{selection.search='';reload();};
     StudioPage.query(genericView,'[data-production-search]').oninput=e=>{selection.search=e.target.value;clearTimeout(window.productionBoardSearchTimer);window.productionBoardSearchTimer=setTimeout(()=>{if(!current())return;const start=e.target.selectionStart;reload();const input=genericView.querySelector('[data-production-search]');input.focus();input.setSelectionRange(start,start);},180);};
-    StudioPage.query(genericView,'[data-production-refresh]').onclick=()=>showCatalogProduction({preserveFilters:true});
+    StudioPage.query(genericView,'[data-production-refresh]').onclick=()=>{productionBoardSnapshot=null;void showCatalogProduction({preserveFilters:true});};
     StudioPage.queryAll(genericView,'[data-production-more]').forEach(button=>button.onclick=()=>{const scroll=new Map([...genericView.querySelectorAll('[data-production-lane]')].map(lane=>[lane.dataset.productionLane,lane.querySelector('.production-lane-list').scrollTop]));laneLimits.set(button.dataset.productionMore,(laneLimits.get(button.dataset.productionMore)||20)+20);paint();genericView.querySelectorAll('[data-production-lane]').forEach(lane=>{lane.querySelector('.production-lane-list').scrollTop=scroll.get(lane.dataset.productionLane)||0;});});
     const openJob=id=>window.studioNavigate('workspaces',{jobId:id});
     StudioPage.queryAll(genericView,'[data-production-job]').forEach(card=>{card.onclick=e=>{if(!e.target.closest('button,input,select,a,details'))openJob(card.dataset.productionJob);};card.onkeydown=e=>{if(e.target===card&&['Enter',' '].includes(e.key)){e.preventDefault();openJob(card.dataset.productionJob);}};});
@@ -187,6 +195,26 @@ async function showCatalogProduction({preserveFilters=false,workspaceId}={}){
     const count=document.getElementById('studioFooterRate');if(count)count.textContent=totalItems+' jobs';
     }
     paint();
+    // Cached board paints immediately; refresh in the background without blocking navigation.
+    // A changed snapshot is rendered through this same authoritative board function.
+    let refreshing=false;
+    const refresh=async()=>{
+        if(!current()||document.hidden||refreshing)return;
+        refreshing=true;
+        try{
+            const [nextWorkload,nextWorkspaces]=await Promise.all([json('/api/production/workload',{signal}),loadWorkspaces()]);
+            if(!current()||signal.aborted)return;
+            if(!nextWorkload||!Array.isArray(nextWorkload.jobs))throw Error('Invalid production workload');
+            const changed=JSON.stringify(nextWorkload)!==JSON.stringify(productionBoardSnapshot?.workload)||
+                JSON.stringify(nextWorkspaces)!==JSON.stringify(productionBoardSnapshot?.workspaces);
+            productionBoardSnapshot={workload:nextWorkload,workspaces:nextWorkspaces};
+            if(changed)void showCatalogProduction({preserveFilters:true});
+        }catch(error){if(!signal.aborted)console.warn('Production refresh failed; retaining last workload.',error);}
+        finally{refreshing=false;}
+    };
+    productionBoardRefreshTimer=setInterval(()=>{void refresh();},productionBoardRefreshMs);
+    productionBoardRefreshTimer.unref?.();
+    if(cached)void refresh();
     void json('/api/production/media-summary').then(rows=>{if(!current())return;for(const row of rows){if(!jobPhotos.has(row.jobId)&&row.thumbnailVersionIds?.length)jobPhotos.set(row.jobId,row.thumbnailVersionIds[Math.floor(Math.random()*row.thumbnailVersionIds.length)]);}paintPhotos();}).catch(()=>{});
 
 }
