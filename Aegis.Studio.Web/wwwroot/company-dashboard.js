@@ -1,7 +1,10 @@
 // Company overview. Operational commands remain in their canonical destination pages.
 (() => {
     'use strict';
-    let controller, resizeObserver;
+    let controller, resizeObserver, refreshTimer;
+    // Tab-memory only: never persist customer/job data in browser storage.
+    const snapshot = new Map();
+    const REFRESH_MS = 60_000;
     const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const closed = value => /^(Completed|Cancelled|Archived|Delivered|Published|Closed)$/i.test(value || '');
     const belongs = (item, id) => !id || String(item.workspaceId || item.request?.workspaceId || '') === id || (item.participatingWorkspaceIds || []).map(String).includes(id);
@@ -36,6 +39,7 @@
     async function render() {
         controller?.abort();
         resizeObserver?.disconnect();
+        clearInterval(refreshTimer);
         const request = controller = new AbortController();
         const host = document.getElementById('genericView');
         const active = () => !request.signal.aborted && document.body.dataset.studioView === 'dashboard';
@@ -53,6 +57,35 @@
             media:'/api/today/media-summary',
             resources:'/api/schedule/resources'
         };
+        // Paint the last successfully fetched values immediately, then refresh in the background.
+        for (const [key] of Object.entries(sources)) {
+            const cached = snapshot.get(key);
+            if (cached) { data[key] = cached.value; ready.add(key); }
+        }
+        let refreshing = false;
+        async function refresh() {
+            if (!active() || refreshing) return;
+            refreshing = true;
+            try {
+                await Promise.all(Object.entries(sources).map(async ([key,url]) => {
+                    try {
+                        const value = await json(url,{signal:request.signal});
+                        if (key === 'workload' ? !value || !Array.isArray(value.jobs) : !Array.isArray(value))
+                            throw Error('Unexpected response');
+                        if (!active()) return;
+                        data[key] = value;
+                        snapshot.set(key,{value,at:Date.now()});
+                        ready.add(key);
+                        failures.delete(key);
+                    } catch (error) {
+                        if (request.signal.aborted) return;
+                        // Retain the last good snapshot during temporary outages.
+                        if (!ready.has(key) && !['media','resources'].includes(key)) failures.add(key);
+                    }
+                    paint();
+                }));
+            } finally { refreshing = false; }
+        }
         const known = (...keys) => keys.every(k => ready.has(k)) && keys.every(k => !failures.has(k));
         const count = (n,...keys) => known(...keys) ? n : keys.some(k => failures.has(k)) ? 'Unavailable' : '…';
         const link = (label,key) => `<button type="button" class="cd-link" data-dashboard-link="${key}">${escape(label)} <span aria-hidden="true">→</span></button>`;
@@ -104,7 +137,7 @@
             host.innerHTML = `<section class="company-dashboard" aria-label="Today company overview"><header class="cd-heading"><div><h1>Studio at a glance</h1><p>Company-wide operations · ${escape(scope)}</p></div><div><time>${escape(new Date().toLocaleDateString([], {weekday:'short',day:'numeric',month:'short',year:'numeric'}))}</time><button class="action" data-dashboard-refresh>Refresh</button></div>${failures.size ? `<div class="cd-warning" role="status">Some summaries are unavailable or restricted. ${link('Retry','retry')}</div>` : ''}</header><div class="cd-main">${card('Production workload',production,link('Open Production','production'))}${card('Next 7 days',week,link('View schedule','schedule'))}${card('Needs attention',attention)}</div><div class="cd-bottom">${card('Today’s sessions',sessions,link('View schedule','schedule'))}${card('Deliveries & deadlines',deliveries,link('View deliveries','delivery'))}</div></section>`;
             host.querySelectorAll('.cd-thumbnail img').forEach(img=>img.onerror=()=>img.remove());
             host.querySelectorAll('[data-dashboard-day]').forEach(b=>b.onclick=()=>window.studioNavigate('schedule',{workspaceId:workspace,date:b.dataset.dashboardDay,mode:'day'}));
-            host.querySelector('[data-dashboard-refresh]').onclick = () => render();
+            host.querySelector('[data-dashboard-refresh]').onclick = () => { void refresh(); };
             host.querySelectorAll('[data-dashboard-job]').forEach(b => b.onclick = () => window.studioNavigate('workspaces',{jobId:b.dataset.dashboardJob}));
             host.querySelectorAll('[data-dashboard-link]').forEach(b => b.onclick = async () => {
                 const key = b.dataset.dashboardLink;
@@ -127,19 +160,10 @@
             const available=Array.isArray(rows)?rows:[];
             if(workspace&&!available.some(w=>String(w.id)===workspace)){workspace='';sessionStorage.setItem('studio.footer.workspace.selection','');paint();}
         }).catch(()=>{});
-        window.studioDashboardReady = Promise.all(Object.entries(sources).map(async ([key,url]) => {
-            try {
-                const value = await json(url,{signal:request.signal});
-                if (key === 'workload' ? !value || !Array.isArray(value.jobs) : !Array.isArray(value)) throw Error('Unexpected response');
-                data[key] = value; ready.add(key);
-            } catch (error) {
-                if (request.signal.aborted) return;
-                if(!['media','resources'].includes(key))failures.add(key);
-            }
-            paint();
-        }));
+        window.studioDashboardReady = refresh();
+        refreshTimer = setInterval(() => { if (active() && !document.hidden) void refresh(); }, REFRESH_MS);
         return Promise.resolve();
     }
-    window.StudioDashboard = {render,project,dispose(){controller?.abort();resizeObserver?.disconnect();}};
+    window.StudioDashboard = {render,project,dispose(){controller?.abort();resizeObserver?.disconnect();clearInterval(refreshTimer);}};
 })();
 
