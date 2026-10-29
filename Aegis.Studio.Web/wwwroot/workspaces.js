@@ -42,11 +42,11 @@ function bindWorkspaceCardEditing(card,item){
     const raw=(key)=>key==='managers'?(item.managers||[]).map(m=>m.userName).join(', '):display(key);
     const paint=(key,node)=>{const value=display(key);node.textContent=value||(key==='managers'?'Manager required':'Not set');node.dataset.empty=String(!value);};
     function finish(){
-        if(!editing)return;const {key,node,button,cancel}=editing;paint(key,node);node.removeAttribute('contenteditable');node.removeAttribute('role');node.removeAttribute('aria-label');node.removeAttribute('aria-invalid');node.onkeydown=node.onpaste=null;
+        if(!editing)return;const {key,node,button,cancel}=editing;editing.control?.remove();paint(key,node);node.removeAttribute('contenteditable');node.removeAttribute('role');node.removeAttribute('aria-label');node.removeAttribute('aria-invalid');node.onkeydown=node.onpaste=null;
         button.textContent='✎';button.setAttribute('aria-label','Edit '+button.dataset.label);button.title='Edit '+button.dataset.label;cancel.remove();editing=null;button.focus();
     }
     async function save(){
-        if(!editing||saving)return;const {key,node}=editing,value=node.textContent.trim();
+        if(!editing||saving)return;const {key,node}=editing,value=editing.control?editing.control.value:node.textContent.trim();
         if(value===raw(key)){finish();status.textContent='';return;}
         const error=message=>{status.textContent=message;node.setAttribute('aria-invalid','true');node.focus();};
         if(key==='name'&&(!value||value.length>200))return error('Enter a workspace name of 1 to 200 characters.');
@@ -81,7 +81,7 @@ function bindWorkspaceCardEditing(card,item){
             if(card.isConnected){finish();status.textContent='Saved';}
             // Refresh shared navigation without replacing any card or another active edit.
             void loadWorkspaces().then(()=>renderWorkspaceMenu()).catch(()=>{});
-        }catch(cause){if(card.isConnected){node.setAttribute('contenteditable','true');error(cause.message||'Could not save. Your edit is retained.');}}
+        }catch(cause){if(card.isConnected){if(!editing?.control)node.setAttribute('contenteditable','true');error(cause.message||'Could not save. Your edit is retained.');}}
         finally{saving=false;card.querySelectorAll('[data-workspace-pencil],[data-workspace-cancel]').forEach(button=>button.disabled=button.dataset.workspacePencil==='managers'&&!item.managers);}
     }
     card.querySelectorAll('[data-workspace-pencil]').forEach(button=>{
@@ -90,7 +90,25 @@ function bindWorkspaceCardEditing(card,item){
             if(saving)return;if(editing?.button===button){void save();return;}if(editing){status.textContent='Save or cancel the current edit first.';editing.node.focus();return;}
             const key=button.dataset.workspacePencil,node=card.querySelector('[data-workspace-value="'+key+'"]');
             const cancel=document.createElement('button');cancel.type='button';cancel.className='workspace-field-pencil';cancel.dataset.workspaceCancel='';cancel.textContent='×';cancel.title='Cancel edit';cancel.setAttribute('aria-label','Cancel '+button.dataset.label+' edit');cancel.onclick=()=>{if(!saving){finish();status.textContent='';}};button.after(cancel);
-            editing={key,node,button,cancel};node.textContent=raw(key);node.setAttribute('contenteditable','true');node.setAttribute('role','textbox');node.setAttribute('aria-label',button.dataset.label);button.textContent='✓';button.title='Save '+button.dataset.label;button.setAttribute('aria-label',button.title);status.textContent=key==='managers'?'Enter staff user names, separated by commas. Enter to save; Escape to cancel.':key==='defaultJobLead'?'Enter a staff user name. Enter to save; Escape to cancel.':'Enter to save; Escape to cancel.';
+            editing={key,node,button,cancel};
+            if(key==='color'||key==='icon'){
+                const control=document.createElement(key==='color'?'input':'select');
+                control.className='workspace-appearance-picker';
+                control.setAttribute('aria-label',button.dataset.label);
+                if(key==='color'){
+                    control.type='color';control.value=/^#[0-9a-f]{6}$/i.test(raw(key))?raw(key):'#b99750';
+                }else{
+                    const icons=[['folder','▣ Folder'],['camera','📷 Camera'],['portrait','▤ Portrait'],['wedding','♡ Wedding'],['id','▦ ID']];
+                    for(const [value,label] of icons){const option=document.createElement('option');option.value=value;option.textContent=label;control.append(option);}
+                    control.value=raw(key);
+                }
+                editing.control=control;node.textContent='';node.append(control);
+                button.textContent='✓';button.title='Save '+button.dataset.label;button.setAttribute('aria-label',button.title);
+                status.textContent='Choose an option, then select ✓ to save.';
+                control.onkeydown=event=>{if(event.key==='Escape'){event.preventDefault();finish();status.textContent='';}else if(event.key==='Enter'){event.preventDefault();void save();}};
+                control.focus();return;
+            }
+            node.textContent=raw(key);node.setAttribute('contenteditable','true');node.setAttribute('role','textbox');node.setAttribute('aria-label',button.dataset.label);button.textContent='✓';button.title='Save '+button.dataset.label;button.setAttribute('aria-label',button.title);status.textContent=key==='managers'?'Enter staff user names, separated by commas. Enter to save; Escape to cancel.':key==='defaultJobLead'?'Enter a staff user name. Enter to save; Escape to cancel.':'Enter to save; Escape to cancel.';
             node.onkeydown=event=>{if(saving){event.preventDefault();return;}if(event.key==='Enter'){event.preventDefault();void save();}if(event.key==='Escape'){event.preventDefault();finish();status.textContent='';}};
             node.onpaste=event=>{event.preventDefault();const text=event.clipboardData?.getData('text/plain')||'';const selection=window.getSelection();if(selection.rangeCount&&node.contains(selection.anchorNode)&&node.contains(selection.focusNode)){const range=selection.getRangeAt(0);range.deleteContents();const inserted=document.createTextNode(text.replace(/[\r\n]+/g,' '));range.insertNode(inserted);range.setStartAfter(inserted);range.collapse(true);selection.removeAllRanges();selection.addRange(range);}};
             node.focus();const selection=window.getSelection(),range=document.createRange();range.selectNodeContents(node);selection.removeAllRanges();selection.addRange(range);
