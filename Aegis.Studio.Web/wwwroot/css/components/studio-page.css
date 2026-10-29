@@ -225,7 +225,9 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .workspace-field-pencil{display:inline-grid;place-items:center;padding:0 2px;min-height:18px;min-width:18px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
 .workspace-field-pencil:focus-visible{outline:2px solid var(--theme-accent,#b99750);outline-offset:1px}
 .workspace-card-feedback{grid-column:1/-1;margin:0;font-size:11px;color:var(--theme-muted)}.workspace-card-feedback:empty{display:none}
-.workspace-card-integration{grid-column:1/-1;font-size:11px}
+.workspace-card-integration{grid-column:1/-1;font-size:11px;padding-block:7px}
+.workspace-card-system-note{grid-column:1/-1;margin:0;padding-block:7px;color:var(--theme-muted);font-size:11px;line-height:1.35}
+.workspace-card-system-note strong{font-weight:700;color:var(--studio-control-text,#233e57)}
 .workspace-create-form{display:flex;flex-direction:column;gap:10px;clear:both;margin-top:14px;padding-top:14px;border-top:1px solid var(--studio-control-border,#cdd8e2)}
 .workspace-create-form label{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:12px}
 .workspace-create-form :is(input,select){box-sizing:border-box;width:100%;min-width:0;padding:6px;border:1px solid var(--studio-control-border,#cdd8e2);border-radius:5px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font:inherit}
