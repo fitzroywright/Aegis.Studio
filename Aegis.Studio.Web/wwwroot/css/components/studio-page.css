@@ -204,7 +204,7 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .workspace-card-title-row .workspace-active-jobs{position:static;margin-left:auto;align-self:center;flex:0 0 auto;font-size:10px;padding:2px 5px;white-space:nowrap}
 .workspace-card-title-row h2{padding-right:0;max-width:100%}
 .workspace-card-routing-row{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
-.workspace-card-appearance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:8px;min-width:0}
+.workspace-card-appearance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:8px;min-width:0;width:calc(100% + 113px)}
 .workspace-card-appearance .workspace-card-field{min-width:0}
 
 
