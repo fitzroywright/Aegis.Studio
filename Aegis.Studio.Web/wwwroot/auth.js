@@ -36,7 +36,7 @@ async function loadSignedInUser() {
     const signOutButton = document.getElementById('signOutButton');
 
     if (signedInUser) {
-        signedInUser.textContent = studioFirstName(user);
+        signedInUser.textContent = String(user.displayName || '').trim() || String(user.userName || user.loginName || '').trim() || 'Signed in';
         signedInUser.title = [user.title, user.department].filter(Boolean).join(' · ');
     }
 
