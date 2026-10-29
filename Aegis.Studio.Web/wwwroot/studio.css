@@ -3738,7 +3738,7 @@ body[data-studio-view] .topbar {
   height: 60px;
   padding: 0 28px;
   gap: 12px;
-  background: #172d4a;
+
   border-bottom: 1px solid var(--studio-border);
   box-shadow: 0 1px 3px rgba(23,52,78,.05);
 }
@@ -7694,7 +7694,7 @@ body[data-studio-view="today"] .mw-list-panel>header h2 {
   height: 72px;
   gap: 16px;
   padding: 0 24px;
-  background: linear-gradient(90deg,rgba(42,21,12,.86),rgba(53,27,12,.43) 48%,rgba(34,17,10,.86)),url('/assets/aegis-studio-login-background.png') center 48%/cover no-repeat;
+
   border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
   box-shadow: 0 1px 0#dfe3e8;
@@ -8521,7 +8521,8 @@ body .topbar {
   padding: 0 36px;
   gap: 14px;
   background: linear-gradient(90deg,rgba(42,21,12,.86),rgba(53,27,12,.43) 48%,rgba(34,17,10,.86)),url('/assets/aegis-studio-login-background.png') center 48%/cover no-repeat;
-  background: linear-gradient(90deg,rgba(42,21,12,.86),rgba(53,27,12,.43) 48%,rgba(34,17,10,.86)),url('/assets/aegis-studio-login-background.png') center 48%/cover no-repeat;
+
+
   color: #fff;
   border-bottom: 1px solid #102238;
   min-height: var(--studio-banner-height);
