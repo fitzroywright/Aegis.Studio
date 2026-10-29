@@ -1707,7 +1707,7 @@ color:var(--studio-grid-header-text);}
 .studio-about-scene {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   min-height: 0;
   flex: 1;
   padding: 22px;
