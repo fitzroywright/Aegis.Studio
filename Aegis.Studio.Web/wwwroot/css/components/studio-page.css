@@ -199,13 +199,15 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .workspace-accountability-card{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:8px;row-gap:4px;min-width:0;padding:7px;border:1px solid var(--studio-control-border,#cdd8e2);border-inline-start:5px solid #427da9;border-radius:9px;background:var(--studio-card-surface,#fff)}
 .workspace-accountability-card:nth-child(3n+2){border-inline-start-color:#8062a6}.workspace-accountability-card:nth-child(3n){border-inline-start-color:#5e8984}
 .workspace-card-heading{grid-column:1/-1;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-height:105px;padding-right:113px;min-width:0}
+.workspace-card-title-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0;max-width:100%}
 .workspace-accountability-card .workspace-card-heading h2{--workspace-value-size:14px;margin:0;font-size:14px;min-height:0;min-width:0;max-width:100%}
+.workspace-card-title-row .workspace-active-jobs{font-size:10px;padding:2px 5px;white-space:nowrap}
 .workspace-card-appearance{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;min-width:0}
 .workspace-card-appearance .workspace-card-field{flex:0 0 auto}
 
 
 .workspace-accountability-photo{position:absolute;right:7px;top:7px;width:105px;height:105px;display:grid;place-items:center;background:#edf1f4;color:#8796a3;border-radius:7px;overflow:hidden;font-size:24px}.workspace-accountability-photo img{width:100%;height:100%;object-fit:cover}
-.workspace-accountability-card footer{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:5px;margin-top:0;font-size:11px}.workspace-active-jobs{background:#e7f1f8;border-radius:8px;padding:4px 8px;color:#427da9;font-weight:600}
+.workspace-active-jobs{background:#e7f1f8;border-radius:8px;padding:4px 8px;color:#427da9;font-weight:600}
 .workspace-card-field{display:flex;flex-direction:column;gap:1px;margin:0;min-width:0}
 .workspace-card-field-label{display:flex;align-items:center;gap:3px;font-size:10px;font-weight:400;color:var(--theme-muted)}
 .workspace-card-value{display:block;min-height:1.3em;overflow-wrap:anywhere;white-space:pre-wrap;font-size:var(--workspace-value-size,12px);font-weight:500}
