@@ -323,6 +323,8 @@ app.MapGet("/assets/bryan-studios-logo.png", (IWebHostEnvironment e) =>
     Results.File(Path.Combine(e.WebRootPath, "assets", "bryan-studios-logo.png"), "image/png")).AllowAnonymous();
 app.MapGet("/assets/aegis-studio-login.png", (IWebHostEnvironment e) =>
     Results.File(Path.Combine(e.WebRootPath, "assets", "aegis-studio-login.png"), "image/png")).AllowAnonymous();
+app.MapGet("/assets/aegis-studio-login-background.png", (IWebHostEnvironment e) =>
+    Results.File(Path.Combine(e.WebRootPath, "assets", "aegis-studio-login-background.png"), "image/png")).AllowAnonymous();
 app.MapGet("/", (HttpContext context,IWebHostEnvironment e) => { context.Response.Headers.CacheControl = "no-cache"; return Results.File(Path.Combine(e.WebRootPath, "index.html"), "text/html; charset=utf-8"); }).RequireAuthorization();
 app.MapStudioAuthentication();
 app.MapStudioOutboundMailbox();
