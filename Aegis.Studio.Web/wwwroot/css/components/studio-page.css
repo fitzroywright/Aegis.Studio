@@ -222,7 +222,7 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .workspace-card-value[aria-invalid="true"]{outline-color:#a12d1e}
 .workspace-field-pencil{display:inline-grid;place-items:center;padding:0 2px;min-height:18px;min-width:18px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
 .workspace-field-pencil:focus-visible{outline:2px solid var(--theme-accent,#b99750);outline-offset:1px}
-.workspace-card-feedback{grid-column:1/-1;margin:0;font-size:11px;color:var(--theme-muted)}.workspace-card-feedback:empty{display:none}
+.workspace-card-feedback{position:absolute;top:119px;right:7px;width:105px;box-sizing:border-box;margin:0;padding:3px 4px;border-radius:4px;background:var(--studio-card-surface,#fff);font-size:10px;line-height:1.25;text-align:center;overflow-wrap:anywhere;color:var(--theme-muted);z-index:1}.workspace-card-feedback[data-state="success"]{color:#22774c;font-weight:700}.workspace-card-feedback[data-state="error"]{color:#b3261e;font-weight:600}.workspace-card-feedback:empty{display:none}
 .workspace-card-integration{grid-column:1/-1;font-size:11px;padding-block:7px}
 .workspace-card-system-note{grid-column:1/-1;margin:0;padding-block:7px;color:var(--theme-muted);font-size:11px;line-height:1.35}
 .workspace-card-system-note strong{font-weight:700;color:#b3261e}
