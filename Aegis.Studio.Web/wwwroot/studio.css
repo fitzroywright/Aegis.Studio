@@ -1768,6 +1768,7 @@ color:var(--studio-grid-header-text);}
 .studio-about-demo-copy { min-width: 0; }
 .studio-about-demo-copy h2 { margin: 0 0 4px; font-size: 13px; }
 .studio-about-demo-warning { margin: 0; font-size: 11px; line-height: 1.4; }
+.studio-about-demo-line { display: block; }
 .studio-about-demo-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; gap: 6px; }
 .studio-about-demo-actions [data-demo-remove] { background: #f7e7d4; border: 1px solid #c68b50; color: #70421e; }
 .studio-about-demo-actions [data-demo-remove]:is(:hover,:focus-visible) { background: #efd4b5; border-color: #aa6c32; color: #593014; }
