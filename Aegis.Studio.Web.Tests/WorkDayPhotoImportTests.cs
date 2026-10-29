@@ -110,7 +110,7 @@ public sealed class WorkDayPhotoImportTests
     public async Task MissingRequiredSessionDoesNotCreatePhotoOrSuccessMessage()
     {
         using var f=new Fixture();
-        using(var insert=new NpgsqlCommand("insert into studio_workflow_sessions(id,job_id,required) values($1,$2,true)",f.Context.Connection))
+        using(var insert=new NpgsqlCommand("insert into studio_workflow_sessions(id,job_id,required,title) values($1,$2,true,'Required shoot')",f.Context.Connection))
         {insert.Parameters.AddWithValue(Guid.NewGuid());insert.Parameters.AddWithValue(f.Job.Id);insert.ExecuteNonQuery();}
         await Assert.ThrowsAsync<ArgumentException>(()=>f.Import(Guid.NewGuid()));
         Assert.Equal(0L,f.Count("studio_messages"));Assert.Equal(0L,f.Count("studio_asset_versions"));Assert.Equal(0L,f.Count("studio_attachments"));

@@ -20,8 +20,8 @@ public sealed class WorkDayShootCompletionTests
         var start=DateTimeOffset.UtcNow.AddHours(-2);
         var entry=new ScheduleStore(db,new ConfigurationBuilder().Build()).Create(new(context.Job,null,"Photography",start,start.AddHours(1),"Studio","Scheduled",null,[a.ScheduleResourceId,b.ScheduleResourceId]));
         var shoot=new OperationalWorkStore(db).CreateShoot(context.Job,new(entry.Id,"a","b",start,start.AddHours(1),"Studio",null,null),"Manager");
-        Execute("create table studio_workflow_sessions(id uuid primary key,job_id uuid,shoot_id uuid,required boolean);create function studio_workflow_notify(uuid,text,text,text,text) returns void language plpgsql as 'begin return; end';");
-        Execute("insert into studio_workflow_sessions values($1,$2,$3,true);update studio_jobs set status='Scheduled' where id=$2",Guid.NewGuid(),context.Job,shoot.Id);
+        Execute("create or replace function studio_workflow_notify(p_job uuid,p_event text,p_audience text,p_subject text,p_body text) returns void language plpgsql as 'begin return; end';");
+        Execute("update studio_jobs set status='Scheduled' where id=$1",context.Job);
         Execute(MediaUploadReceipts.Schema);
         Execute("alter table studio_media_assets add column if not exists deleted_at_utc timestamptz");
         Guid Receipt(string person)
@@ -37,7 +37,8 @@ public sealed class WorkDayShootCompletionTests
             return id;
         }
         var own=Receipt("a");var other=Receipt("b");
-        WorkDayOperationRequest Report(Guid upload)=>new(Guid.NewGuid(),WorkDayOperationKind.ConfirmShootComplete,entry.Id,DateTimeOffset.UtcNow,"workday-web","All photographs uploaded. Shoot done.",null,null,0,[upload]);
+        long initial=workday.GetAssignmentState(entry.Id,"a")!.Value.Version;
+        WorkDayOperationRequest Report(Guid upload)=>new(Guid.NewGuid(),WorkDayOperationKind.ConfirmShootComplete,entry.Id,DateTimeOffset.UtcNow,"workday-web","All photographs uploaded. Shoot done.",null,null,initial,[upload]);
         Assert.Throws<InvalidOperationException>(()=>workday.Apply("a",Report(other)));
         Assert.Throws<InvalidOperationException>(()=>workday.Apply("a",Report(Guid.NewGuid())));
         Execute("update studio_media_upload_receipts set status='Pending' where id=$1",own);
@@ -55,7 +56,7 @@ public sealed class WorkDayShootCompletionTests
         check.Parameters.AddWithValue(shoot.Id);using(var reader=check.ExecuteReader()){Assert.True(reader.Read());Assert.True(reader.IsDBNull(0));Assert.Equal("ShootComplete",reader.GetString(1));}
         using var messages=new NpgsqlCommand("select count(*) from studio_messages where body like '%Their shoot is done.%'",c);Assert.Equal(2L,messages.ExecuteScalar());
         Execute("update studio_jobs set status='Completed' where id=$1",context.Job);
-        Assert.Equal(WorkDayOperationState.Conflict,workday.Apply("a",Report(own) with{ExpectedVersion=1}).State);
+        Assert.Equal(WorkDayOperationState.Conflict,workday.Apply("a",Report(own) with{ExpectedVersion=initial+1}).State);
 
         void Execute(string sql,params object[] values){using var cmd=new NpgsqlCommand(sql,c);foreach(var value in values)cmd.Parameters.AddWithValue(value);cmd.ExecuteNonQuery();}
     }

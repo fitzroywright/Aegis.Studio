@@ -7,7 +7,7 @@ public sealed class LoginPage:ContentPage
     private readonly WorkDayApiClient api; private readonly WorkDaySessionContext session; private readonly IServiceProvider services; private readonly WorkDayDeviceIdentity device; private readonly WorkDayCredentialStore credentials;
     private readonly Entry user=new(){Placeholder="User name"};
     private readonly Entry password=new(){Placeholder="Password",IsPassword=true};
-    private readonly Entry enrollmentCode=new(){Placeholder="First-time setup code",Autocapitalization=TextAutocapitalizationType.None};
+    private readonly Entry enrollmentCode=new(){Placeholder="First-time setup code",Keyboard=Keyboard.Create(KeyboardFlags.None),IsTextPredictionEnabled=false};
     private readonly Label status=new(){Text="Authenticate through Bryan’s API Site. Signing in for work happens separately."};
     public LoginPage(WorkDayApiClient api,WorkDaySessionContext session,IServiceProvider services,WorkDayDeviceIdentity device,WorkDayCredentialStore credentials)
     {

@@ -296,7 +296,7 @@ public sealed class WorkDayApiExchangeWorker(
         }
     }
 
-    private async Task PullUploadsAsync(HttpClient http,CancellationToken ct)
+    internal async Task PullUploadsAsync(HttpClient http,CancellationToken ct)
     {
         using var response=await http.GetAsync("admin/workday/updates?after=0&limit=20&kind=AssignmentUpload",ct);
         response.EnsureSuccessStatusCode();

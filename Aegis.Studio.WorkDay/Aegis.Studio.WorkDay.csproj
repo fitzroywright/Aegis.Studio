@@ -2,7 +2,9 @@
   <PropertyGroup>
     <!-- Clear the desktop target inherited from Directory.Build.props. -->
     <TargetFramework></TargetFramework>
-    <TargetFrameworks>net10.0-android;net10.0-ios</TargetFrameworks>
+    <!-- Select one platform for command-line builds without restoring the other workload. -->
+    <TargetFrameworks Condition="'$(WorkDayBuildTarget)' == ''">net10.0-android;net10.0-ios</TargetFrameworks>
+    <TargetFrameworks Condition="'$(WorkDayBuildTarget)' != ''">$(WorkDayBuildTarget)</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>Aegis.Studio.WorkDay</RootNamespace>
     <UseMaui>true</UseMaui>
@@ -18,7 +20,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-    <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
+    <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
   </ItemGroup>
   <ItemGroup>
     <MauiIcon Include="Resources/AppIcon/appicon.svg" ForegroundFile="Resources/AppIcon/appiconfg.svg" />

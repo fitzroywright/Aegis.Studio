@@ -1,31 +1,73 @@
-# Issue #386 local verification
+# PR #387 local verification
 
-Performed on the developer Mac in an isolated worktree based on main `136ebd4` (PR #385). The user's original checkout and existing worktrees were preserved. No AWS/Kratos deployment, production credential/configuration change, restart, merge, database migration against production, or production account operation was performed.
+All checks below ran on the developer Mac in the isolated `feature/issue-386-raw-ingestion` worktree. The original checkout and existing worktrees were preserved. No AWS/Kratos deployment, service restart, production configuration/credential change, merge, production database migration, or production account operation was performed.
 
-## Passing checks
+## Studio, Android and connected acceptance
 
-- Node 24: `npm ci`, `npm audit` (zero vulnerabilities), `npm test` in PublicSite: **71 passed**, none skipped. This includes existing Google authentication, JPEG gallery, booking, watermark, and shoot-completion regressions.
-- RAW API acceptance: actual 250 MiB streamed transfer, out-of-order/duplicate chunks, mismatched chunk/full checksum, interrupted stream, restart during transfer, restart after original commit/before queue insertion, malformed RAW, wrong assignment/subject/user, private original access, quota, concurrency saturation/retry, cancellation, preview failure, verified ACK, Conflict/replay safety, positive grace and purge.
-- Studio Debug build/test compilation and Release build succeeded with no compiler warnings/errors. The targeted transfer/import/manifest tests: **22 passed**, none skipped, against a disposable local PostgreSQL 18 schema per test. A real 250 MiB disk-backed DNG was imported, read through both the canonical attachment and immutable version stores, and checked byte-for-byte by SHA-256. Other tests cover bad hash/truncated private pull, invalid direct Studio RAW, import retry, durable receipts, mobile chunk resume after disconnect, and decoder credential isolation.
-- Existing WorkDay DOM interaction tests: **4 passed**. Canonical gallery/drop/picker renderer and stylesheet ownership were preserved; no CSS was added or changed.
-- Real headless Google Chrome, `tools/test-workday-raw-browser.mjs`: passed incremental worker hashing, failed XHR after first chunk, reload/reselection resume without resending confirmed chunks, RAW plus JPEG selection, actual progress, gallery persistence on reload, explicit server cancellation, pause/removal, and sign-out during hashing; no JavaScript errors. It creates and removes only disposable local accounts/storage.
-- Python: **14 passed** across the existing PR #101 RAW preview tests and new bounded container tests. Structural container tests cover all nine requested RAW extensions, wrong vendor, bounds/dimension abuse, malformed directories/media boxes, and invalid signatures. Real upstream [Nikon NEF](https://github.com/letmaik/rawpy/blob/main/test/iss030e122639.NEF) and [Canon CR2](https://github.com/letmaik/rawpy/blob/main/test/RAW_CANON_40D_SRAW_V103.CR2) files were accepted by the probe and rendered with the unchanged canonical `raw_preview.py`: JPEG previews 1600×1065 and 1600×1064. These samples were kept outside Git.
-- `git diff --check` passed. Reviewed the full diff and searched affected renderer/transport owners; there is one gallery renderer, one selection implementation, and separate protocol implementations for legacy multipart and resumable transfer.
+The complete Studio suite now passes: **451 passed, zero failed, zero skipped**, including the connected acceptance test. The 16 backend failures previously reproduced on main have been fixed. Fixtures now initialize the real workflow, scheduling, role, employee and WorkDay prerequisites; use published assignment generations; exercise the derivative worker's real claim/lease transition; and assert the current pending-Job and messaging contracts. Authorization, conflict, replay, closed-Job and checksum assertions remain enabled. The large pre-existing-catalog fixture applies startup migrations before exercising its gallery queries and bulk operations.
 
-## Required checks still blocked
+Studio Release builds with **zero warnings/errors**. Android arm64 Release builds with **zero warnings/errors**, including trimming and AOT, and produces locally development-signed APK/AAB artifacts. No device installation is implied.
 
-The PR remains draft. Passing feature checks do not override these release gates:
+Android uses [sqlite-net-pcl 1.11.285](https://www.nuget.org/packages/sqlite-net-pcl/1.11.285), resolving SQLitePCLRaw core/provider 3.0.3 and SourceGear.sqlite3 3.53.3. Both restore auditing and the explicit direct/transitive NuGet vulnerability check pass with **zero findings**. There is no audit suppression, NU1903 downgrade, NoWarn exception, or weakening of warnings-as-errors. The unsupported MAUI enrollment-entry property was replaced with the supported keyboard flags API; the unused location-service constructor dependency was removed. The existing mobile database path and queue data model are unchanged.
 
-1. The complete Studio test suite has **16 failures also present on unchanged main**, with identical failing test names and no added failures. They concern fixture schema initialization/missing columns or tables, an old derivative-worker reflection invocation, and a WorkDay roster fixture. The final full suite summary and exact comparison are recorded below. These unrelated fixture changes are not included in this feature.
-2. Normal Android Release restore/build fails on the existing `SQLitePCLRaw.lib.e_sqlite3.android` 2.1.2 dependency, **NU1903 / [GHSA-2m69-gcr7-jv3q](https://github.com/advisories/GHSA-2m69-gcr7-jv3q)**. Confirmed on unchanged main. No repository audit suppression or package-policy weakening was added.
-3. A separate **diagnostic** Android compilation used an exact temporary source copy with only Android selected, and treated NU1903 as a warning solely to reach C# compilation. Both feature and unchanged-main copies fail identically: `LoginPage.cs` CS0117/CS0103 (`Entry.Autocapitalization` / `TextAutocapitalizationType`) and `WorkDayLocationService.cs` CS9113 (unread `device` parameter). This is not a successful Android build. No Android package/device acceptance is claimed.
-4. iOS build/device checks are blocked: this Mac has Command Line Tools rather than full Xcode and no iOS workload. Android diagnostic tooling was installed only under `/private/tmp`; the system .NET SDK was not changed. The existing Android SDK/JDK 25 could not satisfy MAUI; temporary JDK 21 and checksum-verified Android 36 platform files were used for diagnosis.
-5. The broader CSS ownership suite has **4 baseline failures**, reproduced on unchanged main (references to retired `studio-legacy.css` plus stale selector expectations). No stylesheet is changed by this PR.
-6. Docker image build was not run: Docker is not installed/available on this Mac. The Dockerfile now uses repository-root context to include the canonical Python helpers and pinned preview runtime; validate the image before container deployment.
-7. Physical mobile offline/background/kill/restart behavior, native file-picker behavior with real large camera originals, and a connected Studio-worker/API acceptance journey still require device/integration verification. The mobile transfer Core protocol, streamed pull, durable import, and ACK/retention protocol have local automated coverage, but are not a substitute for that journey.
-8. Real-camera decoding has been exercised for NEF and CR2. The other requested families have container-level coverage; model-specific CR3/NRW/ARW/RAF/ORF/RW2/DNG and HEIC codec samples remain release acceptance work. Unsupported previews retain originals as designed.
+### Connected upload → gallery → ACK → retention
+
+`WorkDayConnectedUploadTests.LargeWorkDayUploadImportsThroughRealWorkerReplaysLostAckAndPurgesOnlyAfterGrace` passed in about **23 seconds** as part of the full suite. It uses a real loopback Node 24 PublicSite process, disposable SQLite/private storage, disposable PostgreSQL schema and actual Studio services. It calls the production `WorkDayApiExchangeWorker.PullUploadsAsync` method; the only injected fault is a lost ACK response. No production hostname is contacted.
+
+1. Create a local active Studio photographer, real assignment and photography session, and grant Job attachment access. Provision/enroll a disposable WorkDay account through the site's authenticated API; publish its assignment snapshot as test setup.
+2. Upload an actual **250 MiB disk-backed DNG container** through the mobile Core's resumable protocol. The real Node API validates chunk and whole-file checksums and queues a metadata-only import. Employee credentials cannot fetch the private original.
+3. Run the real Studio pull worker. It downloads/validates the original, imports the gallery asset, immutable version, internal attachment and Job message, then encounters an injected HTTP 503 instead of delivering its ACK.
+4. Verify that the API operation is still Pending, retention deletes nothing, and Studio's authoritative original reads back with the expected size/SHA-256.
+5. Retry the real worker. Verify one gallery photo, one attachment and one photo-upload message; the same version ID is returned. The API accepts the matching durable Stored/SHA-256 receipt and transitions to Acknowledged.
+6. Verify retention still deletes nothing during the configured **two-second test grace**. After expiry, the authenticated retention endpoint deletes exactly the site's acknowledged original. A private pull returns 404, WorkDay gallery metadata remains Acknowledged, and Studio's original still reads back with the same SHA-256.
+
+The DNG is a structural transport fixture, not a camera sensor-decoding claim. This test covers the connected upload/import/ACK/retention journey; it does not claim full device behavior or run the worker's account-provisioning and snapshot-publication background loop. Its clients, server and databases are all local/disposable. Credentials, enrollment codes and password hashes are not logged or committed.
+
+## Additional passing coverage
+
+- PublicSite: **71 passed**, none skipped; `npm audit` reports zero vulnerabilities. Includes Google authentication, booking, watermark, JPEG gallery, shoot-completion and RAW transfer regression tests.
+- RAW API coverage includes 250 MiB transfer, reordered/idempotent chunks, bad chunk/full checksums, interruption/restart, crash after original commit/before queue insertion, malformed RAW, unauthorized account/assignment/subject, quota/concurrency, cancellation, preview failure, verified ACK, Conflict/replay safety and positive retention grace.
+- Existing local Chrome acceptance passed worker hashing, interruption/reselection resume without resending confirmed chunks, RAW/JPEG selection, progress, gallery reload, server cancellation, pause/removal and sign-out during hashing. WorkDay DOM interaction tests passed. No competing renderer was introduced.
+- Existing RAW Python verification: **14 passed**. Real upstream [NEF](https://github.com/letmaik/rawpy/blob/main/test/iss030e122639.NEF) and [CR2](https://github.com/letmaik/rawpy/blob/main/test/RAW_CANON_40D_SRAW_V103.CR2) samples were also accepted and rendered with PR #101's canonical decoder, producing bounded JPEG previews. Samples stay outside Git.
+- Reviewed the full diff and canonical owners; `git diff --check` passes.
+
+## Separate UI test debt
+
+The 451-test result is the complete Studio **backend/.NET** suite. Existing WorkDay web DOM tests pass. Broader unrelated Jobs/CSS UI checks still contain retired stylesheet paths, obsolete layout assumptions and an existing row-style ownership conflict; those application/UI files are unchanged in this focused WorkDay repair. They are not counted as passing or as device/tooling limitations.
+
+## Device and tooling limitations
+
+These are separate from the resolved backend/Android build blockers:
+
+- Android APK/AAB build and dependency audit pass; physical-device/emulator install, native picker, offline/background/kill/restart, and existing-device database upgrade acceptance have not been performed. A build is not a device run.
+- iOS build/signing/device checks remain unavailable: the Mac has Command Line Tools rather than full Xcode and lacks the iOS workload. Android can now be selected independently using `WorkDayBuildTarget` without restoring iOS.
+- Docker is unavailable on this Mac. The repository-root Docker packaging still needs an image build before container deployment.
+- Real camera decoding was exercised for NEF/CR2. The other requested camera families have structural container coverage; model-specific CR3/NRW/ARW/RAF/ORF/RW2/DNG and HEIC codec samples remain camera acceptance work. Unsupported previews preserve originals.
+- Production HTTPS, proxy limits, disk/quota headroom, service deployment and live Studio↔AWS behavior are deliberately untested in this local-only task. Production remains unchanged; follow the rollout/rollback guide and obtain deployment authorization separately.
 
 ## Reproduction
+
+From the repository root, with `STUDIO_TEST_POSTGRES` pointing only to disposable local PostgreSQL and `CommonRoot` pointing to the existing sibling Common checkout:
+
+```sh
+dotnet test Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj -m:1 -p:CommonRoot=/path/to/Common
+dotnet build Aegis.Studio.Web/Aegis.Studio.Web.csproj -c Release -m:1 -p:CommonRoot=/path/to/Common
+```
+
+Connected test alone (requires Node 24 and `npm ci` in PublicSite):
+
+```sh
+dotnet test Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj -m:1 -p:CommonRoot=/path/to/Common --filter FullyQualifiedName~WorkDayConnectedUploadTests
+```
+
+Android, with MAUI Android installed, JDK 21 and Android SDK 36 available:
+
+```sh
+dotnet build Aegis.Studio.WorkDay/Aegis.Studio.WorkDay.csproj -p:WorkDayBuildTarget=net10.0-android -f net10.0-android -r android-arm64 -c Release -p:JavaSdkDirectory=/path/to/jdk21 -p:AndroidSdkDirectory=/path/to/android-sdk
+dotnet package list --project Aegis.Studio.WorkDay/Aegis.Studio.WorkDay.csproj --no-restore --framework net10.0-android --vulnerable --include-transitive --format json
+```
+
+This run used the temporary toolchains under `/private/tmp/aegis386-dotnet`, `/private/tmp/aegis386-jdk21` and `/private/tmp/aegis386-android-sdk`; the system SDK was not changed. Android output is under `Aegis.Studio.WorkDay/bin/Release/net10.0-android/android-arm64/` and is not committed.
 
 PublicSite:
 
@@ -36,55 +78,4 @@ npm audit
 npm test
 ```
 
-Studio, from the repository root, with `STUDIO_TEST_POSTGRES` pointing only to a disposable local database and `CommonRoot` pointing to the existing sibling Common checkout:
-
-```sh
-dotnet build Aegis.Studio.Web/Aegis.Studio.Web.csproj -c Release -m:1 -p:CommonRoot=/path/to/Common
-dotnet test Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj -m:1 -p:CommonRoot=/path/to/Common
-```
-
-Targeted filter:
-
-```text
-FullyQualifiedName~RawPhotoTransferTests|FullyQualifiedName~WorkDayPhotoImportTests|FullyQualifiedName~UploadAndDepositDeclarationTests
-```
-
-Install the pinned `Aegis.Studio.Web/Media/raw-preview-requirements.txt` into a temporary Python environment, then run:
-
-```sh
-python -m unittest discover -s tests/raw-preview -v
-```
-
-Browser test (Playwright installed outside production dependencies):
-
-```sh
-PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node tools/test-workday-raw-browser.mjs
-cd tests/ui
-npm ci
-node --test workday-web.test.cjs
-```
-
-Local logs and TRX artifacts are under `/private/tmp/aegis-386-*` and `/private/tmp/aegis-386-results/`. No secrets, production database dumps or original camera samples are committed with this report. See [deployment/storage/retention instructions](WORKDAY-RAW-INGESTION.md) for prerequisites and rollout/rollback constraints.
-
-## Full Studio comparison
-
-Final: **434 passed, 16 failed, 450 total**. Unchanged main: 425 passed, 16 failed, 441 total. The failing-name sets match exactly.
-
-| Test | Existing failure |
-| --- | --- |
-| `Aegis.Studio.Web.Tests.CommercialProductionTests.CatalogToJobToSaleToProductionUsesImmutableVersionsAndOneWorkOrder` | Npgsql.PostgresException : 42703: column v.intake_reference does not exist POSITION: 302 |
-| `Aegis.Studio.Web.Tests.DemoIsolationTests.ClearPreservesSecurityAndNormalBookingAndQuoteConversionWorkWithoutDemo` | Npgsql.PostgresException : 42703: column v.intake_reference does not exist POSITION: 302 |
-| `Aegis.Studio.Web.Tests.FrontDeskBookingRequestTests.ConcurrentWebsiteRetryCreatesOnePendingRequestAndOnePendingJob` | Npgsql.PostgresException : 42703: column v.intake_reference does not exist POSITION: 302 |
-| `Aegis.Studio.Web.Tests.FrontDeskBookingRequestTests.PendingJobExistsBeforeDepositAndConcurrentReceiptReplayDoesNotConfirm` | Npgsql.PostgresException : 42703: column v.intake_reference does not exist POSITION: 302 |
-| `Aegis.Studio.Web.Tests.IntegratedWorkflowTests.PreviewGenerationRetainsUnsupportedOriginals` | System.Reflection.TargetParameterCountException : Parameter count mismatch. |
-| `Aegis.Studio.Web.Tests.IntegratedWorkflowTests.WorkDayReschedulePreservesIdsAndRollsBackConflicts` | Npgsql.PostgresException : 42703: column er.attendance_start_utc does not exist POSITION: 242 |
-| `Aegis.Studio.Web.Tests.JobGraphPersistenceTests.FrontDeskCreatesOneWorkflowWithExplicitServicesAndSharedJoin` | Npgsql.PostgresException : 42703: column v.intake_reference does not exist POSITION: 302 |
-| `Aegis.Studio.Web.Tests.ManualPhotographerPersistenceTests.ManualReportsRetainRecorderAndWaitForEveryPhotographer` | Npgsql.PostgresException : 42703: column er.attendance_start_utc does not exist POSITION: 256 |
-| `Aegis.Studio.Web.Tests.MediaProductionPersistenceTests.RosterEditingRoundTripAndWeddingClassificationPreserveIdentity` | Npgsql.PostgresException : 42P01: relation "studio_schedule_entries" does not exist |
-| `Aegis.Studio.Web.Tests.TodayStartupTests.BulkAccessMatchesIndividualPermissionsForInheritanceOverridesAndGlobalRoles` | Npgsql.PostgresException : 42P01: relation "studio_workflow_crew" does not exist POSITION: 1410 |
-| `Aegis.Studio.Web.Tests.UnifiedMessagingPersistenceTests.PersonalInboxKeepsProviderRepliesInOnePrivateThread` | Npgsql.PostgresException : 42703: column "external_message_id" does not exist POSITION: 76 |
-| `Aegis.Studio.Web.Tests.UnifiedMessagingPersistenceTests.SharedIncomingReadIsFirstReaderWinsAndNewRepliesReturnToUnread` | Npgsql.PostgresException : 42P01: relation "studio_workflow_crew" does not exist POSITION: 1410 |
-| `Aegis.Studio.Web.Tests.WorkDayFieldSyncTests.LostAcknowledgementReplaysOnceAndNewStudioRosterEditsConflict` | Npgsql.PostgresException : 42703: column er.attendance_start_utc does not exist POSITION: 256 |
-| `Aegis.Studio.Web.Tests.WorkDayFieldSyncTests.TwoAssignmentsShareRosterRevisionAndCannotOverwriteEachOther` | Npgsql.PostgresException : 42601: cannot insert multiple commands into a prepared statement |
-| `Aegis.Studio.Web.Tests.WorkDayRosterJourneyTests.AssignAcceptReportReplayCountAndScheduleOnlyRemainder` | Npgsql.PostgresException : 42601: cannot insert multiple commands into a prepared statement |
-| `Aegis.Studio.Web.Tests.WorkDayShootCompletionTests.ImportedPhotosAllowExplicitCompletionWithoutInventingArrivalAndWaitForEveryPhotographer` | Npgsql.PostgresException : 42703: column er.attendance_start_utc does not exist POSITION: 256 |
+Local logs/TRX evidence: `/private/tmp/aegis-387-studio-final.log`, `/private/tmp/aegis-387-results/studio-final.trx`, `/private/tmp/aegis-387-android.log`, `/private/tmp/aegis-387-android-audit.json`, `/private/tmp/aegis-387-release.log`, and `/private/tmp/aegis-387-public.log`. No secrets, production database dumps, camera originals or signed binaries are committed. See [storage, rollout and rollback instructions](WORKDAY-RAW-INGESTION.md).
