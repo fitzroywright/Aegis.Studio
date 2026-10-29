@@ -227,7 +227,7 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .workspace-create-form :is(input,select){box-sizing:border-box;width:100%;min-width:0;padding:6px;border:1px solid var(--studio-control-border,#cdd8e2);border-radius:5px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font:inherit}
 .workspace-create-form [role]{margin:0;font-size:12px;overflow-wrap:anywhere}
 .workspace-create-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
-.workspace-admin-actions{grid-column:1/-1;display:flex;gap:4px;flex-wrap:wrap;margin-top:0}.workspace-admin-actions button{font-size:10px;padding:4px 6px}
+.workspace-admin-actions{grid-column:1/-1;display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:0}.workspace-admin-actions button{font-size:10px;padding:4px 6px}
 .workspace-appearance-picker{display:block;max-width:100%;min-height:30px;border:1px solid var(--studio-control-border,#cdd8e2);border-radius:5px;background:var(--studio-card-surface,#fff);color:var(--studio-control-text,#233e57);font:inherit}
 .workspace-appearance-picker[type="color"]{width:76px;padding:2px;cursor:pointer}
 .workspace-admin-actions [data-workspace-mail]{background:#e5edf5;border:1px solid #93afc8;color:#294d6d}
