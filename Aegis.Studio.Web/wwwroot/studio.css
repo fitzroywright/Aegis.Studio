@@ -1760,60 +1760,8 @@ color:var(--studio-grid-header-text);}
   margin-bottom: 6px;
   clip-path: polygon(0 0,100% 0,100% 76%,14.6% 76%,14.6% 100%,0 100%);
 }
-/* About logo: single animation owner; static Thinker, one-time word construction. */
-.studio-about-logo-animation {
-  position: relative;
-  width: 100%;
-  max-width: 360px;
-  aspect-ratio: 2025 / 375;
-  margin-bottom: 6px;
-  overflow: hidden;
-}
-.studio-about-logo-animation .studio-about-logo {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  max-width: none;
-  height: 100%;
-  margin: 0;
-  object-fit: contain;
-}
-.studio-about-logo-figure {
-  clip-path: inset(0 85% 0 0);
-}
-.studio-about-logo-animation .studio-about-logo-letters {
-  clip-path: inset(0 0 0 14%);
-  mask-image: linear-gradient(90deg,#000 0%,#000 100%);
-  animation: studio-about-word-reveal 3.8s steps(48,end) both;
-}
-.studio-about-logo-pixels {
-  position: absolute;
-  left: 14%;
-  top: 14%;
-  width: 86%;
-  height: 62%;
-  pointer-events: none;
-  background-image: radial-gradient(circle,#2878ca 37%,transparent 42%),radial-gradient(circle,#8393a4 35%,transparent 42%);
-  background-size: 11px 9px,17px 13px;
-  background-position: 0 0,5px 4px;
-  mask-image: linear-gradient(90deg,transparent 0%,#000 42%,transparent 100%);
-  animation: studio-about-pixels 3.8s steps(48,end) both;
-}
-@keyframes studio-about-word-reveal {
-  0% { clip-path: inset(0 86% 0 14%); }
-  85%,100% { clip-path: inset(0 0 0 14%); }
-}
-@keyframes studio-about-pixels {
-  0% { opacity: 0; transform: translateX(-35%); }
-  12% { opacity: .85; }
-  78% { opacity: .65; transform: translateX(95%); }
-  90%,100% { opacity: 0; transform: translateX(100%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .studio-about-logo-animation .studio-about-logo-letters,
-  .studio-about-logo-pixels { animation: none; }
-  .studio-about-logo-pixels { display: none; }
-}
+.studio-about-logo-player { display: block; width: 100%; max-width: 360px; margin-bottom: 6px; }
+.studio-about-logo-player .studio-about-logo { width: 100%; max-width: none; height: auto; margin: 0; clip-path: none; }
 .studio-about-details,
 .studio-health-details { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px 12px; margin: 0; }
 .studio-about-details dt,
