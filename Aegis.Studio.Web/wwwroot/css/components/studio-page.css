@@ -198,10 +198,10 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .workspace-accountability-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:stretch}
 .workspace-accountability-card{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:8px;row-gap:4px;min-width:0;padding:7px;border:1px solid var(--workspace-card-accent,#b99750);border-radius:9px;background:#fff}
 .workspace-card-heading{grid-column:1/-1;display:flex;flex-direction:column;align-items:stretch;gap:7px;min-height:105px;padding-right:113px;min-width:0}
-.workspace-card-title-row{display:flex;align-items:flex-end;gap:5px;min-width:0;width:100%;max-width:100%}
+.workspace-card-title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:5px;min-width:0;width:100%;max-width:100%}
 .workspace-accountability-card .workspace-card-heading h2{--workspace-value-size:14px;margin:0;font-size:14px;min-height:0;min-width:0;max-width:100%}
-.workspace-icon-column{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
-.workspace-icon-column .workspace-active-jobs{position:static;align-self:flex-start;margin:0;font-size:10px;padding:2px 5px;white-space:nowrap}
+.workspace-icon-column{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.workspace-card-title-row .workspace-active-jobs{position:static;flex-shrink:0;align-self:flex-end;margin:0 0 1px;font-size:10px;padding:2px 5px;white-space:nowrap}
 .workspace-card-title-row h2{padding-right:0;max-width:100%}
 .workspace-card-routing-row{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
 .workspace-card-appearance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:8px;min-width:0;width:calc(100% + 113px)}
