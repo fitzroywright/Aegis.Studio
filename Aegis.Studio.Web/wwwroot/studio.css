@@ -1760,6 +1760,8 @@ color:var(--studio-grid-header-text);}
   margin-bottom: 6px;
   clip-path: polygon(0 0,100% 0,100% 76%,14.6% 76%,14.6% 100%,0 100%);
 }
+.studio-about-logo-player { display: block; width: 100%; max-width: 360px; margin-bottom: 6px; }
+.studio-about-logo-player .studio-about-logo { width: 100%; max-width: none; height: auto; margin: 0; clip-path: none; }
 .studio-about-details,
 .studio-health-details { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px 12px; margin: 0; }
 .studio-about-details dt,

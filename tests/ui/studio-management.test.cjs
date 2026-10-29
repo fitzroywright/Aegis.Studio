@@ -13,7 +13,8 @@ test('About contains product, support, service health and demo tools; Staff and 
  const {w}=setup(t);await new Promise(resolve=>w.setTimeout(resolve,0));await w.studioNavigate('about');
  assert.equal(w.document.querySelector('.st-toolbar h1').textContent,'About');
  assert.ok(w.document.querySelector('[data-service-status]'));assert.ok(w.document.querySelector('[data-demo-reset]'));assert.ok(w.document.querySelector('[data-load-demo]'));
- assert.equal(w.document.querySelector('.studio-about-logo').getAttribute('src'),'/thinking-machines-letterhead.png');
+ assert.equal(w.document.querySelector('.studio-about-logo-player .studio-about-logo').getAttribute('src'),'/thinking-machines-about-once.gif');
+ assert.equal(w.document.querySelectorAll('.studio-about-logo-player').length,1);
  assert.match(w.document.querySelector('.studio-about').textContent,/it@thinkingmachines.ltd.*America\/Jamaica/s);
  assert.equal(w.document.querySelector('.studio-about h2'),null);
  assert.equal(w.document.querySelectorAll('.studio-about-grid > .studio-about-card').length,3);
