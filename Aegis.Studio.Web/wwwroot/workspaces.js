@@ -37,7 +37,13 @@ async function hydrateWorkspaceManagers(items){
 function bindWorkspaceCardEditing(card,item){
     if(!card)return;
     const workspace=item.workspace,id=encodeURIComponent(workspace.id),status=card.querySelector('[role=status]');
-    let editing=null,saving=false;
+    let editing=null,saving=false,feedbackTimer=null;
+    const showFeedback=(message,state='info')=>{
+        clearTimeout(feedbackTimer);
+        status.textContent=message;
+        status.dataset.state=state;
+        if(state==='success')feedbackTimer=setTimeout(()=>{if(status.isConnected&&status.dataset.state==='success'){status.textContent='';status.removeAttribute('data-state');}},3000);
+    };
     const display=(key)=>key==='managers'?(item.managers||[]).map(m=>m.displayName||m.userName).join(', '):key==='isEnabled'?(workspace.isEnabled?'Yes':'No'):key==='icon'?(workspace.iconName||'folder'):key==='color'?(workspace.accentColor||'#b99750'):workspace[key]||'';
     const raw=(key)=>key==='managers'?(item.managers||[]).map(m=>m.userName).join(', '):display(key);
     const paint=(key,node)=>{
@@ -49,14 +55,14 @@ function bindWorkspaceCardEditing(card,item){
             const thumb=document.createElement('span');thumb.className='workspace-enabled-toggle-thumb';thumb.setAttribute('aria-hidden','true');toggle.append(thumb);node.append(toggle);
             toggle.onclick=async()=>{
                 if(saving||editing)return;
-                saving=true;toggle.disabled=true;status.textContent='Saving…';
+                saving=true;toggle.disabled=true;showFeedback('Saving…');
                 try{
                     const latest=await json('/api/workspaces/'+id);
                     const payload={name:latest.name,emailAddress:latest.emailAddress,routeKey:latest.routeKey,isEnabled:!workspace.isEnabled,sortOrder:latest.sortOrder,defaultJobLead:latest.defaultJobLead};
                     const saved=await json('/api/workspaces/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-                    Object.assign(workspace,payload,saved||{});paint('isEnabled',node);status.textContent='Saved';
+                    Object.assign(workspace,payload,saved||{});paint('isEnabled',node);showFeedback('Saved','success');
                     void loadWorkspaces().then(()=>renderWorkspaceMenu()).catch(()=>{});
-                }catch(cause){status.textContent=cause.message||'Could not update workspace.';toggle.disabled=false;}
+                }catch(cause){showFeedback(cause.message||'Could not update workspace.','error');toggle.disabled=false;}
                 finally{saving=false;}
             };
             return;
@@ -88,7 +94,7 @@ function bindWorkspaceCardEditing(card,item){
         if(key==='icon'&&!['folder','camera','portrait','wedding','id'].includes(value))return error('Use folder, camera, portrait, wedding or id.');
         if(key==='color'&&!/^#[0-9a-f]{6}$/i.test(value))return error('Use a six-digit hex color, such as #b99750.');
         if(key==='managers'&&!value)return error('At least one Workspace Manager is required.');
-        saving=true;node.setAttribute('contenteditable','false');card.querySelectorAll('[data-workspace-pencil],[data-workspace-cancel]').forEach(button=>button.disabled=true);status.textContent='Saving…';
+        saving=true;node.setAttribute('contenteditable','false');card.querySelectorAll('[data-workspace-pencil],[data-workspace-cancel]').forEach(button=>button.disabled=true);showFeedback('Saving…');
         try{
             if(key==='icon'||key==='color'){
                 const appearance=await json('/api/workspaces/'+id+'/appearance');
@@ -111,7 +117,7 @@ function bindWorkspaceCardEditing(card,item){
                 const payload={name:latest.name,emailAddress:latest.emailAddress,routeKey:latest.routeKey,isEnabled:latest.isEnabled,sortOrder:latest.sortOrder,defaultJobLead:latest.defaultJobLead,[key]:key==='isEnabled'?value.toLowerCase()==='yes':value||null};
                 const saved=await json('/api/workspaces/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});Object.assign(workspace,payload,saved||{});
             }
-            if(card.isConnected){finish();status.textContent='Saved';}
+            if(card.isConnected){finish();showFeedback('Saved','success');}
             // Refresh shared navigation without replacing any card or another active edit.
             void loadWorkspaces().then(()=>renderWorkspaceMenu()).catch(()=>{});
         }catch(cause){if(card.isConnected){if(!editing?.control)node.setAttribute('contenteditable','true');error(cause.message||'Could not save. Your edit is retained.');}}
@@ -262,7 +268,7 @@ async function refreshStudioEmployees(){
             const payload={userName:employee.userName,displayName:row.querySelector('[data-employee-name]').value.trim(),emailAddress:row.querySelector('[data-employee-email]').value.trim()||null,isActive:row.querySelector('[data-employee-active]').checked,isAssignable:row.querySelector('[data-employee-assignable]').checked,source:employee.source||'Manual',externalId:employee.externalId||null,skills:employee.skills||[],workDayUserName:employee.workDayUserName||null,lastSyncedAtUtc:employee.lastSyncedAtUtc||null};
             if(!payload.displayName){status.textContent='Display name is required.';return;}
             row.querySelectorAll('input,button').forEach(el=>el.disabled=true);status.textContent='Saving…';let saved=false;
-            try{const latest=(await json('/api/admin/studio-employees/')).find(e=>String(e.userName).toLowerCase()===String(employee.userName).toLowerCase());if(!latest)throw Error('Staff member no longer exists. Reload the directory.');for(const key of ['source','externalId','skills','workDayUserName','lastSyncedAtUtc'])if(key in latest)payload[key]=latest[key];await json('/api/admin/studio-employees/'+encodeURIComponent(employee.userName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});Object.assign(employee,payload);status.textContent='Saved';saved=true;}catch(error){status.textContent=error.message||'Could not save. Your edits are retained.';}
+            try{const latest=(await json('/api/admin/studio-employees/')).find(e=>String(e.userName).toLowerCase()===String(employee.userName).toLowerCase());if(!latest)throw Error('Staff member no longer exists. Reload the directory.');for(const key of ['source','externalId','skills','workDayUserName','lastSyncedAtUtc'])if(key in latest)payload[key]=latest[key];await json('/api/admin/studio-employees/'+encodeURIComponent(employee.userName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});Object.assign(employee,payload);showFeedback('Saved','success');saved=true;}catch(error){status.textContent=error.message||'Could not save. Your edits are retained.';}
             finally{row.querySelectorAll('input,button').forEach(el=>el.disabled=false);save.disabled=undo.disabled=saved;const register=row.querySelector('[data-register-photographer]');if(register)register.disabled=!employee.isActive||!employee.isAssignable;}
         };
         const register=row.querySelector('[data-register-photographer]');if(register)register.onclick=()=>registerStudioPhotographer(employee);
@@ -301,7 +307,7 @@ async function saveStudioRoleRow(button){
     const name=row.querySelector('[data-role-name]');if(!name.reportValidity()||!name.value.trim()){status.textContent='Role name is required.';return;}
     const payload={name:name.value.trim(),scope:role.scope,description:row.querySelector('[data-role-description]').value.trim()||null,isActive:row.querySelector('[data-role-active]').checked,permissionsJson:role.permissionsJson};
     row.querySelectorAll('input,button').forEach(el=>el.disabled=true);status.textContent='Saving…';
-    try{const latest=(await json('/api/security/roles')).find(r=>String(r.id)===String(role.id));if(!latest)throw Error('Role no longer exists. Reload the roles.');payload.scope=latest.scope;payload.permissionsJson=latest.permissionsJson;await json('/api/security/roles/'+encodeURIComponent(role.id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});Object.assign(role,payload);status.textContent='Saved';}catch(error){status.textContent=error.message||'Could not save. Your edits are retained.';}finally{row.querySelectorAll('input,button').forEach(el=>el.disabled=false);}
+    try{const latest=(await json('/api/security/roles')).find(r=>String(r.id)===String(role.id));if(!latest)throw Error('Role no longer exists. Reload the roles.');payload.scope=latest.scope;payload.permissionsJson=latest.permissionsJson;await json('/api/security/roles/'+encodeURIComponent(role.id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});Object.assign(role,payload);showFeedback('Saved','success');}catch(error){status.textContent=error.message||'Could not save. Your edits are retained.';}finally{row.querySelectorAll('input,button').forEach(el=>el.disabled=false);}
 }
 
 function roleTemplate(scope, template) {
