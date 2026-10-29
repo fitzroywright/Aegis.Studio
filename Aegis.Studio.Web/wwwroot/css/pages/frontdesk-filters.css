@@ -1,33 +1,95 @@
-/* Front Desk queue and request review own their content styling here. */
-.fd-work-tabs{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #dce5ee;flex:0 0 auto;overflow-x:auto}
-.fd-work-tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--theme-text);font:inherit;font-size:12px;padding:8px 12px;white-space:nowrap;cursor:pointer}
-.fd-work-tabs button[aria-current=page]{border-bottom-color:#1677ff;color:#16477e;font-weight:600}
-.fd-selected-request{flex:0 0 auto;max-height:42%;overflow:auto;padding:18px;background:var(--studio-card-surface,#fff);border:1px solid var(--studio-grid-border,#dce5ee);border-radius:6px;color:var(--theme-text)}
-.fd-selected-request h2{margin:0 0 16px;font-size:15px}
-.fd-selected-request h2 small{font-size:12px;font-weight:400}
-.fd-selected-request h3{margin:10px 0 4px;font-size:12px}
-.fd-selected-request p{margin:4px 0 12px;font-size:12px}
-.fd-table .fd-column-controls{display:flex;align-items:center;gap:4px;min-width:0;white-space:nowrap}
-.fd-table .fd-column-controls button{min-width:0;overflow:hidden;text-overflow:ellipsis}
-.fd-table .fd-column-controls select{flex:0 0 22px;width:22px;min-width:22px;max-width:22px;height:25px;padding:0;border:1px solid #bacbd8;border-radius:4px;background:var(--studio-control-surface,#fff);color:var(--theme-text);font-size:11px;cursor:pointer}
-.fd-client-header{display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-width:0}
-.fd-client-header input{flex:1 1 100px;min-width:0;width:100%;height:26px;padding:3px 7px;border:1px solid #bacbd8;border-radius:4px;background:var(--studio-control-surface,#fff);color:var(--theme-text);font:inherit;font-size:11px}
-.fd-client-header input:focus-visible,.fd-column-controls select:focus-visible{outline:2px solid var(--theme-accent,#1677ff);outline-offset:-2px}
-.fd-table-frame .fd-table{width:100%;min-width:0;table-layout:fixed}
-.fd-table-frame .fd-table th,.fd-table-frame .fd-table td{overflow:hidden;text-overflow:ellipsis;white-space:normal}
-.fd-table-frame .fd-table th:nth-child(1),.fd-table-frame .fd-table td:nth-child(1){width:5%}
-.fd-table-frame .fd-table th:nth-child(2),.fd-table-frame .fd-table td:nth-child(2){width:27%}
-.fd-table-frame .fd-table th:nth-child(3),.fd-table-frame .fd-table td:nth-child(3){width:14%}
-.fd-table-frame .fd-table th:nth-child(4),.fd-table-frame .fd-table td:nth-child(4){width:14%}
-.fd-table-frame .fd-table th:nth-child(5),.fd-table-frame .fd-table td:nth-child(5){width:13%}
-.fd-table-frame .fd-table th:nth-child(6),.fd-table-frame .fd-table td:nth-child(6){width:16%}
-.fd-table-frame .fd-table th:nth-child(7),.fd-table-frame .fd-table td:nth-child(7){width:11%}
-.fd-table tbody tr[aria-selected=true]{background:#e7f1fd}
-.fd-table tbody tr[data-fd-row-open]{cursor:pointer}
-/* Front Desk commands belong to the grid toolbar. */
-.fd-grid-actions{display:flex;flex:0 0 auto;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--studio-grid-border,#dce5ee);background:var(--studio-card-surface,#fff)}
-.fd-grid-actions button{font-size:12px;min-height:30px;padding:5px 10px;white-space:nowrap}
-
-.fd-queue .front-desk-row[role="link"]{cursor:pointer}
-.fd-queue .front-desk-row[role="link"]:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:-2px}
-
+/* Front Desk reception content has one stylesheet owner. The shared shell owns navigation. */
+.fd-reception{--fd-ink:var(--theme-text,#17344f);--fd-muted:var(--theme-muted,#637892);--fd-border:var(--studio-grid-border,#dce3eb);--fd-surface:var(--studio-card-surface,#fff);--fd-gold:#b98225;display:flex;flex-direction:column;height:100%;min-width:0;min-height:0;overflow:hidden;background:var(--fd-surface);color:var(--fd-ink);font-family:Inter,Arial,sans-serif}
+.fd-reception button,.fd-reception select,.fd-reception input{font:inherit;color:inherit}
+.fd-reception button{cursor:pointer}
+.fd-reception button:disabled{cursor:wait;opacity:.55}
+.fd-topline{display:grid;grid-template-columns:minmax(150px,220px) minmax(180px,230px) minmax(160px,1fr) auto;align-items:center;gap:18px;padding:16px 24px 10px;flex:none}
+.fd-topline select,.fd-topline input{box-sizing:border-box;width:100%;height:38px;border:1px solid var(--fd-border);border-radius:5px;background:var(--fd-surface);padding:7px 12px;font-size:13px;min-width:0}
+.fd-topline .primary{height:38px;padding:8px 18px;white-space:nowrap}
+.fd-reception .primary{background:var(--fd-gold);color:#fff;border:1px solid var(--fd-gold);border-radius:5px;font-size:13px;font-weight:600}
+.fd-date{position:relative;display:flex;align-items:center;min-height:38px;font-size:13px;font-weight:600}
+.fd-calendar-native{position:absolute;inset:0;opacity:0;cursor:pointer}
+.fd-topline #frontDeskSearch{justify-self:end;max-width:440px}
+.fd-work-tabs{display:flex;align-items:center;gap:20px;padding:0 24px;border-bottom:1px solid var(--fd-border);flex:none}
+.fd-work-tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;padding:12px 6px;font-size:13px;font-weight:600;white-space:nowrap}
+.fd-work-tabs button[aria-current=page]{border-bottom-color:var(--fd-gold)}
+.fd-arrival-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:center;border-bottom:1px solid var(--fd-border);padding:12px 24px;flex:none;gap:0}
+.fd-arrival-strip button{display:flex;align-items:center;justify-content:flex-start;gap:10px;min-width:0;padding:3px 14px;border:0;border-right:1px solid var(--fd-border);background:transparent;color:var(--fd-ink);font-size:13px;white-space:nowrap}
+.fd-arrival-strip button:last-child{border-right:0;color:var(--fd-muted)}
+.fd-arrival-strip button[aria-pressed=true]{font-weight:700;text-decoration:underline;text-decoration-color:var(--fd-gold);text-underline-offset:8px}
+.fd-stage-icon{width:22px;height:22px;flex:none;fill:none;stroke:var(--fd-ink);stroke-width:1.7}
+.fd-tone-expected{--fd-stage:#de900e}
+.fd-tone-arrived{--fd-stage:#259745}
+.fd-tone-photographer{--fd-stage:#2876dd}
+.fd-tone-ready{--fd-stage:#7546c5}
+.fd-tone-unknown{--fd-stage:#788593}
+.fd-stage-dot{color:var(--fd-stage)}
+.fd-service-desk{display:grid;grid-template-columns:minmax(290px,43%) minmax(0,1fr);flex:1;min-height:0;overflow:hidden}
+.fd-appointment-list{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--fd-border)}
+.fd-appointment-list>header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 24px 10px}
+.fd-appointment-list h2{font-size:19px;margin:0;letter-spacing:-.4px}
+.fd-appointment-list>header select{max-width:135px;min-width:0;padding:7px;border:1px solid var(--fd-border);border-radius:5px;font-size:12px;background:var(--fd-surface)}
+.fd-appointment-scroll{overflow:auto;min-height:0;flex:1;padding:0 18px 14px 24px}
+.fd-appointment-row{display:grid;grid-template-columns:64px minmax(0,1fr) auto 10px;align-items:center;gap:12px;width:100%;min-height:79px;text-align:left;padding:12px 14px;border:0;border-bottom:1px solid var(--fd-border);border-left:3px solid transparent;background:transparent}
+.fd-appointment-row[aria-selected=true]{background:color-mix(in srgb,var(--fd-surface) 92%,#e5bd6d);border-left-color:var(--fd-gold);border-radius:5px}
+.fd-appointment-row time{font-size:18px;font-weight:700}
+.fd-appointment-copy{display:flex;flex-direction:column;gap:6px;min-width:0}
+.fd-appointment-copy strong{font-size:14px}
+.fd-appointment-copy>span{font-size:12px;color:var(--fd-muted)}
+.fd-appointment-status{display:flex;flex-direction:column;align-items:flex-start;gap:5px;font-size:11px}
+.fd-appointment-status small{font-size:10px;color:var(--fd-muted)}
+.fd-arrival-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:12px;background:color-mix(in srgb,var(--fd-stage,#788593) 12%,var(--fd-surface));color:var(--fd-stage,var(--fd-ink));font-size:10px;white-space:nowrap}
+.fd-appointment-status .fd-deposit-alert{color:#a45d0c;background:#fff1dc;padding:3px 7px;border-radius:4px}
+.fd-selected-request{min-width:0;min-height:0;overflow:auto;padding:18px 24px 16px;display:flex;flex-direction:column;gap:16px}
+.fd-customer-heading{display:flex;align-items:center;gap:12px}
+.fd-initials{display:grid;place-items:center;width:56px;height:56px;flex:none;border-radius:50%;background:#e8ecf2;color:#193650;font-size:23px;font-weight:700}
+.fd-customer-heading h2{margin:0 0 7px;font-size:20px;letter-spacing:-.4px}
+.fd-customer-heading p{margin:0;font-size:12px;color:var(--fd-muted);overflow-wrap:anywhere}
+.fd-customer-heading>.fd-text-action{margin-left:auto;white-space:nowrap}
+.fd-text-action{border:0;padding:0;background:transparent;font-size:11px;text-align:left}
+.fd-returning{display:inline-block;vertical-align:middle;font-size:10px;font-weight:500;padding:3px 9px;border-radius:5px;background:#e3f1e1;color:#28753a;letter-spacing:0}
+.fd-arrival-progress{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;padding:0;list-style:none}
+.fd-arrival-progress li{display:flex;flex-direction:column;align-items:center;gap:5px;position:relative;font-size:10px;text-align:center;color:var(--fd-muted)}
+.fd-arrival-progress li:before{content:"";position:absolute;top:10px;left:0;right:0;height:2px;background:var(--fd-border)}
+.fd-arrival-progress li:first-child:before{left:50%}
+.fd-arrival-progress li:last-child:before{right:50%}
+.fd-arrival-progress li>span{z-index:1;display:grid;place-items:center;width:20px;height:20px;border:2px solid var(--fd-border);background:var(--fd-surface);color:var(--fd-border);border-radius:50%;box-sizing:border-box;font-size:11px}
+.fd-arrival-progress li[aria-current=step]>span,.fd-arrival-progress li[data-complete=true]>span{background:var(--fd-stage);border-color:var(--fd-stage);color:#fff}
+.fd-arrival-progress li[aria-current=step]{color:var(--fd-stage);font-weight:700}
+.fd-arrival-progress small{font-size:10px;font-weight:400;color:var(--fd-muted)}
+.fd-booking-card{border:1px solid var(--fd-border);border-radius:6px;padding:16px}
+.fd-session-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+.fd-session-heading h3{font-size:18px;margin:0 0 8px;letter-spacing:-.3px}
+.fd-session-heading p{font-size:11px;color:var(--fd-muted);margin:7px 0;overflow-wrap:anywhere}
+.fd-money{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:20px 0 12px}
+.fd-money>div+div{border-left:1px solid var(--fd-border);padding-left:16px}
+.fd-money dt{font-size:11px;font-weight:600;margin-bottom:5px}
+.fd-money dd{font-size:19px;font-weight:700;margin:0}
+.fd-money>div:last-child dd{color:#a76f15}
+.fd-payment-progress{appearance:none;width:100%;height:8px;display:block;border:0;border-radius:5px;overflow:hidden;background:#e9edf2;accent-color:var(--fd-gold)}
+.fd-payment-progress::-webkit-progress-bar{background:#e9edf2}
+.fd-payment-progress::-webkit-progress-value{background:var(--fd-gold);border-radius:5px}
+.fd-payment-progress::-moz-progress-bar{background:var(--fd-gold)}
+.fd-customer-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0}
+.fd-customer-actions>.action,.fd-customer-actions>.primary{flex:1 1 auto;min-height:36px;padding:7px 10px;font-size:12px;text-align:center;white-space:nowrap}
+.fd-customer-actions>.action{border:1px solid var(--fd-border);border-radius:5px;background:var(--fd-surface)}
+.fd-session-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--fd-border);margin:0;padding-top:12px;gap:10px}
+.fd-session-facts dt{font-size:10px;font-weight:600;margin-bottom:6px}
+.fd-session-facts dd{font-size:11px;margin:0;overflow-wrap:anywhere}
+.fd-customer-bottom{display:grid;grid-template-columns:1.3fr 1fr;gap:20px}
+.fd-customer-bottom h3{font-size:13px;margin:0 0 10px}
+.fd-customer-bottom p{font-size:11px;color:var(--fd-muted);line-height:1.6;margin:0}
+.fd-activity{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:9px}
+.fd-activity li{display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px;font-size:10px;line-height:1.5}
+.fd-activity time{color:var(--fd-muted)}
+.fd-customer-bottom .fd-customer-note{padding:10px;border:1px solid var(--fd-border);border-radius:5px;background:color-mix(in srgb,var(--fd-surface) 95%,#dbe3ef);white-space:pre-wrap}
+.fd-grid-actions{display:flex;align-items:center;gap:10px;padding:10px 24px;border-top:1px solid var(--fd-border);flex:none;background:var(--fd-surface)}
+.fd-grid-actions>button{padding:9px 12px;min-height:36px;border:1px solid #d8bc84;border-radius:5px;background:transparent;color:#a86e15;font-size:12px;white-space:nowrap}
+.fd-more-actions{position:relative;margin-left:auto;font-size:12px}
+.fd-more-actions>button{display:block;border:1px solid var(--fd-border);background:var(--fd-surface);padding:10px;font-size:12px;width:150px}
+.fd-more-actions[open]{align-self:end}
+.fd-empty{padding:24px;font-size:13px;color:var(--fd-muted)}
+.fd-warning,.fd-load-warning{padding:8px 24px;margin:0;font-size:11px;background:#fff1dc;color:#925208}
+.fd-reception button:focus-visible,.fd-reception select:focus-visible,.fd-reception input:focus-visible,.fd-date:focus-within{outline:2px solid var(--fd-gold);outline-offset:2px}
+@media(max-width:1100px){.fd-topline{grid-template-columns:minmax(130px,180px) 185px minmax(120px,1fr) auto;gap:10px;padding-inline:16px}.fd-arrival-strip{padding-inline:12px}.fd-arrival-strip button{gap:6px;padding-inline:8px;font-size:11px}.fd-appointment-row{grid-template-columns:50px minmax(0,1fr) auto 8px;gap:8px;padding:10px 8px}.fd-appointment-copy strong{font-size:12px}.fd-appointment-row time{font-size:15px}.fd-arrival-pill{font-size:9px;padding:4px 6px}.fd-selected-request{padding:16px}.fd-customer-heading h2{font-size:17px}.fd-session-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.fd-grid-actions{padding-inline:16px;gap:6px}.fd-grid-actions>button{padding-inline:9px;font-size:11px}}
+@media(max-width:760px){.fd-reception{overflow:auto}.fd-topline{grid-template-columns:1fr 1fr}.fd-work-tabs{padding-inline:12px;gap:12px}.fd-arrival-strip{overflow:auto;grid-template-columns:repeat(4,max-content) auto}.fd-service-desk{display:flex;flex-direction:column;overflow:visible;flex:none}.fd-appointment-list{border-right:0;max-height:360px;flex:none}.fd-selected-request{overflow:visible}.fd-grid-actions{flex-wrap:wrap}.fd-customer-bottom{grid-template-columns:1fr}.fd-appointment-status{max-width:125px}}

@@ -29,7 +29,7 @@ window.addEventListener('message',async event=>{
     if(document.body.dataset.studioView==='delivery'){await StudioWorkflowViews.showDelivery();return;}
     if(document.body.dataset.studioView!=='frontdesk')return;
     const positions=[...genericView.querySelectorAll('*')].filter(el=>el.scrollTop||el.scrollLeft).map(el=>({id:el.id,cls:el.className,top:el.scrollTop,left:el.scrollLeft}));
-    try{const [jobs,requests]=await Promise.all([json('/api/jobs'),json('/api/frontdesk/booking-requests')]);frontDeskJobs=jobs;frontDeskRequests=requests;renderFrontDesk();for(const p of positions){const el=p.id?document.getElementById(p.id):[...genericView.querySelectorAll('*')].find(e=>e.className===p.cls);if(el){el.scrollTop=p.top;el.scrollLeft=p.left;}}}catch(error){console.error('Front Desk update failed',error);}
+    try{const [jobs,requests]=await Promise.all([json('/api/jobs'),json('/api/frontdesk/booking-requests')]);frontDeskJobs=jobs;frontDeskRequests=requests;frontDeskDetails.clear();renderFrontDesk();for(const p of positions){const el=p.id?document.getElementById(p.id):[...genericView.querySelectorAll('*')].find(e=>e.className===p.cls);if(el){el.scrollTop=p.top;el.scrollLeft=p.left;}}}catch(error){console.error('Front Desk update failed',error);}
 });
 
 

@@ -1,42 +1,4 @@
-const {test}=require('node:test');
-const assert=require('node:assert/strict');
-const fs=require('node:fs'),path=require('node:path');
-const {JSDOM}=require('jsdom');
-const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-function setup(t){
- const dom=new JSDOM('<body data-studio-view="frontdesk"><main id="genericView"></main><span id="studioFooterRate"></span></body>',{url:'https://studio.test',runScripts:'outside-only'});
- t.after(()=>dom.window.close());const w=dom.window,calls=[],errors=[];
- w.genericView=w.document.querySelector('main');w.esc=String;w.money=String;w.json=async()=>[];w.alert=message=>errors.push(message);
- for(const name of ['studio-status-order.js','studio-message-card.js'])w.eval(fs.readFileSync(path.join(root,name),'utf8'));
- w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"\nloadFrontDeskCommunications=()=>{};frontDeskRequests=[];frontDeskJobs=[];window.switchFrontDeskActionsTest=()=>{frontDeskTab='sales';renderFrontDesk();};renderFrontDesk();");
- w.studioLaunchNewBooking=async()=>calls.push(['booking']);
- w.pickFrontDeskFinancialAction=async action=>calls.push(['financial',action]);
- w.showFrontDeskClients=async openNew=>calls.push(['clients',openNew]);
- w.launchFrontDeskPos=async action=>calls.push(['pos',action]);
- return {w,calls,errors};
-}
-test('Front Desk actions sit above the grid and include all sales commands without a Sales tab after repaint',async t=>{
- const {w,calls,errors}=setup(t);
- for(let pass=0;pass<2;pass++){
-  const toolbar=w.document.querySelector('.fd-grid-actions');
-  assert.equal(w.document.querySelectorAll('.fd-grid-actions').length,1);
-  assert.equal(toolbar.getAttribute('aria-label'),'Front Desk actions');
-  assert.ok(toolbar.compareDocumentPosition(w.document.querySelector('.fd-table-frame'))&w.Node.DOCUMENT_POSITION_FOLLOWING);
-  assert.equal(w.document.querySelector('[data-fd-tab="sales"],[data-fd-sale-action]'),null);
-  assert.deepEqual([...w.document.querySelectorAll('[data-fd-tab]')].map(b=>b.dataset.fdTab),['today','confirmation','deposits']);
-  assert.ok(w.document.querySelector('#frontDeskSearch'));
-  const buttons=[...toolbar.querySelectorAll('button')];
-  assert.deepEqual(buttons.map(b=>b.textContent),['New Booking','Take Payment','Record Deposit','Issue Refund','New Sale','View Receipt','New Client','Close Register']);
-  for(const button of buttons)await button.onclick();
-  w.switchFrontDeskActionsTest();
- }
- const expected=[['booking'],['financial','TakePayment'],['financial','RecordDeposit'],['financial','IssueRefund'],['financial','NewSale'],['financial','ViewReceipt'],['clients',true],['pos','CloseRegister']];
- assert.deepEqual(calls,[...expected,...expected]);assert.deepEqual(errors,[]);
- assert.equal(w.document.querySelector('.fd-overview'),null);
-});
-test('relocated financial, client and register actions report existing service errors',async t=>{
- const {w,errors}=setup(t);const fail=async()=>{throw Error('Service unavailable');};
- w.pickFrontDeskFinancialAction=fail;w.showFrontDeskClients=fail;w.launchFrontDeskPos=fail;
- for(const selector of ['[data-fd-financial-action="TakePayment"]','[data-fd-financial-action="ViewReceipt"]','[data-fd-new-client]','[data-fd-close-register]'])await w.document.querySelector(selector).onclick();
- assert.deepEqual(errors,['Service unavailable','Service unavailable','Service unavailable','Service unavailable']);
-});
+const {test}=require('node:test'),assert=require('node:assert/strict'),setup=require('./frontdesk-reception-fixture.cjs');
+test('Front Desk uses one content split, one footer action bar and task tabs from the approved design',async t=>{const {w,fixture,render}=setup(t);await render();assert.equal(w.document.querySelectorAll('.fd-grid-actions').length,1);assert.ok(w.document.querySelector('.fd-service-desk>.fd-appointment-list'));assert.ok(w.document.querySelector('.fd-service-desk>.fd-selected-request'));assert.equal(w.document.querySelector('.fd-table,.fd-secondary,.fd-overview'),null);assert.deepEqual([...w.document.querySelectorAll('[data-fd-tab]')].map(b=>b.dataset.fdTab),['today','enquiries','sales']);w.document.querySelector('[data-fd-new-booking]').click();assert.deepEqual(fixture.actions[0],['booking']);for(const b of w.document.querySelectorAll('[data-fd-financial-action]'))await b.onclick();assert.ok(fixture.actions.some(a=>a[1]==='IssueRefund'));assert.ok(fixture.actions.some(a=>a[1]==='ViewReceipt'));});
+test('selected payment action passes the exact job context to the existing POS launch',async t=>{const {w,fixture,render,settle}=setup(t);await render();await settle();w.document.querySelector('[data-fd-row-open="booking-ready"]').click();w.document.querySelector('[data-fd-payment]').click();await settle();assert.deepEqual(JSON.parse(JSON.stringify(fixture.actions.at(-1))),['pos','TakePayment',{jobId:'ready'}]);});
+test('financial launch failures are reported without discarding the customer selection',async t=>{const {w,render,settle}=setup(t);await render();await settle();w.launchFrontDeskPos=async()=>{throw Error('Service unavailable');};w.document.querySelector('[data-fd-payment]').click();await settle();assert.match(w.document.querySelector('[data-fd-selection-error]').textContent,/Service unavailable/);assert.match(w.document.querySelector('.fd-selected-request').textContent,/Alicia/);});

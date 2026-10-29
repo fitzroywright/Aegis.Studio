@@ -76,6 +76,51 @@ public static class StudioOperationsEnhancements
             return Results.Ok(studio.GetJob(job.Id));
         }).RequireAuthorization();
 
+        // One day-scoped reception read avoids loading every job's audit and workflow.
+        app.MapGet("/api/frontdesk/reception", (DateTimeOffset from, DateTimeOffset to,
+            ClaimsPrincipal user, StudioDatabase database) =>
+        {
+            GlobalOperationalRoleStore roles = new(database);
+            if (!user.IsInRole(StudioRoleNames.Administrator) && !roles.HasPermission(user, StudioPermissions.ViewAllJobs))
+                return Results.Forbid();
+            if (to <= from || to - from > TimeSpan.FromDays(2))
+                return Results.BadRequest(new { error = "Choose a reception day of at most two days." });
+            using NpgsqlConnection connection = database.OpenConnection();
+            using NpgsqlCommand command = connection.CreateCommand();
+            command.CommandText = """
+                select j.id, a.arrived_at, s.started_at, s.finished_at,
+                       coalesce(s.session_count,0), coalesce(s.completed_sessions,0)
+                from studio_jobs j
+                left join lateral (
+                    select min(created_at_utc) as arrived_at
+                    from studio_operational_audit
+                    where job_id=j.id and action='FrontDeskCheckIn'
+                      and created_at_utc >= $1 and created_at_utc < $2
+                ) a on true
+                left join lateral (
+                    select min(checked_in_at_utc) as started_at, max(checked_out_at_utc) as finished_at,
+                           count(*) as session_count, count(checked_out_at_utc) as completed_sessions
+                    from studio_shoot_sessions
+                    where job_id=j.id and status <> 'Cancelled'
+                      and call_time_utc < $2 and coalesce(planned_end_utc,call_time_utc) >= $1
+                ) s on true
+                where a.arrived_at is not null or s.session_count > 0
+                """;
+            command.Parameters.AddWithValue(from.ToUniversalTime());
+            command.Parameters.AddWithValue(to.ToUniversalTime());
+            using NpgsqlDataReader reader = command.ExecuteReader();
+            var rows = new List<object>();
+            while (reader.Read()) rows.Add(new
+            {
+                jobId = reader.GetGuid(0),
+                arrivedAtUtc = reader.IsDBNull(1) ? (DateTimeOffset?)null : reader.GetFieldValue<DateTimeOffset>(1),
+                startedAtUtc = reader.IsDBNull(2) ? (DateTimeOffset?)null : reader.GetFieldValue<DateTimeOffset>(2),
+                finishedAtUtc = reader.IsDBNull(3) ? (DateTimeOffset?)null : reader.GetFieldValue<DateTimeOffset>(3),
+                sessionCount = reader.GetInt64(4), completedSessions = reader.GetInt64(5)
+            });
+            return Results.Ok(rows);
+        }).RequireAuthorization();
+
         app.MapPost("/api/frontdesk/jobs/{jobId:guid}/check-in", (
             Guid jobId,
             ClaimsPrincipal user,

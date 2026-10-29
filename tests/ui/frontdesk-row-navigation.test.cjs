@@ -1,54 +1,7 @@
-const {test}=require('node:test');
-const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const path=require('node:path');
-const {JSDOM}=require('jsdom');
-const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-function setup(){
- const dom=new JSDOM('<body data-studio-view="frontdesk"><main id="genericView"></main><span id="studioFooterRate"></span></body>',{url:'https://studio.test',runScripts:'outside-only',pretendToBeVisual:true});
- const w=dom.window,opened=[],navigations=[],errors=[];
- w.addEventListener('error',event=>{errors.push(event.error);event.preventDefault();});
- w.genericView=w.document.querySelector('main');w.esc=v=>String(v??'');w.money=String;
- w.openWorkspaceJob=async id=>opened.push(id);
- w.studioNavigate=async(view,options)=>{navigations.push({view,jobId:options.jobId});await w.openWorkspaceJob(options.jobId,{navigationRecorded:true,history:false});};
- w.json=async()=>[];
- for(const name of ['studio-status-order.js','studio-message-card.js'])w.eval(fs.readFileSync(path.join(root,name),'utf8'));
- w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"loadFrontDeskCommunications=()=>{};frontDeskJobs=[{id:'job-one',clientName:'A',title:'First job',status:'In Progress'},{id:'job-two',clientName:'B',title:'Second job',status:'Completed'}];frontDeskRequests=[{id:'booking-one',jobId:'job-one',status:'AwaitingDeposit',request:{clientName:'A',title:'Booking',requiredDeposit:10}}];window.setFrontDeskTestState=()=>{recordFrontDeskFulfillment=async()=>{};frontDeskJobs=[{id:'ready',title:'Ready',clientName:'A',status:'Ready for Delivery'}];frontDeskColumnFilters.status='Pickup / Delivery';renderFrontDesk();};renderFrontDesk();");
- return {w,opened,navigations,errors};
-}
-test('booking selection shows review details and opens the selected job explicitly',async()=>{
- const {w,opened,navigations,errors}=setup();try{
- w.document.querySelector('[data-fd-row-open="booking-one"] strong').click();
- assert.deepEqual(opened,[]);assert.match(w.document.querySelector('.fd-selected-request').textContent,/Deposit received/);
- w.document.querySelector('[data-fd-open-selected]').click();
- const status=w.document.querySelector('[data-fd-filter="status"]');status.value='Completed';status.dispatchEvent(new w.Event('change'));
- w.document.querySelector('[data-fd-row-open="job-two"]').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
- w.document.querySelector('[data-fd-open-selected]').click();
- await Promise.resolve();await Promise.resolve();
- assert.deepEqual(opened,['job-one','job-two']);assert.deepEqual(navigations,[{view:'workspaces',jobId:'job-one'},{view:'workspaces',jobId:'job-two'}]);assert.deepEqual(errors,[]);
- }finally{w.close();}
-});
-test('Unassigned queue renders after search and its rows open jobs without breaking return to intake',async()=>{
- const {w,opened,navigations,errors}=setup();try{
- const input=w.document.querySelector('#frontDeskSearch');input.focus();input.value='A';input.dispatchEvent(new w.Event('input'));
- w.document.querySelector('[data-fd-metric="unassigned"]').click();
- assert.deepEqual(errors,[]);
- assert.ok(w.document.querySelector('[data-fd-job-row="job-one"]'));
- w.document.querySelector('[data-fd-job-row="job-one"] strong').click();
- await Promise.resolve();await Promise.resolve();assert.deepEqual(opened,['job-one']);assert.deepEqual(navigations,[{view:'workspaces',jobId:'job-one'}]);
- w.document.querySelector('[data-fd-metric="unassigned"]').click();
- assert.deepEqual(errors,[]);
- assert.ok(w.document.querySelector('#frontDeskSearch'));assert.deepEqual(errors,[]);
- }finally{w.close();}
-});
-test('row actions do not also open the job and Front Desk keeps the shared rail/message card',async()=>{
- const {w,opened,errors}=setup();try{
- w.setFrontDeskTestState();
- w.document.querySelector('[data-frontdesk-fulfill]').click();await Promise.resolve();
- assert.deepEqual(opened,[]);assert.deepEqual(errors,[]);
- assert.ok(w.document.querySelector('.fd-secondary.mw-list-right [data-mw-region="schedule"].mw-list-panel'));
- assert.equal(w.document.querySelectorAll('#frontDeskMessageCard.smc-card').length,1);
- assert.equal(w.document.querySelectorAll('#frontDeskMessageCard [data-smc-notes-toggle]').length,1);
- }finally{w.close();}
-});
+const {test}=require('node:test'),assert=require('node:assert/strict'),setup=require('./frontdesk-reception-fixture.cjs');
+test('appointment selection updates customer workspace and preserves explicit job navigation',async t=>{const {w,fixture,render,settle}=setup(t);await render();await settle();assert.equal(w.document.querySelectorAll('[data-fd-row-open]').length,4);const row=w.document.querySelector('[data-fd-row-open="booking-arrived"]');row.click();await settle();assert.match(w.document.querySelector('.fd-selected-request').textContent,/Marcus Brown/);assert.equal(fixture.actions.length,0);w.document.querySelector('[data-fd-open-selected]').click();await settle();assert.equal(fixture.actions[0][1],'workspaces');assert.equal(fixture.actions[0][2].jobId,'arrived');});
+test('customer financials and workflow details use the selected job and do not invent missing amounts',async t=>{const {w,render,settle}=setup(t);await render();await settle();const detail=w.document.querySelector('.fd-selected-request');assert.match(detail.textContent,/J\$10,000.*J\$2,000.*J\$8,000/s);assert.match(detail.textContent,/Lisa Brown/);assert.match(detail.textContent,/Daniel/);w.document.querySelector('[data-fd-session-plan]').click();});
+test('search keeps focus and filters reference, name and phone across appointment data',async t=>{const {w,render}=setup(t);await render();const input=w.document.querySelector('#frontDeskSearch');input.focus();input.value='2026-BR-000001';input.dispatchEvent(new w.Event('input'));assert.equal(w.document.activeElement,input);assert.equal(w.document.querySelectorAll('[data-fd-row-open]').length,1);assert.match(w.document.querySelector('.fd-appointment-scroll').textContent,/Marcus Brown/);});
+test('late selected-job responses cannot replace a newer customer selection',async t=>{const {w,fixture,render,settle}=setup(t);let release;const pending=new Promise(resolve=>release=resolve);fixture.custom=async url=>{if(url==='/api/jobs/expected'){await pending;return fixture.jobs[0];}};await render();w.document.querySelector('[data-fd-row-open="booking-arrived"]').click();await settle();release();await settle();assert.match(w.document.querySelector('.fd-selected-request h2').textContent,/Marcus Brown/);});
 
+test('unknown charges are labeled unpriced while published zero-price sessions remain zero',async t=>{const {w,fixture,render,settle}=setup(t);delete fixture.requests[0].request.priceSnapshot;await render();await settle();assert.match(w.document.querySelector('.fd-money').textContent,/Not priced/);fixture.requests[0].request.priceSnapshot={priceMinor:0};await render();await settle();assert.doesNotMatch(w.document.querySelector('.fd-money').textContent,/Not priced/);});
