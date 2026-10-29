@@ -3,7 +3,7 @@ function commercialPage(title,body,tools='',summary='',attention='') {
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
     const sharedTitle=['Products and Services','Templates'].includes(title);
     const content=sharedTitle&&tools?`<div class="commercial-page-actions">${tools}</div>${body}`:body;
-    genericView.innerHTML=StudioPage.html({title,tools,showHeader:title!=='Production'&&!sharedTitle,content,className:'st-commercial',summary:summary||'<p>Manage Studio services, templates and production.</p>',attention});
+    genericView.innerHTML=StudioPage.html({title,tools,showHeader:title!=='Production'&&!sharedTitle,content,className:'st-commercial'+(title==='Products and Services'?' catalog-page':''),summary:summary||'<p>Manage Studio services, templates and production.</p>',attention});
     StudioPage.bind(genericView);
     window.studioSetBreadcrumb?.([{label:title}]);
 }
