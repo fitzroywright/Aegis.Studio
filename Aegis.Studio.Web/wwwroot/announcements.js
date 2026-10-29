@@ -74,22 +74,29 @@
         try {
             const workspaces=await loadWorkspaces();
             if(!current()||!toolbar.isConnected)return;
-            const eligible=workspaces.filter(w=>w.permissions?.accessWorkspace&&w.permissions?.view&&w.permissions?.notifyMembers);
+            const eligible=workspaces.filter(w=>w.permissions?.accessWorkspace&&w.permissions?.view&&w.permissions?.notifyMembers&&!/^(unassigned|unassigned workspace)$/i.test(String(w.name||'').trim()));
             if(!eligible.length)return;
             const button=document.createElement('button');button.type='button';button.className='action';button.dataset.postAnnouncement='';button.textContent='Post Announcement';
             toolbar.append(button);
             button.onclick=()=>{
                 if(!current())return;
-                const dialog=studioDialog('Staff Announcement','<p>For Bryan’s staff in the selected workspace. Announcements are not sent to clients.</p><form class="announcement-form"><label>Staff workspace<select name="workspace"></select></label><label>Title<input name="title" required maxlength="200"></label><label>Announcement<textarea name="body" required maxlength="10000"></textarea></label><button class="primary">Post announcement</button><p role="status"></p></form>');
+                const dialog=studioDialog('Post Announcement','<form class="announcement-form" style="display:grid;gap:10px;max-width:420px;width:min(80vw,420px)"><label style="display:grid;gap:4px">Workspace<select name="workspace"></select></label><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="allStaff" style="width:auto"> All staff</label><label style="display:grid;gap:4px">Title<input name="title" required maxlength="200"></label><label style="display:grid;gap:4px">Message<textarea name="body" required maxlength="10000" rows="4" style="resize:vertical"></textarea></label><button class="primary" type="submit">Send</button><p role="status" aria-live="polite"></p></form>');
                 const form=dialog.querySelector('form');
                 for(const workspace of eligible){const option=document.createElement('option');option.value=workspace.id;option.textContent=workspace.name;form.elements.workspace.append(option);}
+                form.elements.allStaff.onchange=()=>{form.elements.workspace.disabled=form.elements.allStaff.checked;};
                 form.onsubmit=async event=>{
-                    event.preventDefault();if(!current()){dialog.close();return;}const submit=form.querySelector('button');submit.disabled=true;
-                    try {
-                        await json('/api/workspaces/'+encodeURIComponent(form.elements.workspace.value)+'/announcements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:form.elements.title.value,body:form.elements.body.value})});
-                        form.elements.title.value='';form.elements.body.value='';form.querySelector('[role=status]').textContent='Staff announcement posted. It will appear at the next login.';
-                    }catch(error){form.querySelector('[role=status]').textContent=error.message||'Could not post announcement.';}
-                    finally{submit.disabled=false;}
+                    event.preventDefault();if(!current()){dialog.close();return;}
+                    const submit=form.querySelector('button');submit.disabled=true;
+                    const all=form.elements.allStaff.checked;
+                    const destinations=all?eligible:eligible.filter(w=>w.id===form.elements.workspace.value);
+                    const payload=JSON.stringify({title:form.elements.title.value,body:form.elements.body.value});
+                    const results=await Promise.allSettled(destinations.map(w=>json('/api/workspaces/'+encodeURIComponent(w.id)+'/announcements',{method:'POST',headers:{'Content-Type':'application/json'},body:payload})));
+                    const failed=results.filter(r=>r.status==='rejected').length;
+                    if(!failed){
+                        form.elements.title.value='';form.elements.body.value='';
+                        form.querySelector('[role=status]').textContent=all?'Sent to all eligible workspaces. Staff in multiple workspaces may see more than one copy.':'Announcement sent. It will appear at the next login.';
+                    }else form.querySelector('[role=status]').textContent='Sent to '+(destinations.length-failed)+' of '+destinations.length+' workspaces. Some deliveries failed; retry only those destinations to avoid duplicates.';
+                    submit.disabled=false;
                 };
             };
         }catch(error){console.error('Announcement permissions could not be loaded.',error);}
