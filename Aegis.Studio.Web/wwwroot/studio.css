@@ -1762,7 +1762,8 @@ color:var(--studio-grid-header-text);}
 .studio-health-details dt { color: var(--theme-muted,#667383); font-size: 10px; margin-bottom: 3px; }
 .studio-about-details dd,
 .studio-health-details dd { margin: 0; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
-.studio-about-key { margin-top: 8px; }
+.studio-about-key { margin-top: 8px; background: #dceee9; border: 1px solid #78ad9d; color: #21594d; }
+.studio-about-key:is(:hover,:focus-visible) { background: #c4e3d9; border-color: #508e7c; color: #164438; }
 .studio-about-demo { grid-column: 1 / -1; }
 .studio-about-demo-main { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .studio-about-demo-copy { min-width: 0; }
