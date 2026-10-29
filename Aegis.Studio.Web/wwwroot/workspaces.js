@@ -26,7 +26,7 @@ async function hydrateWorkspaceManagers(items){
         try{
             const managers=await json('/api/workspaces/'+encodeURIComponent(item.workspace.id)+'/managers');
             item.managers=managers;
-            target.textContent=managers.length?managers.map(m=>m.displayName||m.userName).join(', '):'Manager required';
+            target.textContent=managers.length?managers.map(m=>m.displayName||m.userName).join(', '):'Manager required';target.classList.toggle('workspace-value-warning',!managers.length);
             target.dataset.empty=String(!managers.length);target.classList.toggle('risk',!managers.length);
             if(pencil)pencil.disabled=false;
         }catch{target.textContent='Manager status unavailable';}
@@ -40,7 +40,23 @@ function bindWorkspaceCardEditing(card,item){
     let editing=null,saving=false;
     const display=(key)=>key==='managers'?(item.managers||[]).map(m=>m.displayName||m.userName).join(', '):key==='isEnabled'?(workspace.isEnabled?'Yes':'No'):key==='icon'?(workspace.iconName||'folder'):key==='color'?(workspace.accentColor||'#b99750'):workspace[key]||'';
     const raw=(key)=>key==='managers'?(item.managers||[]).map(m=>m.userName).join(', '):display(key);
-    const paint=(key,node)=>{const value=display(key);node.textContent=value||(key==='managers'?'Manager required':'Not set');node.dataset.empty=String(!value);};
+    const paint=(key,node)=>{
+        const value=display(key),missing=!value||key==='managers'&&!(item.managers||[]).length;
+        node.replaceChildren();node.dataset.empty=String(missing);
+        node.classList.remove('workspace-value-danger','workspace-value-warning','workspace-value-caution','workspace-value-success');
+        if(key==='color'){
+            const swatch=document.createElement('span');swatch.className='workspace-accent-swatch';swatch.style.backgroundColor=/^#[0-9a-f]{6}$/i.test(value)?value:'#b99750';swatch.title=value;swatch.setAttribute('aria-label','Accent color '+value);swatch.setAttribute('role','img');node.append(swatch);return;
+        }
+        if(key==='icon'){
+            const icons={folder:'📁',camera:'📷',portrait:'🖼️',wedding:'💐',id:'🪪'};
+            const symbol=document.createElement('span');symbol.className='workspace-icon-symbol';symbol.textContent=icons[value]||'📁';symbol.title=value;symbol.setAttribute('role','img');symbol.setAttribute('aria-label',value+' icon');node.append(symbol);return;
+        }
+        if(key==='managers'&&missing){node.textContent='Manager required';node.classList.add('workspace-value-warning');}
+        else if(key==='emailAddress'){node.textContent=value||'Routing email required';node.classList.add(value?'workspace-value-success':'workspace-value-danger');}
+        else if(key==='defaultJobLead'){node.textContent=value||'Job lead not set';if(!value)node.classList.add('workspace-value-caution');}
+        else if(key==='isEnabled'){node.textContent=value;node.classList.add(workspace.isEnabled?'workspace-value-success':'workspace-value-danger');}
+        else node.textContent=value||'Not set';
+    };
     function finish(){
         if(!editing)return;const {key,node,button,cancel}=editing;editing.control?.remove();paint(key,node);node.removeAttribute('contenteditable');node.removeAttribute('role');node.removeAttribute('aria-label');node.removeAttribute('aria-invalid');node.onkeydown=node.onpaste=null;
         button.textContent='✎';button.setAttribute('aria-label','Edit '+button.dataset.label);button.title='Edit '+button.dataset.label;cancel.remove();editing=null;button.focus();
@@ -84,6 +100,7 @@ function bindWorkspaceCardEditing(card,item){
         }catch(cause){if(card.isConnected){if(!editing?.control)node.setAttribute('contenteditable','true');error(cause.message||'Could not save. Your edit is retained.');}}
         finally{saving=false;card.querySelectorAll('[data-workspace-pencil],[data-workspace-cancel]').forEach(button=>button.disabled=button.dataset.workspacePencil==='managers'&&!item.managers);}
     }
+    card.querySelectorAll('[data-workspace-value]').forEach(node=>paint(node.dataset.workspaceValue,node));
     card.querySelectorAll('[data-workspace-pencil]').forEach(button=>{
         button.dataset.label=button.title.replace(/^Edit /,'');
         button.onclick=()=>{
