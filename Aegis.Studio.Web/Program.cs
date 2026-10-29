@@ -329,6 +329,8 @@ app.MapGet("/assets/studio-login-clean-background.jpg", (IWebHostEnvironment e) 
     Results.File(Path.Combine(e.WebRootPath, "assets", "studio-login-clean-background.jpg"), "image/jpeg")).AllowAnonymous();
 app.MapGet("/assets/studio-login-master-background.jpg", (IWebHostEnvironment e) =>
     Results.File(Path.Combine(e.WebRootPath, "assets", "studio-login-master-background.jpg"), "image/jpeg")).AllowAnonymous();
+app.MapGet("/assets/studio-login-mirrored-background.jpg", (IWebHostEnvironment e) =>
+    Results.File(Path.Combine(e.WebRootPath, "assets", "studio-login-mirrored-background.jpg"), "image/jpeg")).AllowAnonymous();
 app.MapGet("/", (HttpContext context,IWebHostEnvironment e) => { context.Response.Headers.CacheControl = "no-cache"; return Results.File(Path.Combine(e.WebRootPath, "index.html"), "text/html; charset=utf-8"); }).RequireAuthorization();
 app.MapStudioAuthentication();
 app.MapStudioOutboundMailbox();
