@@ -194,8 +194,7 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 @media(max-width:800px) { .staff-editors,.staff-global-role-columns { grid-template-columns:minmax(0,1fr); } .staff-grid-section>header { flex-wrap:wrap; } }
 
 /* Workspace accountability content; the shared shell continues to own the frame. */
-.workspace-management-actions{display:flex;justify-content:flex-end;margin-bottom:8px}
-.workspace-accountability-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:start}
+.workspace-accountability-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:stretch}
 .workspace-accountability-card{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:8px;row-gap:4px;min-width:0;padding:7px;border:1px solid var(--studio-control-border,#cdd8e2);border-radius:9px;background:var(--studio-card-surface,#fff)}
 .workspace-card-heading{grid-column:1/-1;display:flex;flex-direction:column;align-items:stretch;gap:7px;min-height:105px;padding-right:113px;min-width:0}
 .workspace-card-title-row{display:flex;align-items:flex-start;gap:5px;min-width:0;width:100%;max-width:100%}
@@ -232,15 +231,15 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .workspace-create-form :is(input,select){box-sizing:border-box;width:100%;min-width:0;padding:6px;border:1px solid var(--studio-control-border,#cdd8e2);border-radius:5px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font:inherit}
 .workspace-create-form [role]{margin:0;font-size:12px;overflow-wrap:anywhere}
 .workspace-create-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
-.workspace-admin-actions{grid-column:1/-1;display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:2px;padding-top:7px;border-top:1px solid var(--studio-control-border,#cdd8e2)}.workspace-admin-actions button{font-size:10px;padding:4px 6px}.workspace-admin-actions [data-workspace-jobs]{position:static;margin-left:auto;white-space:nowrap}
+.workspace-admin-actions{grid-column:1/-1;display:flex;align-items:center;align-self:end;gap:4px;flex-wrap:wrap;margin-top:2px;padding-top:7px;border-top:1px solid var(--studio-control-border,#cdd8e2)}.workspace-admin-actions button{font-size:10px;padding:4px 6px}.workspace-admin-actions [data-workspace-jobs]{position:static;margin-left:auto;white-space:nowrap}
 .workspace-appearance-picker{display:block;max-width:100%;min-height:30px;border:1px solid var(--studio-control-border,#cdd8e2);border-radius:5px;background:var(--studio-card-surface,#fff);color:var(--studio-control-text,#233e57);font:inherit}
 .workspace-appearance-picker[type="color"]{width:76px;padding:2px;cursor:pointer}
 .workspace-admin-actions [data-workspace-mail]{background:#e5edf5;border:1px solid #93afc8;color:#294d6d}
 .workspace-admin-actions [data-workspace-mail]:is(:hover,:focus-visible){background:#d2e2f0;border-color:#6d96b9;color:#183b5b}
 .workspace-admin-actions [data-workspace-members]{background:#dceee9;border:1px solid #78ad9d;color:#21594d;font-weight:600}
 .workspace-admin-actions [data-workspace-members]:is(:hover,:focus-visible){background:#c4e3d9;border-color:#508e7c;color:#164438}
-.workspace-management-actions [data-create-workspace],.workspace-admin-actions .workspace-card-create{background:#8b5729;border:1px solid #71421e;color:#fff8ed;font-weight:700}
-.workspace-management-actions [data-create-workspace]:is(:hover,:focus-visible),.workspace-admin-actions .workspace-card-create:is(:hover,:focus-visible){background:#70411e;border-color:#583015;color:#fff}
+.workspace-admin-actions .workspace-card-create{background:#8b5729;border:1px solid #71421e;color:#fff8ed;font-weight:700;min-height:42px;padding:9px 16px;font-size:12px}
+.workspace-admin-actions .workspace-card-create:is(:hover,:focus-visible){background:#70411e;border-color:#583015;color:#fff}
 .workspace-create-actions [type="submit"]{background:#8b5729;border:1px solid #71421e;color:#fff8ed}
 .workspace-create-actions [type="submit"]:is(:hover,:focus-visible){background:#70411e;color:#fff}
 /* Dedicated import content mirrors the reference's steps, mapping, preview and review. */
