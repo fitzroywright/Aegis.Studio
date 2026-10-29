@@ -31,18 +31,41 @@ async function hydrateWorkspaceManagers(items){
 }
 
 async function editWorkspace(id) {
-    const [current,employees] = await Promise.all([json('/api/workspaces/' + id),json('/api/studio-employees?assignable=true')]);
-    const leadOptions='<option value="">No default Job Lead</option>'+employees.map(employee=>`<option value="${esc(employee.userName)}" ${String(current.defaultJobLead||'').toLowerCase()===String(employee.userName||'').toLowerCase()?'selected':''}>${esc(employee.displayName)}${employee.roles?.length?' · '+esc(employee.roles.join(', ')):''}</option>`).join('');
-    const dialog=studioDialog('Edit Workspace',`<form class="request-form"><label>Name<input name="name" required value="${esc(current.name)}"></label><label>Email address<input name="email" type="email" value="${esc(current.emailAddress||'')}"></label><label>Default Job Lead<select name="defaultJobLead">${leadOptions}</select></label><label>Enabled<select name="enabled"><option value="true" ${current.isEnabled?'selected':''}>Yes</option><option value="false" ${!current.isEnabled?'selected':''}>No</option></select></label><details><summary>Advanced / Integration Settings</summary><label>Route key<input name="routeKey" value="${esc(current.routeKey||'')}" placeholder="Generated automatically"></label><small>Used by website booking and incoming-message integrations. Leaving blank keeps the current key or generates one if missing.</small></details><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Save</button></div></form>`);
-    dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
-    const form=dialog.querySelector('form');
-    form.onsubmit=async event=>{
-        event.preventDefault();const button=form.querySelector('[type=submit]');button.disabled=true;
-        try{
-            await json('/api/workspaces/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:form.elements.name.value.trim(),emailAddress:form.elements.email.value.trim()||null,routeKey:form.elements.routeKey.value.trim()||null,isEnabled:form.elements.enabled.value==='true',sortOrder:current.sortOrder||0,defaultJobLead:form.elements.defaultJobLead.value||null})});
-            dialog.close();await loadWorkspaces();await showWorkspaces();
-        }catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}
-    };
+    let card=[...genericView.querySelectorAll('[data-workspace-card]')].find(card=>card.dataset.workspaceCard===String(id));
+    if(!card){await showWorkspaces();card=[...genericView.querySelectorAll('[data-workspace-card]')].find(card=>card.dataset.workspaceCard===String(id));}
+    const host=card?.querySelector('[data-workspace-editor]');if(!host)return;
+    if(host.childElementCount){host.querySelector('input')?.focus();return;}
+    const loading=document.createElement('p');loading.setAttribute('role','status');loading.textContent='Loading workspace editor…';host.append(loading);
+    const live=()=>host.isConnected&&loading.parentNode===host;
+    try{
+        const [current,employees,appearance]=await Promise.all([json('/api/workspaces/'+encodeURIComponent(id)),json('/api/studio-employees?assignable=true'),json('/api/workspaces/'+encodeURIComponent(id)+'/appearance')]);
+        if(!live())return;
+        const escape=StudioPage.escape;
+        const people=[...employees];if(current.defaultJobLead&&!people.some(person=>person.userName.toLowerCase()===current.defaultJobLead.toLowerCase()))people.push({userName:current.defaultJobLead,displayName:current.defaultJobLead});
+        const leadOptions='<option value="">No default Job Lead</option>'+people.map(person=>`<option value="${escape(person.userName)}" ${String(current.defaultJobLead||'').toLowerCase()===String(person.userName).toLowerCase()?'selected':''}>${escape(person.displayName||person.userName)}</option>`).join('');
+        host.innerHTML=`<form class="workspace-card-editor" aria-label="Edit ${escape(current.name)}"><label>Name<input name="name" maxlength="200" required value="${escape(current.name)}"></label><label>Email address<input name="email" type="email" value="${escape(current.emailAddress||'')}"></label><label>Default Job Lead<select name="defaultJobLead">${leadOptions}</select></label><label>Enabled<select name="enabled"><option value="true" ${current.isEnabled?'selected':''}>Yes</option><option value="false" ${!current.isEnabled?'selected':''}>No</option></select></label><label>Icon<select name="icon">${['folder','camera','portrait','wedding','id'].map(icon=>`<option ${appearance.icon===icon?'selected':''}>${icon}</option>`).join('')}</select></label><label>Accent<input name="color" type="color" value="${escape(appearance.color||'#b99750')}"></label><details><summary>Advanced / Integration Settings</summary><label>Route key<input name="routeKey" value="${escape(current.routeKey||'')}"></label></details><p role="status" aria-live="polite"></p><div class="workspace-card-editor-actions"><button type="button" class="action" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`;
+        const form=host.querySelector('form'),status=form.querySelector('[role=status]');let saving=false;
+        const close=()=>{host.replaceChildren();card.querySelector('[data-workspace-edit]')?.focus();};
+        form.querySelector('[data-cancel]').onclick=close;
+        form.onsubmit=async event=>{
+            event.preventDefault();if(saving||!form.reportValidity())return;
+            const value=name=>form.elements.namedItem(name).value;
+            if(!value('name').trim()){status.textContent='Workspace name is required.';return;}
+            saving=true;form.querySelectorAll('input,select,button').forEach(control=>control.disabled=true);status.textContent='Saving…';let workspaceSaved=false;
+            try{
+                const payload={name:value('name').trim(),emailAddress:value('email').trim()||null,routeKey:value('routeKey').trim()||null,isEnabled:value('enabled')==='true',sortOrder:current.sortOrder||0,defaultJobLead:value('defaultJobLead')||null};
+                const saved=await json('/api/workspaces/'+encodeURIComponent(id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});workspaceSaved=true;
+                Object.assign(current,payload,saved||{});
+                const cached=workspaceAccessCache.find(item=>String(item.workspace.id)===String(id));if(cached)Object.assign(cached.workspace,current);
+                if(card.isConnected){card.querySelector('h2').textContent=current.name;card.querySelector('[data-workspace-email]').textContent=current.emailAddress||'No routing email configured';}
+                await json('/api/workspaces/'+encodeURIComponent(id)+'/appearance',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({icon:value('icon'),color:value('color')})});
+                if(host.isConnected)close();
+                await loadWorkspaces();renderWorkspaceMenu();
+            }catch(error){if(host.isConnected&&form.isConnected)status.textContent=(workspaceSaved?'Workspace fields saved; appearance could not be confirmed. Retry Save changes. ':'')+(error.message||'Could not save. Your edits are retained.');}
+            finally{saving=false;form.querySelectorAll('input,select,button').forEach(control=>control.disabled=false);}
+        };
+        form.elements.namedItem('name').focus();
+    }catch(error){if(live()){host.replaceChildren();const message=document.createElement('p');message.setAttribute('role','alert');message.textContent=error.message||'Could not load workspace editor.';const retry=document.createElement('button');retry.type='button';retry.className='action';retry.textContent='Retry';retry.onclick=()=>{host.replaceChildren();editWorkspace(id);};host.append(message,retry);}}
 }
 
 const permissionLabels = [
@@ -129,7 +152,7 @@ async function runMailboxImport(workspaceId) {
 }
 
 function renderEmployeeDirectorySection() {
-    return `<section class="staff-administration"><div class="staff-editors"><section class="staff-editor"><h2>Add staff member</h2><div class="staff-entry"><label>User name<input id="employeeUserName" autocomplete="off"></label><label>Display name<input id="employeeDisplayName"></label><label>Email<input id="employeeEmail" type="email"></label><label>Assignable<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><button type="button" class="primary" onclick="saveStudioEmployee()">Save employee</button></div></section>${renderStudioRoleEditor('Job')}<div class="staff-global-roles" data-staff-global-roles></div></div><section class="staff-grid-section"><header><h2>Staff directory</h2><span>Edit a row, then Save. User names identify existing accounts.</span></header><div id="studioEmployeeList" class="staff-grid-scroll"><p role="status">Loading…</p></div></section>${renderStudioRoleGrid('Job')}</section>`;
+    return `<section class="staff-administration"><div class="staff-editors"><section class="staff-editor"><h2>Add staff member</h2><div class="staff-entry"><label>User name<input id="employeeUserName" autocomplete="off"></label><label>Display name<input id="employeeDisplayName"></label><label>Email<input id="employeeEmail" type="email"></label><label>Assignable<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><button type="button" class="primary" onclick="saveStudioEmployee()">Save employee</button></div></section>${renderStudioRoleEditor()}<div class="staff-global-roles" data-staff-global-roles></div></div><section class="staff-grid-section"><header><h2>Staff directory</h2><span>Edit a row, then Save. User names identify existing accounts.</span></header><div id="studioEmployeeList" class="staff-grid-scroll"><p role="status">Loading…</p></div></section>${renderStudioRoleGrid()}</section>`;
 }
 async function refreshStudioEmployees(){
     const holder=document.getElementById('studioEmployeeList');if(!holder)return;
@@ -173,13 +196,13 @@ async function saveStudioEmployee(){
     await refreshStudioEmployees();
 }
 
-function renderStudioRoleEditor(scope){
-    return `<section class="staff-editor"><h2>Create reusable role</h2><div class="staff-entry"><label>Name<input id="roleName"></label><label>Scope<select id="roleScope"><option>${esc(scope)}</option></select></label><label>Description<input id="roleDescription"></label><label>Template<select id="roleTemplate"><option value="viewer">Viewer</option><option value="worker">Worker</option><option value="manager">Manager</option><option value="admin">Administrator</option></select></label><button type="button" class="primary" onclick="createStudioRole()">Create role</button></div></section>`;
+function renderStudioRoleEditor(){
+    return `<section class="staff-editor"><h2>Create reusable role</h2><div class="staff-entry"><label>Name<input id="roleName"></label><label>Scope<select id="roleScope"><option>Job</option><option>Workspace</option></select></label><label>Description<input id="roleDescription"></label><label>Template<select id="roleTemplate"><option value="viewer">Viewer</option><option value="worker">Worker</option><option value="manager">Manager</option><option value="admin">Administrator</option></select></label><button type="button" class="primary" onclick="createStudioRole()">Create role</button></div></section>`;
 }
-function renderStudioRoleGrid(scope){
-    return `<section class="staff-grid-section"><header><h2>Reusable security roles</h2><span>Name and description edits preserve existing permissions.</span></header><div id="securityRoleList" class="staff-grid-scroll"><table class="staff-editable-grid"><caption class="sr-only">Editable reusable security roles</caption><thead><tr><th>Name</th><th>Scope</th><th>Description</th><th>Active</th><th>Actions</th></tr></thead><tbody>${studioRolesCache.filter(x=>x.scope===scope).map(x=>`<tr data-role-row="${esc(x.id)}"><td><input data-role-name aria-label="Name for role ${esc(x.name)}" value="${esc(x.name)}" required></td><td>${esc(x.scope)}</td><td><input data-role-description aria-label="Description for role ${esc(x.name)}" value="${esc(x.description||'')}"></td><td><input data-role-active type="checkbox" aria-label="Active role ${esc(x.name)}" ${x.isActive?'checked':''}></td><td><div class="staff-row-actions"><button type="button" class="action" onclick="saveStudioRoleRow(this)">Save</button><button type="button" class="action" onclick="deleteStudioRole(this.closest('[data-role-row]').dataset.roleRow)">Delete</button></div><span data-row-status role="status"></span></td></tr>`).join('')||'<tr><td colspan="5">No reusable roles yet.</td></tr>'}</tbody></table></div></section>`;
+function renderStudioRoleGrid(){
+    return `<section class="staff-grid-section"><header><h2>Reusable security roles</h2><span>Name and description edits preserve existing permissions.</span></header><div id="securityRoleList" class="staff-grid-scroll"><table class="staff-editable-grid"><caption class="sr-only">Editable reusable security roles</caption><thead><tr><th>Name</th><th>Scope</th><th>Description</th><th>Active</th><th>Actions</th></tr></thead><tbody>${studioRolesCache.filter(x=>['Job','Workspace'].includes(x.scope)).map(x=>`<tr data-role-row="${esc(x.id)}"><td><input data-role-name aria-label="Name for role ${esc(x.name)}" value="${esc(x.name)}" required></td><td>${esc(x.scope)}</td><td><input data-role-description aria-label="Description for role ${esc(x.name)}" value="${esc(x.description||'')}"></td><td><input data-role-active type="checkbox" aria-label="Active role ${esc(x.name)}" ${x.isActive?'checked':''}></td><td><div class="staff-row-actions"><button type="button" class="action" onclick="saveStudioRoleRow(this)">Save</button><button type="button" class="action" onclick="deleteStudioRole(this.closest('[data-role-row]').dataset.roleRow)">Delete</button></div><span data-row-status role="status"></span></td></tr>`).join('')||'<tr><td colspan="5">No reusable roles yet.</td></tr>'}</tbody></table></div></section>`;
 }
-function renderSecurityRolesSection(scope='Job') {return `<section class="job-section staff-role-section">${renderStudioRoleEditor(scope)}${renderStudioRoleGrid(scope)}</section>`;}
+
 async function saveStudioRoleRow(button){
     const row=button.closest('[data-role-row]'),role=studioRolesCache.find(r=>String(r.id)===row.dataset.roleRow),status=row.querySelector('[data-row-status]');if(!role)return;
     const name=row.querySelector('[data-role-name]');if(!name.reportValidity()||!name.value.trim()){status.textContent='Role name is required.';return;}
@@ -201,9 +224,9 @@ function roleTemplate(scope, template) {
 
 async function createStudioRole() {
     const name=document.getElementById('roleName').value.trim(); if(!name)return alert('Role name is required.'); const scope=document.getElementById('roleScope').value; const permissions=roleTemplate(scope,document.getElementById('roleTemplate').value);
-    await json('/api/security/roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,scope,description:document.getElementById('roleDescription').value.trim()||null,permissionsJson:JSON.stringify(permissions),isActive:true})}); await (scope==='Workspace'?showWorkspaces():studioNavigate('staff-roles'));
+    await json('/api/security/roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,scope,description:document.getElementById('roleDescription').value.trim()||null,permissionsJson:JSON.stringify(permissions),isActive:true})}); await studioNavigate('staff-roles');
 }
-async function deleteStudioRole(id){if(!confirm('Delete this reusable role? Existing members keep their copied permissions but lose the role link.'))return;const r=await fetch('/api/security/roles/'+id,{method:'DELETE'});if(!r.ok)throw new Error(await r.text());await (document.body.dataset.studioView==='workspace-management'?showWorkspaces():studioNavigate('staff-roles'));}
+async function deleteStudioRole(id){if(!confirm('Delete this reusable role? Existing members keep their copied permissions but lose the role link.'))return;const r=await fetch('/api/security/roles/'+id,{method:'DELETE'});if(!r.ok)throw new Error(await r.text());await studioNavigate('staff-roles');}
 
 function renderWorkflowSection() {
     return `<section class="job-section"><h2>Workflow automation</h2><p class="muted">Database-backed event/condition/action workflows. Supported triggers include JobStatusChanged, ScheduleChanged, ProductionChanged and DeliveryChanged. Actions: coordination CreateActivity, NotifyJob, NotifyRequester and WaitMinutes. Job status, ownership, production dispatch and scheduling require authorized Job workflow decisions.</p><div id="workflowList"><p class="muted">Loading…</p></div><h3>Create workflow</h3><div class="pos-entry"><label>Name<input id="workflowName"></label><label>Trigger<select id="workflowTrigger"><option>JobStatusChanged</option><option>ScheduleChanged</option><option>ProductionChanged</option><option>DeliveryChanged</option></select></label><label>Job status condition<input id="workflowStatusCondition" placeholder="optional, e.g. Shoot Complete"></label></div><label style="display:block;margin-top:10px">Actions JSON<textarea id="workflowActions" rows="8" style="width:100%">[{"type":"CreateActivity","activityType":"Other","title":"Review backup verification","dueMinutes":120},{"type":"NotifyJob","subject":"Workflow started","body":"Automated production workflow started."}]</textarea></label><button class="primary" onclick="createWorkflowDefinition()">Create workflow</button><h3>Authorization audit</h3><button class="action" onclick="runAuthorizationAudit()">Run endpoint audit</button><div id="authorizationAuditResult" class="meta"></div></section>`;
@@ -231,6 +254,3 @@ async function seedStudioDemoData(button) {
         button.disabled = false;
     }
 }
-
-
-
