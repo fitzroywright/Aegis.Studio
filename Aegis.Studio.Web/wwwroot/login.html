@@ -5,39 +5,73 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Sign in - Aegis Studio</title>
   <style>
-    :root { font-family: Inter, Segoe UI, Arial, sans-serif; color-scheme: dark; }
+    :root { font-family: Inter, "Segoe UI", Arial, sans-serif; color-scheme: light; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0c1118; color: #eef3f8; }
-    .card { width: min(420px, calc(100vw - 32px)); background: #141c26; border: 1px solid #2a3746; border-radius: 16px; padding: 32px; box-shadow: 0 24px 70px rgba(0,0,0,.35); }
-    .brand { display: flex; gap: 8px; align-items: baseline; letter-spacing: .08em; margin-bottom: 28px; }
-    .brand strong { font-size: 24px; }
-    .brand span { color: #8fa4b8; }
-    h1 { margin: 0 0 8px; font-size: 24px; }
-    p { color: #9fb0c1; line-height: 1.45; margin: 0 0 24px; }
-    label { display: block; margin: 14px 0; font-size: 13px; color: #b8c6d3; }
-    input { width: 100%; margin-top: 7px; border: 1px solid #344456; background: #0f1620; color: #fff; border-radius: 9px; padding: 12px 13px; font: inherit; }
-    button { width: 100%; margin-top: 12px; border: 0; border-radius: 9px; padding: 12px 14px; font: inherit; font-weight: 700; background: #e8eef5; color: #111820; cursor: pointer; }
-    button:disabled { opacity: .6; cursor: wait; }
-    .error { min-height: 22px; color: #ff9c9c; font-size: 13px; margin-top: 12px; }
-    .environment { margin-top: 22px; padding-top: 18px; border-top: 1px solid #293645; font-size: 12px; color: #7f93a7; }
+    body { margin:0; min-height:100vh; background:#e9e9e9; color:#101a2b; }
+    .login-shell { min-height:100vh; display:grid; grid-template-columns:minmax(0, 1.1fr) minmax(420px, .9fr); background:#f8f8f8; }
+    .hero { position:relative; min-height:100vh; padding:54px clamp(30px,5vw,88px) 42px; display:flex; flex-direction:column; color:white; background:linear-gradient(90deg,rgba(17,15,13,.88),rgba(17,15,13,.3)),url('/assets/studio-login-background.jpg') center/cover no-repeat,#39332c; }
+    .studio-logo { display:block; width:min(350px,75%); height:94px; object-fit:contain; object-position:left center; }
+    .logo-fallback { font-size:44px; font-family:cursive; color:white; }
+    .hero-content { margin:auto 0; max-width:580px; }
+    .eyebrow { font-size:13px; letter-spacing:.27em; color:#d9d4cf; }
+    .hero h2 { font-size:clamp(42px,4.4vw,72px); line-height:1.08; letter-spacing:-.04em; font-weight:500; margin:36px 0 30px; }
+    .hero-content p { font-size:clamp(17px,1.5vw,23px); line-height:1.5; color:#e4e1df; }
+    .benefits { display:flex; gap:30px; align-items:start; margin-top:45px; }
+    .benefit { flex:1; font-size:15px; line-height:1.5; }
+    .benefit + .benefit { border-left:1px solid #b7b2ac; padding-left:26px; }
+    .benefit-icon { display:block; font-size:25px; margin-bottom:9px; }
+    .login-side { display:grid; place-items:center; padding:48px 5vw; }
+    .card { width:min(100%,560px); border-radius:22px; padding:clamp(32px,4.5vw,66px); background:#fff; box-shadow:0 20px 70px rgba(0,0,0,.07); }
+    .brand { display:flex; justify-content:center; margin-bottom:50px; min-height:74px; }
+    .brand img { max-width:235px; max-height:90px; object-fit:contain; }
+    .brand-fallback { font-size:27px; font-weight:700; color:#be1e20; }
+    h1 { font-size:clamp(29px,2.4vw,39px); letter-spacing:-.03em; margin:0 0 10px; }
+    p { color:#788293; line-height:1.5; margin:0 0 34px; font-size:17px; }
+    label { display:block; margin:22px 0; font-size:15px; font-weight:600; }
+    input { width:100%; margin-top:10px; border:1px solid #d8dde5; background:#fff; color:#172033; border-radius:9px; padding:17px 18px; font:inherit; font-weight:400; outline-offset:3px; }
+    input:focus { border-color:#b58a5a; }
+    button { width:100%; margin-top:22px; border:0; border-radius:9px; padding:18px; font:inherit; font-weight:600; background:#222427; color:white; cursor:pointer; }
+    button:hover { background:#37393c; }
+    button:disabled { opacity:.6; cursor:wait; }
+    .error { min-height:22px; color:#b42318; font-size:13px; margin-top:12px; }
+    .environment { margin-top:12px; font-size:12px; color:#758091; text-align:center; }
+    @media(max-width:850px) { .login-shell { grid-template-columns:1fr; } .hero { min-height:310px; padding:28px; } .studio-logo { height:65px; } .hero-content { margin:32px 0 0; } .hero h2 { font-size:37px; margin:14px 0; } .hero-content p { font-size:16px; } .benefits { display:none; } .login-side { padding:28px 18px; } .card { padding:32px; } }
+    @media(prefers-reduced-motion:reduce) { *,*:before,*:after { scroll-behavior:auto!important; } }
   </style>
 </head>
 <body>
-  <main class="card">
-    <div class="brand"><strong>AEGIS</strong><span>STUDIO</span></div>
-    <h1>Sign in</h1>
-    <p id="signInHelp">Enter your Windows/Active Directory user name and password. Aegis requires an explicit sign-in before any Studio workspace or client data is shown.</p>
-    <form id="loginForm">
-      <label>User name
-        <input id="userName" autocomplete="username" autofocus required placeholder="FWright or FFPJM\\FWright">
-      </label>
-      <label id="passwordLabel">Password
-        <input id="password" type="password" autocomplete="current-password" required>
-      </label>
-      <button id="signInButton" type="submit">Sign in</button>
-      <div id="error" class="error" role="alert"></div>
-    </form>
-    <div id="environment" class="environment">Development/testing directory: FFP Active Directory over LDAPS.</div>
+  <main class="login-shell">
+    <section class="hero" aria-label="Studio introduction">
+      <div><img class="studio-logo" src="/assets/studio-login-logo.png" alt="Studio" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="logo-fallback" hidden>Studio</span></div>
+      <div class="hero-content">
+        <div class="eyebrow">IDEAS &nbsp;→&nbsp; WORK &nbsp;→&nbsp; IMPACT</div>
+        <h2>A more creative<br>way to work.</h2>
+        <p>Studio brings your ideas, projects, and people together — so you can make what’s next.</p>
+      </div>
+      <div class="benefits" aria-label="Studio features">
+        <div class="benefit"><span class="benefit-icon" aria-hidden="true">♧</span>Manage<br>bookings</div>
+        <div class="benefit"><span class="benefit-icon" aria-hidden="true">▣</span>Work<br>together</div>
+        <div class="benefit"><span class="benefit-icon" aria-hidden="true">▧</span>Deliver<br>beautiful results</div>
+      </div>
+    </section>
+    <section class="login-side">
+      <div class="card">
+        <div class="brand"><img src="/assets/bryan-studios-logo.png" alt="Bryan Studios Ltd" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="brand-fallback" hidden>Bryan Studios Ltd</span></div>
+        <h1>Welcome to Studio</h1>
+        <p id="signInHelp">Sign in to access your workspace.</p>
+        <form id="loginForm">
+          <label for="userName">Username
+            <input id="userName" autocomplete="username" autofocus required placeholder="Enter your username">
+          </label>
+          <label id="passwordLabel" for="password">Password
+            <input id="password" type="password" autocomplete="current-password" required placeholder="Enter your password">
+          </label>
+          <button id="signInButton" type="submit">Sign in →</button>
+          <div id="error" class="error" role="alert" aria-live="polite"></div>
+        </form>
+        <div id="environment" class="environment" hidden></div>
+      </div>
+    </section>
   </main>
   <script>
     const loginForm = document.getElementById('loginForm');
@@ -58,8 +92,8 @@
             mockAuthentication = options.mockAuthentication === true;
             if (!mockAuthentication) return;
 
-            signInHelp.textContent = 'Mock authentication is enabled for this Development environment. Sign in with the development identity below; no directory password is required.';
-            environment.textContent = 'Development mode: Mock Authentication enabled. Active Directory credentials are not used.';
+            signInHelp.textContent = 'Sign in to access your workspace.';
+            environment.textContent = 'Development sign-in mode'; environment.hidden = false;
             password.required = false;
             password.value = '';
             passwordLabel.style.display = 'none';
@@ -109,7 +143,7 @@
             error.textContent = 'Aegis could not reach the sign-in service.';
         } finally {
             signInButton.disabled = false;
-            signInButton.textContent = 'Sign in';
+            signInButton.textContent = 'Sign in →';
         }
     });
   </script>
