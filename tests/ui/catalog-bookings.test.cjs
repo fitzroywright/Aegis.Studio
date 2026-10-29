@@ -11,7 +11,7 @@ function setup(t,url='https://studio.test/#studio=catalog'){
  return {w,fixture};
 }
 test('Booking Sessions shares Products and Services and retains unsaved edits across catalog tabs',async t=>{
- const {w,fixture}=setup(t);await w.showCommercialCatalog({tab:'booking-sessions'});assert.equal(w.document.querySelectorAll('h1').length,1);assert.equal(w.document.querySelector('.st-page').getAttribute('aria-label'),'Products and Services');const panel=w.document.querySelector('[data-catalog-panel="booking-sessions"]');assert.equal(panel.hidden,false);assert.equal(w.document.querySelector('[data-add]').hidden,false);
+ const {w,fixture}=setup(t);await w.showCommercialCatalog({tab:'booking-sessions'});assert.equal(w.document.querySelectorAll('h1').length,0);assert.equal(w.document.querySelector('.st-page').getAttribute('aria-label'),'Products and Services');const panel=w.document.querySelector('[data-catalog-panel="booking-sessions"]');assert.equal(panel.hidden,false);assert.equal(w.document.querySelector('[data-add]').hidden,false);
  const input=panel.querySelector('[data-field=name]');input.value='Wedding';input.dispatchEvent(new w.Event('input',{bubbles:true}));w.document.querySelector('[data-catalog-tab=products]').click();await settle();assert.equal(w.document.querySelector('[data-catalog-panel=products]').hidden,false);assert.match(w.document.querySelector('[data-item]').textContent,/Print/);assert.equal(w.document.querySelector('[data-add]').hidden,false);
  w.document.querySelector('[data-catalog-tab="booking-sessions"]').click();await settle();assert.equal(panel.querySelector('[data-field=name]').value,'Wedding');assert.equal(panel.querySelector('[data-booking-save]').disabled,false);assert.equal(fixture.calls.filter(call=>call.url==='/api/admin/public-booking/session-types/').length,1);panel.querySelector('[data-booking-save]').click();await settle();assert.equal(fixture.sessions[0].name,'Wedding');assert.equal(w.history.state.studioCatalogTab,'booking-sessions');
 });
@@ -30,7 +30,7 @@ test('approved catalog layout has one tab strip, real hours and an inline editor
  assert.equal(w.document.querySelectorAll('[data-catalog-tab]').length,3);assert.equal(w.document.querySelectorAll('.booking-tabs').length,1);
  assert.equal(w.document.querySelector('[data-catalog-tab="booking-sessions"]').getAttribute('aria-pressed'),'true');
  assert.ok(w.document.querySelector('[data-booking-editor] form'));assert.equal(w.document.querySelector('dialog'),null);
- assert.equal(w.document.querySelector('[data-catalog-preview]').href,'https://web.bryanstudiosltd.com/#booking');
+ assert.equal(w.document.querySelector('[data-catalog-preview]'),null);
  assert.match(w.document.querySelector('[data-catalog-publication]').textContent,/Automatic publishing enabled/);
  assert.doesNotMatch(w.document.querySelector('[data-catalog-publication]').textContent,/up to date/);
  w.document.querySelector('[data-catalog-hours]').click();await settle();assert.equal(w.history.state.studioCatalogTab,'hours');assert.ok(w.document.querySelector('.booking-hours-grid'));

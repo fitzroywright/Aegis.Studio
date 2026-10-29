@@ -3,11 +3,9 @@
 /* Products and Services content. The shared shell owns the page header and dimensions. */
 .catalog-page { --studio-content-padding:24px;--studio-content-gap:12px; }
 .catalog-heading { display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap; }
-.catalog-heading-copy h1 { margin:0 0 6px;font-size:28px;line-height:1.2;color:var(--theme-text,#172d4a); }
 .catalog-heading-copy p { margin:0;color:var(--theme-muted,#667383);font-size:14px; }
 .catalog-heading-actions { display:flex;align-items:center;gap:10px; }
 .catalog-heading-actions .primary,.booking-sessions .primary { background:#b88635;border-color:#b88635;color:#fff;font-size:14px;padding:9px 14px;border-radius:4px; }
-.catalog-heading-actions a.action { display:inline-flex;align-items:center;border:1px solid #b88635;border-radius:4px;padding:9px 14px;background:transparent;color:var(--catalog-link-ink,#8c5f19);text-decoration:none;font-size:14px; }
 .catalog-heading-actions [hidden] { display:none; }
 .catalog-status-strip { display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 16px;background:var(--catalog-header-surface,#f0f4f7);border-radius:4px;color:var(--catalog-header-ink,#172d4a);font-size:14px; }
 .catalog-status-strip > span + span { border-left:1px solid var(--studio-grid-border,#dce4ec);padding-left:18px; }

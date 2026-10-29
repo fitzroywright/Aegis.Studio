@@ -1,9 +1,15 @@
 .ps-page .ps-board{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .ps-page .st-toolbar p{margin:5px 0 0;font-size:11px;opacity:.75}
-.ps-toolbar,.ps-filters,.pipeline-filters,.pp-filters{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.ps-toolbar{justify-content:space-between;padding:10px 12px 6px}.ps-filters select,.ps-filters>input{min-height:29px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;padding:4px 7px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;box-sizing:border-box}
-.ps-filters{padding:6px 12px 10px}.ps-filters>input{flex:1;min-width:140px}.ps-filters select{max-width:180px}.ps-filters label{font-size:11px;display:flex;align-items:center;gap:5px}
-.ps-calendar-tools{display:inline-flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;min-width:0;max-width:100%;gap:6px;white-space:nowrap;margin-left:auto}
+.pipeline-filters,.pp-filters{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ps-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;justify-content:space-between;padding:8px 12px;min-width:0}
+.ps-filters{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0}
+.ps-filters label{display:flex;align-items:center;gap:4px;font-size:10px;white-space:nowrap;margin:0}
+.ps-filters .ps-header-filter{flex:0 1 140px;min-width:85px}
+.ps-filters .ps-header-search{flex:1 1 150px;min-width:95px}
+.ps-filters .ps-header-inactive{flex:none}
+.ps-filters :is(select,input[type=search]){flex:1;min-width:0;width:100%;height:26px;min-height:26px;padding:3px 5px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:10px;box-sizing:border-box}
+.ps-filters input[type=checkbox]{width:12px;height:12px;margin:0}
+.ps-calendar-tools{display:inline-flex;align-items:center;justify-content:flex-end;flex-wrap:nowrap;flex:0 0 auto;min-width:0;max-width:100%;gap:6px;white-space:nowrap;margin-left:auto}
 .ps-calendar-tools .mw-calendar-view-switch{display:inline-flex;align-items:center;gap:1px;height:28px;margin:0;padding:2px;background:#eaf1f7;border:1px solid #cddbe8;border-radius:7px;flex:0 0 auto}
 .ps-calendar-tools .mw-calendar-view-switch button{min-width:37px;height:22px;min-height:22px;padding:2px 7px;border:0;border-radius:5px;background:transparent;color:#4c647d;font-size:10px;font-weight:700;cursor:pointer}
 .ps-calendar-tools .mw-calendar-view-switch button.active{background:#234c73;color:#fff;box-shadow:0 1px 2px rgba(20,44,68,.18)}
@@ -31,7 +37,6 @@
 .studio-schedule-switch{display:inline-flex;gap:0;align-items:stretch;border:1px solid var(--studio-control-border,#bacbd8);border-radius:6px;overflow:hidden;flex:0 0 auto}
 .studio-schedule-switch button{appearance:none;border:0;border-radius:0;padding:7px 10px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#244464);font:inherit;font-size:11px;font-weight:700;cursor:pointer}
 .studio-schedule-switch button+button{border-left:1px solid var(--studio-control-border,#bacbd8)}
-.ps-page .studio-schedule-switch button[aria-pressed=true]{background:#986c55;border-color:#986c55;color:#fff;font-weight:700}
 .studio-schedule-switch button:hover{box-shadow:inset 0 -3px var(--theme-accent,#cf792a)}
 .studio-schedule-switch button:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:-2px}
 .st-pipeline-content .st-tools,.st-commercial .st-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
@@ -45,26 +50,26 @@
 .st-pipeline-content .pipeline-status-heading select{flex:1 1 110px;min-width:0;max-width:150px;height:27px;min-height:27px;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
 .st-pipeline-content .pipeline-status-heading select:focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
 
-/* Front Desk-style compact search/filter header. */
-:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex:none;display:flex;align-items:center;flex-wrap:nowrap;gap:10px;min-width:0;padding:8px 11px;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border-bottom:2px solid var(--theme-accent,#cf792a);box-sizing:border-box}
-:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) label{display:flex;align-items:center;gap:7px;margin:0;font-size:11px;font-weight:700;min-width:0}
-:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-filter{flex:0 1 240px}
-:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-search{flex:1 1 260px}
-:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) label>span{white-space:nowrap;flex:none}
-:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) select,:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) input[type=search]{flex:1;min-width:0;width:100%;max-width:none;height:28px;min-height:28px;margin:0;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
-:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) input[type=search]::placeholder{color:#e2ebf6;opacity:1}
-:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-inactive{flex:none;font-weight:500;white-space:nowrap}
-:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) input[type=checkbox]{width:auto;min-height:0;margin:0}
-.ps-page :is(.ps-calendar-head,.ps-day-head),.ps-page :is(.ps-calendar-head,.ps-day-head)>div:first-child{background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8)}
-:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) :is(input,select):focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
+/* Pipeline and Production retain their separate filter headers. */
+.st-pipeline-content .pipeline-filters,.pp-page .pp-filters{flex:none;display:flex;align-items:center;flex-wrap:nowrap;gap:10px;min-width:0;padding:8px 11px;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border-bottom:2px solid var(--theme-accent,#cf792a);box-sizing:border-box}
+.st-pipeline-content .pipeline-filters label,.pp-page .pp-filters label{display:flex;align-items:center;gap:7px;margin:0;font-size:11px;font-weight:700;min-width:0}
+.st-pipeline-content .ps-header-filter,.pp-page .ps-header-filter{flex:0 1 240px}
+.st-pipeline-content .ps-header-search,.pp-page .ps-header-search{flex:1 1 260px}
+.st-pipeline-content .pipeline-filters label>span,.pp-page .pp-filters label>span{white-space:nowrap;flex:none}
+.st-pipeline-content .pipeline-filters select,.st-pipeline-content .pipeline-filters input[type=search],.pp-page .pp-filters input[type=search],.pp-page .pp-filters select{flex:1;min-width:0;width:100%;max-width:none;height:28px;min-height:28px;margin:0;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
+.st-pipeline-content .pipeline-filters input[type=search]::placeholder,.pp-page .pp-filters input[type=search]::placeholder{color:#e2ebf6;opacity:1}
+.st-pipeline-content .ps-header-inactive,.pp-page .ps-header-inactive{flex:none;font-weight:500;white-space:nowrap}
+.st-pipeline-content .pipeline-filters input[type=checkbox],.pp-page .pp-filters input[type=checkbox]{width:auto;min-height:0;margin:0}
+.ps-page .ps-calendar-head,.ps-page .ps-calendar-head>div:first-child,.ps-page .ps-day-head>div:first-child,.ps-page .ps-day-head{background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8)}
+.st-pipeline-content .pipeline-filters input:focus-visible,.st-pipeline-content .pipeline-filters select:focus-visible,.pp-page .pp-filters input:focus-visible,.pp-page .pp-filters select:focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
 .st-pipeline-content .pipeline-filters{margin-inline:-8px}
-@media(max-width:1100px){.st-pipeline-content .pipeline-calendar-toolbar{flex-wrap:wrap}.st-pipeline-content .pipeline-toolbar-left{flex-wrap:wrap}:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex-wrap:wrap;gap:8px}:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-filter{flex:1 1 200px}:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-search{flex:1 1 260px}}
+@media(max-width:1100px){.st-pipeline-content .pipeline-calendar-toolbar{flex-wrap:wrap}
+.st-pipeline-content .pipeline-toolbar-left{flex-wrap:wrap}
+.st-pipeline-content .pipeline-filters,.pp-page .pp-filters{flex-wrap:wrap;gap:8px}
+.st-pipeline-content .ps-header-filter,.pp-page .ps-header-filter{flex:1 1 200px}
+.st-pipeline-content .ps-header-search,.pp-page .ps-header-search{flex:1 1 260px}
+}
 
-.ps-role-filter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;background:#fff;border-bottom:1px solid #dfe3e8}
-.ps-role-filter button{min-height:31px;padding:5px 14px;border:1px solid #dedbd8;border-radius:999px;background:#fff;color:#26394b;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer}
-.ps-role-filter button.active{background:#986c55;border-color:#986c55;color:#fff;box-shadow:0 1px 2px #422d201f}
-.ps-role-filter button:hover:not(.active){background:#f6f0ec;border-color:#c9ad9e}
-.ps-role-filter button:focus-visible{outline:2px solid #df8a32;outline-offset:2px}
 .ps-role-icon{display:grid;place-items:center;width:27px;height:27px;border-radius:7px;color:#173b5b;font-size:17px;line-height:1}
 .ps-role-name{font-size:12px;line-height:1.25;color:#152f47}
 .ps-shoot[data-role="PHOTOGRAPHER"]{border-color:#f0c4a7;background:#fff0e4;color:#71421e}
@@ -79,6 +84,5 @@
 .ps-shoot[data-role="RETOUCHER"] .ps-status-pill{background:#7544d4}
 .ps-shoot[data-role="REVIEWER"] .ps-status-pill{background:#47a538}
 .ps-shoot[data-role="DELIVERY"] .ps-status-pill{background:#c86a26}
-@media(max-width:1100px){.ps-role-filter{gap:6px;padding:8px}.ps-role-filter button{padding-inline:10px}}
 
 
