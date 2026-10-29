@@ -245,8 +245,8 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .workspace-admin-actions [data-workspace-mail]:is(:hover,:focus-visible){background:#d2e2f0;border-color:#6d96b9;color:#183b5b}
 .workspace-admin-actions [data-workspace-members]{background:#dceee9;border:1px solid #78ad9d;color:#21594d;font-weight:600}
 .workspace-admin-actions [data-workspace-members]:is(:hover,:focus-visible){background:#c4e3d9;border-color:#508e7c;color:#164438}
-.workspace-admin-actions .workspace-card-create{background:#315a7c;border:1px solid #254662;color:#fff;font-weight:700;min-height:42px;padding:9px 16px;font-size:12px}
-.workspace-admin-actions .workspace-card-create:is(:hover,:focus-visible){background:#244765;border-color:#19364e;color:#fff}
+.workspace-admin-actions .workspace-card-create{background:#4f85b0;border:1px solid #39719e;color:#fff;font-weight:700;min-height:42px;padding:9px 16px;font-size:12px}
+.workspace-admin-actions .workspace-card-create:is(:hover,:focus-visible){background:#39719e;border-color:#285b83;color:#fff}
 .workspace-create-actions [type="submit"]{background:#8b5729;border:1px solid #71421e;color:#fff8ed}
 .workspace-create-actions [type="submit"]:is(:hover,:focus-visible){background:#70411e;color:#fff}
 /* Dedicated import content mirrors the reference's steps, mapping, preview and review. */
