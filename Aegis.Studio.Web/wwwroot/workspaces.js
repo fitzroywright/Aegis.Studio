@@ -1,4 +1,4 @@
-function workspaceAdminPanel(id){let panel=document.getElementById(id);if(!panel){panel=document.createElement('section');panel.id=id;panel.className='job-section';(document.querySelector('.workspace-admin-details')||genericView).append(panel);}return panel;}
+function workspaceAdminPanel(id){let panel=document.getElementById(id);if(!panel){const dialog=studioDialog(id==='workspaceImportPanel'?'Import old email':'Managers, members & permissions','<section class="job-section"></section>');panel=dialog.querySelector('section');panel.id=id;}return panel;}
 let workspaceAccessCache = [];
 let studioRolesCache = [];
 
@@ -21,51 +21,87 @@ async function createWorkspace() {
 
 async function hydrateWorkspaceManagers(items){
     await Promise.all(items.map(async item=>{
-        const target=document.querySelector('[data-workspace-managers="'+item.workspace.id+'"]');if(!target)return;
+        const target=[...genericView.querySelectorAll('[data-workspace-managers]')].find(node=>node.dataset.workspaceManagers===String(item.workspace.id));if(!target)return;
+        const pencil=target.parentElement.querySelector('[data-workspace-pencil]');if(pencil)pencil.disabled=true;
         try{
-            const managers=await json('/api/workspaces/'+item.workspace.id+'/managers');
-            target.textContent=managers.length?'Manager: '+managers.map(m=>studioFirstName(m)).join(', '):'Manager required';
-            target.classList.toggle('risk',!managers.length);
+            const managers=await json('/api/workspaces/'+encodeURIComponent(item.workspace.id)+'/managers');
+            item.managers=managers;
+            target.textContent=managers.length?managers.map(m=>m.displayName||m.userName).join(', '):'Manager required';
+            target.dataset.empty=String(!managers.length);target.classList.toggle('risk',!managers.length);
+            if(pencil)pencil.disabled=false;
         }catch{target.textContent='Manager status unavailable';}
     }));
 }
 
-async function editWorkspace(id) {
-    let card=[...genericView.querySelectorAll('[data-workspace-card]')].find(card=>card.dataset.workspaceCard===String(id));
-    if(!card){await showWorkspaces();card=[...genericView.querySelectorAll('[data-workspace-card]')].find(card=>card.dataset.workspaceCard===String(id));}
-    const host=card?.querySelector('[data-workspace-editor]');if(!host)return;
-    if(host.childElementCount){host.querySelector('input')?.focus();return;}
-    const loading=document.createElement('p');loading.setAttribute('role','status');loading.textContent='Loading workspace editor…';host.append(loading);
-    const live=()=>host.isConnected&&loading.parentNode===host;
-    try{
-        const [current,employees,appearance]=await Promise.all([json('/api/workspaces/'+encodeURIComponent(id)),json('/api/studio-employees?assignable=true'),json('/api/workspaces/'+encodeURIComponent(id)+'/appearance')]);
-        if(!live())return;
-        const escape=StudioPage.escape;
-        const people=[...employees];if(current.defaultJobLead&&!people.some(person=>person.userName.toLowerCase()===current.defaultJobLead.toLowerCase()))people.push({userName:current.defaultJobLead,displayName:current.defaultJobLead});
-        const leadOptions='<option value="">No default Job Lead</option>'+people.map(person=>`<option value="${escape(person.userName)}" ${String(current.defaultJobLead||'').toLowerCase()===String(person.userName).toLowerCase()?'selected':''}>${escape(person.displayName||person.userName)}</option>`).join('');
-        host.innerHTML=`<form class="workspace-card-editor" aria-label="Edit ${escape(current.name)}"><label>Name<input name="name" maxlength="200" required value="${escape(current.name)}"></label><label>Email address<input name="email" type="email" value="${escape(current.emailAddress||'')}"></label><label>Default Job Lead<select name="defaultJobLead">${leadOptions}</select></label><label>Enabled<select name="enabled"><option value="true" ${current.isEnabled?'selected':''}>Yes</option><option value="false" ${!current.isEnabled?'selected':''}>No</option></select></label><label>Icon<select name="icon">${['folder','camera','portrait','wedding','id'].map(icon=>`<option ${appearance.icon===icon?'selected':''}>${icon}</option>`).join('')}</select></label><label>Accent<input name="color" type="color" value="${escape(appearance.color||'#b99750')}"></label><details><summary>Advanced / Integration Settings</summary><label>Route key<input name="routeKey" value="${escape(current.routeKey||'')}"></label></details><p role="status" aria-live="polite"></p><div class="workspace-card-editor-actions"><button type="button" class="action" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`;
-        const form=host.querySelector('form'),status=form.querySelector('[role=status]');let saving=false;
-        const close=()=>{host.replaceChildren();card.querySelector('[data-workspace-edit]')?.focus();};
-        form.querySelector('[data-cancel]').onclick=close;
-        form.onsubmit=async event=>{
-            event.preventDefault();if(saving||!form.reportValidity())return;
-            const value=name=>form.elements.namedItem(name).value;
-            if(!value('name').trim()){status.textContent='Workspace name is required.';return;}
-            saving=true;form.querySelectorAll('input,select,button').forEach(control=>control.disabled=true);status.textContent='Saving…';let workspaceSaved=false;
-            try{
-                const payload={name:value('name').trim(),emailAddress:value('email').trim()||null,routeKey:value('routeKey').trim()||null,isEnabled:value('enabled')==='true',sortOrder:current.sortOrder||0,defaultJobLead:value('defaultJobLead')||null};
-                const saved=await json('/api/workspaces/'+encodeURIComponent(id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});workspaceSaved=true;
-                Object.assign(current,payload,saved||{});
-                const cached=workspaceAccessCache.find(item=>String(item.workspace.id)===String(id));if(cached)Object.assign(cached.workspace,current);
-                if(card.isConnected){card.querySelector('h2').textContent=current.name;card.querySelector('[data-workspace-email]').textContent=current.emailAddress||'No routing email configured';}
-                await json('/api/workspaces/'+encodeURIComponent(id)+'/appearance',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({icon:value('icon'),color:value('color')})});
-                if(host.isConnected)close();
-                await loadWorkspaces();renderWorkspaceMenu();
-            }catch(error){if(host.isConnected&&form.isConnected)status.textContent=(workspaceSaved?'Workspace fields saved; appearance could not be confirmed. Retry Save changes. ':'')+(error.message||'Could not save. Your edits are retained.');}
-            finally{saving=false;form.querySelectorAll('input,select,button').forEach(control=>control.disabled=false);}
+// Each pencil edits the existing value node; saving changes only that field.
+function bindWorkspaceCardEditing(card,item){
+    if(!card)return;
+    const workspace=item.workspace,id=encodeURIComponent(workspace.id),status=card.querySelector('[role=status]');
+    let editing=null,saving=false;
+    const display=(key)=>key==='managers'?(item.managers||[]).map(m=>m.displayName||m.userName).join(', '):key==='isEnabled'?(workspace.isEnabled?'Yes':'No'):key==='icon'?(workspace.iconName||'folder'):key==='color'?(workspace.accentColor||'#b99750'):workspace[key]||'';
+    const raw=(key)=>key==='managers'?(item.managers||[]).map(m=>m.userName).join(', '):display(key);
+    const paint=(key,node)=>{const value=display(key);node.textContent=value||(key==='managers'?'Manager required':'Not set');node.dataset.empty=String(!value);};
+    function finish(){
+        if(!editing)return;const {key,node,button,cancel}=editing;paint(key,node);node.removeAttribute('contenteditable');node.removeAttribute('role');node.removeAttribute('aria-label');node.removeAttribute('aria-invalid');node.onkeydown=node.onpaste=null;
+        button.textContent='✎';button.setAttribute('aria-label','Edit '+button.dataset.label);button.title='Edit '+button.dataset.label;cancel.remove();editing=null;button.focus();
+    }
+    async function save(){
+        if(!editing||saving)return;const {key,node}=editing,value=node.textContent.trim();
+        if(value===raw(key)){finish();status.textContent='';return;}
+        const error=message=>{status.textContent=message;node.setAttribute('aria-invalid','true');node.focus();};
+        if(key==='name'&&(!value||value.length>200))return error('Enter a workspace name of 1 to 200 characters.');
+        if(key==='emailAddress'&&value&&!/^[^\s@]+@[^\s@]+$/.test(value))return error('Enter a valid routing email address.');
+        if(key==='isEnabled'&&!/^(yes|no)$/i.test(value))return error('Use Yes or No for Enabled.');
+        if(key==='icon'&&!['folder','camera','portrait','wedding','id'].includes(value))return error('Use folder, camera, portrait, wedding or id.');
+        if(key==='color'&&!/^#[0-9a-f]{6}$/i.test(value))return error('Use a six-digit hex color, such as #b99750.');
+        if(key==='managers'&&!value)return error('At least one Workspace Manager is required.');
+        saving=true;node.setAttribute('contenteditable','false');card.querySelectorAll('[data-workspace-pencil],[data-workspace-cancel]').forEach(button=>button.disabled=true);status.textContent='Saving…';
+        try{
+            if(key==='icon'||key==='color'){
+                const appearance=await json('/api/workspaces/'+id+'/appearance');
+                const payload={icon:appearance.icon,color:appearance.color,[key]:value};
+                await json('/api/workspaces/'+id+'/appearance',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+                workspace.iconName=payload.icon;workspace.accentColor=payload.color;
+            }else if(key==='managers'){
+                const employees=await json('/api/studio-employees?assignable=true'),previous=await json('/api/workspaces/'+id+'/managers');
+                const users=[...new Set(value.split(',').map(name=>name.trim()).filter(Boolean).map(name=>name.toLowerCase()))];
+                if(!users.length)throw Error('At least one Workspace Manager is required.');
+                const people=users.map(user=>employees.find(person=>person.userName.toLowerCase()===user)||previous.find(person=>person.userName.toLowerCase()===user));
+                if(people.some(person=>!person))throw Error('Enter existing staff user names separated by commas.');
+                // Add replacements before reducing prior manager permissions; retain their membership.
+                for(const person of people)if(!previous.some(prior=>prior.userName.toLowerCase()===person.userName.toLowerCase()))await json('/api/workspaces/'+id+'/managers/'+encodeURIComponent(person.userName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:person.userName,displayName:person.displayName||person.userName,isActive:true,permissions:null})});
+                for(const person of previous)if(!users.includes(person.userName.toLowerCase()))await json('/api/workspaces/'+id+'/members/'+encodeURIComponent(person.userName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:person.userName,displayName:person.displayName,isActive:true,permissions:{...person.permissions,manageMembers:false}})});
+                item.managers=people;
+            }else{
+                const latest=await json('/api/workspaces/'+id);
+                if(key==='defaultJobLead'&&value&&value!==latest.defaultJobLead){const employees=await json('/api/studio-employees?assignable=true');if(!employees.some(person=>person.userName.toLowerCase()===value.toLowerCase()))throw Error('Enter an assignable staff user name for Default Job Lead.');}
+                const payload={name:latest.name,emailAddress:latest.emailAddress,routeKey:latest.routeKey,isEnabled:latest.isEnabled,sortOrder:latest.sortOrder,defaultJobLead:latest.defaultJobLead,[key]:key==='isEnabled'?value.toLowerCase()==='yes':value||null};
+                const saved=await json('/api/workspaces/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});Object.assign(workspace,payload,saved||{});
+            }
+            if(card.isConnected){finish();status.textContent='Saved';}
+            // Refresh shared navigation without replacing any card or another active edit.
+            void loadWorkspaces().then(()=>renderWorkspaceMenu()).catch(()=>{});
+        }catch(cause){if(card.isConnected){node.setAttribute('contenteditable','true');error(cause.message||'Could not save. Your edit is retained.');}}
+        finally{saving=false;card.querySelectorAll('[data-workspace-pencil],[data-workspace-cancel]').forEach(button=>button.disabled=button.dataset.workspacePencil==='managers'&&!item.managers);}
+    }
+    card.querySelectorAll('[data-workspace-pencil]').forEach(button=>{
+        button.dataset.label=button.title.replace(/^Edit /,'');
+        button.onclick=()=>{
+            if(saving)return;if(editing?.button===button){void save();return;}if(editing){status.textContent='Save or cancel the current edit first.';editing.node.focus();return;}
+            const key=button.dataset.workspacePencil,node=card.querySelector('[data-workspace-value="'+key+'"]');
+            const cancel=document.createElement('button');cancel.type='button';cancel.className='workspace-field-pencil';cancel.dataset.workspaceCancel='';cancel.textContent='×';cancel.title='Cancel edit';cancel.setAttribute('aria-label','Cancel '+button.dataset.label+' edit');cancel.onclick=()=>{if(!saving){finish();status.textContent='';}};button.after(cancel);
+            editing={key,node,button,cancel};node.textContent=raw(key);node.setAttribute('contenteditable','true');node.setAttribute('role','textbox');node.setAttribute('aria-label',button.dataset.label);button.textContent='✓';button.title='Save '+button.dataset.label;button.setAttribute('aria-label',button.title);status.textContent=key==='managers'?'Enter staff user names, separated by commas. Enter to save; Escape to cancel.':key==='defaultJobLead'?'Enter a staff user name. Enter to save; Escape to cancel.':'Enter to save; Escape to cancel.';
+            node.onkeydown=event=>{if(saving){event.preventDefault();return;}if(event.key==='Enter'){event.preventDefault();void save();}if(event.key==='Escape'){event.preventDefault();finish();status.textContent='';}};
+            node.onpaste=event=>{event.preventDefault();const text=event.clipboardData?.getData('text/plain')||'';const selection=window.getSelection();if(selection.rangeCount&&node.contains(selection.anchorNode)&&node.contains(selection.focusNode)){const range=selection.getRangeAt(0);range.deleteContents();const inserted=document.createTextNode(text.replace(/[\r\n]+/g,' '));range.insertNode(inserted);range.setStartAfter(inserted);range.collapse(true);selection.removeAllRanges();selection.addRange(range);}};
+            node.focus();const selection=window.getSelection(),range=document.createRange();range.selectNodeContents(node);selection.removeAllRanges();selection.addRange(range);
         };
-        form.elements.namedItem('name').focus();
-    }catch(error){if(live()){host.replaceChildren();const message=document.createElement('p');message.setAttribute('role','alert');message.textContent=error.message||'Could not load workspace editor.';const retry=document.createElement('button');retry.type='button';retry.className='action';retry.textContent='Retry';retry.onclick=()=>{host.replaceChildren();editWorkspace(id);};host.append(message,retry);}}
+    });
+}
+
+async function editWorkspace(id){
+    let card=[...genericView.querySelectorAll('[data-workspace-card]')].find(node=>node.dataset.workspaceCard===String(id));
+    if(!card){await showWorkspaces();card=[...genericView.querySelectorAll('[data-workspace-card]')].find(node=>node.dataset.workspaceCard===String(id));}
+    card?.querySelector('[data-workspace-pencil="name"]')?.click();
 }
 
 const permissionLabels = [
@@ -87,7 +123,7 @@ async function manageWorkspaceMembers(workspaceId, workspaceName) {
     const roleOptions = studioRolesCache.filter(x => x.scope === 'Workspace' && x.isActive).map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
     panel.classList.remove('hidden');
     panel.innerHTML = `<h2>${esc(workspaceName)} — Members & permissions</h2><p class="muted">Assign a reusable role or a one-off permission preset.</p><div>${members.length ? members.map(member => renderMember(workspaceId, member)).join('') : '<p class="muted">No members yet.</p>'}</div><h3>Add or update member</h3><div class="pos-entry"><label>User name<input id="memberUserName" placeholder="domain user name"></label><label>Display name<input id="memberDisplayName"></label><label>Preset<select id="memberPreset"><option value="view">View only</option><option value="reply">Request handler</option><option value="editor">Workspace editor</option><option value="manager">Workspace Manager</option><option value="admin">Workspace admin</option></select></label><button class="primary" onclick="saveWorkspaceMember('${workspaceId}','${esc(workspaceName)}')">Save member</button></div>${roleOptions ? `<h3>Assign reusable role</h3><div class="pos-entry"><label>User name<input id="roleMemberUser"></label><label>Role<select id="workspaceRoleSelect">${roleOptions}</select></label><button class="primary" onclick="assignWorkspaceRole('${workspaceId}','${esc(workspaceName)}')">Assign role</button></div>` : ''}`;
-    panel.scrollIntoView({behavior:'smooth',block:'start'});
+
 }
 
 function renderMember(workspaceId, member) {
@@ -110,13 +146,18 @@ async function assignWorkspaceRole(workspaceId, workspaceName) {
 }
 
 async function editWorkspaceMember(workspaceId, userName, displayName) {
-    const members = await json(`/api/workspaces/${workspaceId}/members`);
-    const member = members.find(x => x.userName.toLowerCase() === userName.toLowerCase()); if (!member) return;
-    const selected = permissionLabels.map(([key,label]) => `${label}: ${member.permissions[key] ? 'yes' : 'no'}`).join('\n');
-    const preset = prompt(`Current permissions:\n${selected}\n\nSet preset: view, reply, editor, manager, admin`, member.permissions.adminWorkspace ? 'admin' : member.permissions.manageMembers ? 'manager' : member.permissions.editJob ? 'editor' : member.permissions.replyRequester ? 'reply' : 'view');
-    if (!preset) return;
-    await putWorkspaceMember(workspaceId,userName,displayName,permissionsForPreset(preset.toLowerCase()));
-    const item = workspaceAccessCache.find(x => x.workspace.id === workspaceId); await manageWorkspaceMembers(workspaceId,item?.workspace?.name || 'Workspace');
+    const members=await json('/api/workspaces/'+encodeURIComponent(workspaceId)+'/members');
+    const member=members.find(person=>person.userName.toLowerCase()===userName.toLowerCase());if(!member)return;
+    const escape=StudioPage.escape;
+    const dialog=studioDialog('Permissions — '+displayName,`<form class="subject-form"><fieldset><legend>Workspace permissions</legend>${permissionLabels.map(([key,label])=>`<label><input type="checkbox" name="${key}" ${member.permissions[key]?'checked':''}>${escape(label)}</label>`).join('')}</fieldset><p role="alert"></p><div class="dialog-actions"><button type="button" class="action" data-cancel>Cancel</button><button type="submit" class="primary">Save permissions</button></div></form>`);
+    const form=dialog.querySelector('form');let saving=false;form.querySelector('[data-cancel]').onclick=()=>dialog.close();
+    form.onsubmit=async event=>{
+        event.preventDefault();if(saving)return;saving=true;form.querySelectorAll('button').forEach(button=>button.disabled=true);
+        const permissions=Object.fromEntries(permissionLabels.map(([key])=>[key,form.elements.namedItem(key).checked]));
+        try{await putWorkspaceMember(workspaceId,member.userName,member.displayName,permissions);dialog.close();const item=workspaceAccessCache.find(item=>String(item.workspace.id)===String(workspaceId));await manageWorkspaceMembers(workspaceId,item?.workspace.name||'Workspace');}
+        catch(error){if(form.isConnected)form.querySelector('[role=alert]').textContent=error.message||'Could not save permissions.';}
+        finally{saving=false;form.querySelectorAll('button').forEach(button=>button.disabled=false);}
+    };
 }
 
 async function putWorkspaceMember(workspaceId,userName,displayName,permissions) {
@@ -139,7 +180,7 @@ async function notifyWorkspaceMember(workspaceId,userName,displayName) {
 function showMailboxImport(workspaceId, workspaceName) {
     const panel = workspaceAdminPanel('workspaceImportPanel');
     panel.innerHTML = `<h2>${esc(workspaceName)} — Import historical mailbox</h2><p class="muted">Imports messages and attachments directly into this workspace. Gmail, Yahoo and Hotmail/Outlook normally require an app password or provider token rather than the user's normal password.</p><div class="pos-entry"><label>Provider<select id="importProvider"><option>Gmail</option><option>Hotmail</option><option>Yahoo</option></select></label><label>Mailbox address<input id="importUser" type="email"></label><label>App password / token<input id="importSecret" type="password"></label><label>Folder<input id="importFolder" value="INBOX"></label><label>From date<input id="importFrom" type="date"></label><label>Maximum messages<input id="importMax" type="number" value="5000" min="1" max="50000"></label><button class="primary" onclick="runMailboxImport('${workspaceId}')">Import mailbox</button></div><div id="importResult" class="meta"></div>`;
-    panel.scrollIntoView({behavior:'smooth',block:'start'});
+
 }
 
 async function runMailboxImport(workspaceId) {

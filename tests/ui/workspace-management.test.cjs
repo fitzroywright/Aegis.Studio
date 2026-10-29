@@ -8,16 +8,18 @@ function setup(t,admin=true){
  w.json=async(url,options)=>{calls.push({url,options});if(url==='/api/workspace-access')return workspaces;if(url==='/api/auth/me')return {user:{isAdministrator:admin}};if(url==='/api/jobs')return [{id:'j',workspaceId:'w',title:'Portraits',status:'Active Production'},{id:'done',workspaceId:'w',status:'Completed'},{id:'pending',workspaceId:'unassigned',status:'Pending'}];if(url==='/api/security/roles')return [{id:'wr',name:'Workspace Manager',scope:'Workspace',isActive:true},{id:'jr',name:'Job Owner',scope:'Job',isActive:true}];if(url==='/api/workspaces/w')return {id:'w',name:'Portraits',emailAddress:'portraits@studio.test',isEnabled:true,routeKey:'keep-route',sortOrder:5,defaultJobLead:'lisa'};if(url==='/api/workspaces/w/appearance')return {icon:'camera',color:'#123456'};if(url==='/api/studio-employees?assignable=true')return [{userName:'lisa',displayName:'Lisa Brown'}];if(url.endsWith('/managers'))return[{userName:'lisa',displayName:'Lisa Brown'}];if(url.endsWith('/members'))return[];if(url==='/api/production/media-summary')return[{jobId:'j',thumbnailVersionIds:['v']}];throw Error(url);};
  w.eval(read('studio-page.js')+'\n'+read('workspaces.js')+'\n'+read('workspace-management.js'));return {w,calls,navigation};
 }
-test('Workspaces has accountability cards, real managers and counts, photos and centralized administration',async t=>{
- const {w,calls,navigation}=setup(t);await w.StudioWorkspaceManagement.render();await settle();
+test('Workspaces cards show values with pencils while permissions and old mail use dialogs',async t=>{
+ const {w,navigation}=setup(t);await w.StudioWorkspaceManagement.render();await settle();
  const cards=w.document.querySelectorAll('[data-workspace-card]');assert.equal(cards.length,2);const card=cards[0];assert.match(card.textContent,/Portraits.*Lisa Brown.*1 active jobs/s);assert.match(card.querySelector('img').src,/jobs\/j\/versions\/by-id\/v/);
- assert.equal(w.document.querySelector('.studio-right-rail'),null);assert.equal(w.document.querySelector('#workspaceMemberPanel'),null);card.querySelector('[data-workspace-members]').click();await settle();assert.ok(w.document.querySelector('#workspaceMemberPanel'));assert.match(w.document.querySelector('#workspaceMemberPanel').textContent,/Members & permissions/);
- card.querySelector('[data-workspace-edit]').click();await settle();assert.ok(card.querySelector('[data-workspace-editor] form'));assert.equal(w.document.querySelector('dialog:not([id])'),null);card.querySelector('[data-workspace-jobs]').click();assert.deepEqual(JSON.parse(JSON.stringify(navigation.at(-1))),{view:'jobs',options:{workspaceId:'w'}});
+ assert.equal(card.querySelector('input,select,form,[data-workspace-editor]'),null);assert.equal(card.querySelectorAll('[data-workspace-pencil]').length,8);
+ card.querySelector('[data-workspace-members]').click();await settle();assert.ok(w.document.querySelector('dialog #workspaceMemberPanel'));w.document.querySelector('#workspaceMemberPanel').closest('dialog').close();
+ card.querySelector('[data-workspace-mail]').click();assert.ok(w.document.querySelector('dialog #workspaceImportPanel'));w.document.querySelector('#workspaceImportPanel').closest('dialog').close();
+ card.querySelector('[data-workspace-jobs]').click();assert.deepEqual(JSON.parse(JSON.stringify(navigation.at(-1))),{view:'jobs',options:{workspaceId:'w'}});
  assert.equal(w.document.querySelector('#roleScope,#securityRoleList'),null);
  w.document.querySelector('[data-create-workspace]').click();assert.ok(w.document.querySelector('[data-new-workspace] #workspaceManagerUser[required]'));assert.equal(w.document.querySelector('dialog:not([id])'),null);
 });
 test('view-only Workspace cards expose jobs without administration actions',async t=>{
- const {w}=setup(t,false);await w.StudioWorkspaceManagement.render();assert.equal(w.document.querySelector('[data-create-workspace],[data-workspace-edit],[data-workspace-members],[data-workspace-mail],#roleScope'),null);assert.equal(w.document.querySelectorAll('[data-workspace-jobs]').length,2);
+ const {w}=setup(t,false);await w.StudioWorkspaceManagement.render();assert.equal(w.document.querySelector('[data-create-workspace],[data-workspace-pencil],[data-workspace-members],[data-workspace-mail],#roleScope'),null);assert.equal(w.document.querySelectorAll('[data-workspace-jobs]').length,2);
 });
 test('Admin menu exposes Workspaces and ends with About',async t=>{
  const {w,navigation}=setup(t);w.fetch=async()=>({ok:true,json:async()=>[]});w.eval(read('studio-admin.js'));w.eval(read('studio-shell-nav.js'));w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await settle();
@@ -57,32 +59,44 @@ test('Admin entries use shared restrained icons and speed-bump rows while icon c
  const shared=read('css/components/studio-rows.css');assert.match(shared,/studio-admin-item.*transition:/);assert.match(shared,/@media\(prefers-reduced-motion:reduce\).*studio-admin-item/);
 });
 
-test('workspace cards save routing, lead and appearance in place without losing other card state',async t=>{
+function edit(w,card,key,value){const button=card.querySelector('[data-workspace-pencil="'+key+'"]');button.click();const node=card.querySelector('[data-workspace-value="'+key+'"]');if(value!==undefined)node.textContent=value;return {button,node};}
+async function saveField(button){button.click();await settle();await settle();}
+test('pencils edit the existing value node and save only that field without a form or textbox',async t=>{
  const {w,calls,navigation}=setup(t),original=w.json;let release;const pending=new Promise(resolve=>release=resolve);
  w.json=async(url,options)=>{if(options?.method==='PUT'){calls.push({url,options});await pending;return {};}return original(url,options);};
- await w.StudioWorkspaceManagement.render();const cards=w.document.querySelectorAll('[data-workspace-card]'),card=cards[0],other=cards[1];
- card.querySelector('[data-workspace-edit]').click();await settle();const form=card.querySelector('form');
- assert.equal(form.elements.defaultJobLead.value,'lisa');assert.equal(form.elements.icon.value,'camera');
- form.elements.namedItem('name').value='New portraits';form.elements.email.value='new@studio.test';form.elements.color.value='#654321';
- const event={preventDefault(){}};const saving=form.onsubmit(event);await form.onsubmit(event);assert.equal(calls.filter(call=>call.options?.method==='PUT').length,1);assert.equal(form.querySelector('[data-cancel]').disabled,true);release();await saving;
- const writes=calls.filter(call=>call.options?.method==='PUT');assert.equal(writes.length,2);const payload=JSON.parse(writes[0].options.body);assert.equal(payload.name,'New portraits');assert.equal(payload.routeKey,'keep-route');assert.equal(payload.sortOrder,5);assert.equal(payload.defaultJobLead,'lisa');assert.deepEqual(JSON.parse(writes[1].options.body),{icon:'camera',color:'#654321'});
- assert.equal(card.querySelector('h2').textContent,'New portraits');assert.equal(card.querySelector('[data-workspace-email]').textContent,'new@studio.test');assert.equal(card.querySelector('form'),null);assert.equal(other.isConnected,true);assert.equal(navigation.length,0);assert.equal(w.document.querySelector('dialog:not([id])'),null);
+ await w.StudioWorkspaceManagement.render();await settle();const card=w.document.querySelector('[data-workspace-card]'),originalNode=card.querySelector('[data-workspace-value="name"]');
+ const {node,button}=edit(w,card,'name','New portraits');assert.equal(node,originalNode);assert.equal(node.getAttribute('contenteditable'),'true');assert.equal(card.querySelector('input,textarea,select,form'),null);
+ button.click();await settle();button.click();assert.equal(calls.filter(call=>call.options?.method==='PUT').length,1);assert.equal(node.getAttribute('contenteditable'),'false');node.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(node.getAttribute('contenteditable'),'false');release();await settle();await settle();
+ const writes=calls.filter(call=>call.options?.method==='PUT'),payload=JSON.parse(writes[0].options.body);assert.equal(writes.length,1);assert.equal(payload.name,'New portraits');assert.equal(payload.routeKey,'keep-route');assert.equal(payload.sortOrder,5);assert.equal(payload.defaultJobLead,'lisa');assert.equal(node.textContent,'New portraits');assert.equal(node.hasAttribute('contenteditable'),false);assert.equal(navigation.length,0);assert.equal(w.document.querySelector('dialog:not([id])'),null);
 });
-test('workspace card failures retain drafts for retry and Cancel performs no writes',async t=>{
- const {w,calls}=setup(t),original=w.json;let fail=true;
- w.json=async(url,options)=>{if(options?.method==='PUT'){calls.push({url,options});if(fail)throw Error('Save unavailable');return {};}return original(url,options);};
- await w.StudioWorkspaceManagement.render();const card=w.document.querySelector('[data-workspace-card]');card.querySelector('[data-workspace-edit]').click();await settle();const form=card.querySelector('form');form.elements.namedItem('name').value='Retained draft';await form.onsubmit({preventDefault(){}});
- assert.match(form.querySelector('[role=status]').textContent,/Save unavailable/);assert.equal(form.elements.namedItem('name').value,'Retained draft');assert.equal(form.querySelector('[type=submit]').disabled,false);assert.equal(card.querySelector('h2').textContent,'Portraits');
- fail=false;await form.onsubmit({preventDefault(){}});assert.equal(card.querySelector('h2').textContent,'Retained draft');
- card.querySelector('[data-workspace-edit]').click();await settle();const before=calls.filter(call=>call.options?.method==='PUT').length;card.querySelector('[data-cancel]').click();assert.equal(card.querySelector('form'),null);assert.equal(calls.filter(call=>call.options?.method==='PUT').length,before);
+test('field validation and failed saves retain the same value for retry, Escape cancels without writes',async t=>{
+ const {w,calls}=setup(t),original=w.json;let fail=true;w.json=async(url,options)=>{if(options?.method==='PUT'){calls.push({url,options});if(fail)throw Error('Save unavailable');return {};}return original(url,options);};
+ await w.StudioWorkspaceManagement.render();const card=w.document.querySelector('[data-workspace-card]');const {node,button}=edit(w,card,'emailAddress','invalid');await saveField(button);assert.equal(calls.filter(call=>call.options?.method==='PUT').length,0);assert.match(card.querySelector('[role=status]').textContent,/valid routing email/);
+ node.textContent='new@studio.test';await saveField(button);assert.equal(node.textContent,'new@studio.test');assert.equal(node.getAttribute('contenteditable'),'true');assert.match(card.querySelector('[role=status]').textContent,/Save unavailable/);
+ fail=false;await saveField(button);assert.equal(node.textContent,'new@studio.test');assert.equal(node.hasAttribute('contenteditable'),false);
+ edit(w,card,'emailAddress','discard@studio.test');const count=calls.length;node.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(node.textContent,'new@studio.test');assert.equal(calls.length,count);
 });
-test('workspace settings hook opens the same card editor and no modal renderer remains',async t=>{
- const {w}=setup(t);await w.StudioWorkspaceManagement.render();w.eval(read('media-production.js'));await w.openWorkspaceSettings('w');assert.ok(w.document.querySelector('[data-workspace-card="w"] form'));assert.equal(w.document.querySelector('dialog:not([id])'),null);
+test('appearance pencils preserve the other appearance setting and independent cards retain drafts',async t=>{
+ const {w,calls}=setup(t),original=w.json;w.json=async(url,options)=>{if(options?.method==='PUT'){calls.push({url,options});return {};}return original(url,options);};await w.StudioWorkspaceManagement.render();
+ const cards=w.document.querySelectorAll('[data-workspace-card]'),draft=edit(w,cards[1],'name','Unassigned draft');const color=edit(w,cards[0],'color','#654321');await saveField(color.button);
+ const write=calls.find(call=>call.options?.method==='PUT');assert.equal(write.url,'/api/workspaces/w/appearance');assert.deepEqual(JSON.parse(write.options.body),{icon:'camera',color:'#654321'});assert.equal(draft.node.textContent,'Unassigned draft');assert.equal(draft.node.getAttribute('contenteditable'),'true');
 });
-
+test('manager pencil grants the replacement before changing the previous manager and keeps membership',async t=>{
+ const {w,calls}=setup(t),original=w.json;w.json=async(url,options)=>{if(url==='/api/studio-employees?assignable=true')return [{userName:'nicole',displayName:'Nicole'}];if(url.endsWith('/managers')&&!options)return [{userName:'lisa',displayName:'Lisa',permissions:{accessWorkspace:true,view:true,manageSchedule:true,manageProduction:true,manageMembers:true}}];if(options?.method==='PUT'){calls.push({url,options});return {};}return original(url,options);};
+ await w.StudioWorkspaceManagement.render();await settle();const card=w.document.querySelector('[data-workspace-card]'),field=edit(w,card,'managers','nicole');await saveField(field.button);const writes=calls.filter(call=>call.options?.method==='PUT');assert.equal(writes[0].url,'/api/workspaces/w/managers/nicole');assert.equal(writes[1].url,'/api/workspaces/w/members/lisa');assert.equal(JSON.parse(writes[1].options.body).isActive,true);assert.equal(JSON.parse(writes[1].options.body).permissions.manageMembers,false);assert.equal(field.node.textContent,'Nicole');
+});
+test('workspace settings hook focuses the same displayed name with no expanded editor',async t=>{
+ const {w}=setup(t);await w.StudioWorkspaceManagement.render();w.eval(read('media-production.js'));await w.openWorkspaceSettings('w');const card=w.document.querySelector('[data-workspace-card="w"]');assert.equal(card.querySelector('[data-workspace-value="name"]').getAttribute('contenteditable'),'true');assert.equal(card.querySelector('form,input,select,[data-workspace-editor]'),null);assert.equal(w.document.querySelector('dialog:not([id])'),null);
+});
 test('Staff and Roles is the single destination for creating and editing reusable job and workspace roles',async t=>{
  const {w,navigation}=setup(t);await w.StudioWorkspaceManagement.render();assert.equal(w.document.querySelector('#roleScope,#securityRoleList'),null);
  w.genericView.innerHTML=w.renderEmployeeDirectorySection();const scope=w.document.querySelector('#roleScope');assert.deepEqual([...scope.options].map(option=>option.value),['Job','Workspace']);
  const rows=w.document.querySelectorAll('[data-role-row]');assert.equal(rows.length,2);assert.match(w.document.querySelector('#securityRoleList').textContent,/Workspace.*Job/s);
  w.document.querySelector('#roleName').value='Workspace editor';scope.value='Workspace';const original=w.json;w.json=async(url,options)=>options?.method==='POST'?{}:original(url,options);await w.createStudioRole();assert.equal(navigation.at(-1).view,'staff-roles');
+});
+
+test('individual member permissions use a popup with the existing permission values',async t=>{
+ const {w,calls}=setup(t),original=w.json;
+ w.json=async(url,options)=>{if(options?.method==='PUT'){calls.push({url,options});return {};}if(url==='/api/workspaces/w/members')return [{userName:'lisa',displayName:'Lisa',isActive:true,permissions:{accessWorkspace:true,view:true}}];return original(url,options);};
+ await w.StudioWorkspaceManagement.render();await w.editWorkspaceMember('w','lisa','Lisa');const form=w.document.querySelector('dialog:not([id]) form');assert.ok(form);assert.equal(form.elements.namedItem('view').checked,true);assert.equal(form.elements.namedItem('editWorkspace').checked,false);form.elements.namedItem('replyRequester').checked=true;await form.onsubmit({preventDefault(){}});const write=calls.find(call=>call.options?.method==='PUT');assert.equal(write.url,'/api/workspaces/w/members/lisa');const payload=JSON.parse(write.options.body);assert.equal(payload.permissions.replyRequester,true);assert.equal(payload.permissions.view,true);assert.equal(payload.permissions.editWorkspace,false);assert.ok(w.document.querySelector('dialog #workspaceMemberPanel'));
 });
