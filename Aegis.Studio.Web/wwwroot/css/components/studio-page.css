@@ -194,8 +194,9 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 @media(max-width:800px) { .staff-editors,.staff-global-role-columns { grid-template-columns:minmax(0,1fr); } .staff-grid-section>header { flex-wrap:wrap; } }
 
 /* Workspace accountability content; the shared shell continues to own the frame. */
+.workspace-management-page{background:#f5f7fa}
 .workspace-accountability-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:stretch}
-.workspace-accountability-card{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:8px;row-gap:4px;min-width:0;padding:7px;border:1px solid var(--studio-control-border,#cdd8e2);border-radius:9px;background:var(--studio-card-surface,#fff)}
+.workspace-accountability-card{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:8px;row-gap:4px;min-width:0;padding:7px;border:1px solid var(--studio-control-border,#cdd8e2);border-radius:9px;background:#fff}
 .workspace-card-heading{grid-column:1/-1;display:flex;flex-direction:column;align-items:stretch;gap:7px;min-height:105px;padding-right:113px;min-width:0}
 .workspace-card-title-row{display:flex;align-items:flex-end;gap:5px;min-width:0;width:100%;max-width:100%}
 .workspace-accountability-card .workspace-card-heading h2{--workspace-value-size:14px;margin:0;font-size:14px;min-height:0;min-width:0;max-width:100%}
