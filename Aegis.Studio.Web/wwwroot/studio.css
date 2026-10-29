@@ -3259,7 +3259,6 @@ body[data-studio-view="workspaces"] .generic {
   color: #7c746c;
 }
 body[data-studio-view="workspaces"] .topbar {
-  background: #172d4a;
   box-shadow: 0 1px 0#ddd7cf,0 5px 18px rgba(54,37,24,.04);
 }
 body[data-studio-view="workspaces"] .brand-button.active {
@@ -7695,7 +7694,7 @@ body[data-studio-view="today"] .mw-list-panel>header h2 {
   height: 72px;
   gap: 16px;
   padding: 0 24px;
-  background: #fff;
+  background: linear-gradient(90deg,rgba(42,21,12,.86),rgba(53,27,12,.43) 48%,rgba(34,17,10,.86)),url('/assets/aegis-studio-login-background.png') center 48%/cover no-repeat;
   border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
   box-shadow: 0 1px 0#dfe3e8;
