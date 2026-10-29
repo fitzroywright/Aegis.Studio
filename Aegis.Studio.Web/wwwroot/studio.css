@@ -6585,7 +6585,7 @@ body[data-studio-view="workspaces"] .generic {
   padding: 14px 18px 14px 12px;
   box-sizing: border-box;
   background: #fff8df;
-  color: #172d4a;
+  color: #422a1d;
   border: 1px solid #d7b660;
   border-left: 5px solid #d6a627;
   border-radius: 8px;
@@ -6597,7 +6597,7 @@ body[data-studio-view="workspaces"] .generic {
   align-self: stretch;
   min-height: 80px;
   border-radius: 6px;
-  background: #172d4a;
+  background: #422a1d;
 }
 .workspace-announcement-symbol svg { display:block; width:64px; height:64px; }
 .workspace-announcement-copy { min-width:0; }
@@ -6608,7 +6608,7 @@ body[data-studio-view="workspaces"] .generic {
   font-size: 18px;
   font-weight: 700;
   line-height: 1.25;
-  color: #172d4a;
+  color: #422a1d;
   overflow-wrap: anywhere;
 }
 .workspace-announcement p {
@@ -6628,9 +6628,9 @@ body[data-studio-view="workspaces"] .generic {
 .workspace-announcement .action {
   white-space: nowrap;
   padding: 6px 12px;
-  border: 1px solid #172d4a;
+  border: 1px solid #422a1d;
   border-radius: 4px;
-  background: #172d4a;
+  background: #422a1d;
   color: #fff;
   font: inherit;
   font-size: 12px;
@@ -7841,7 +7841,7 @@ body[data-studio-view="today"] .mw-today-heading h1 {
   line-height: 1.1;
   letter-spacing: -.035em;
   font-weight: 800;
-  color: #172d4a;
+  color: #422a1d;
 }
 body[data-studio-view="today"] .mw-today-focus-label {
   display: inline-flex;
@@ -8596,7 +8596,7 @@ body .topbar {
   border: 1px solid #bdc9d5;
   border-radius: 4px;
   background: #fff;
-  color: #172d4a;
+  color: #422a1d;
   box-shadow: 0 14px 32px rgba(12,30,50,.25);
 }
 .studio-admin-popover button {
@@ -8633,7 +8633,7 @@ body .topbar {
   height: var(--studio-navigation-strip-height);
   min-height: 0;
   padding: 1px 2px;
-  background: #172d4a;
+  background: #422a1d;
   color: #fff;
 }
 .studio-navigation-status {
@@ -8662,7 +8662,7 @@ body .topbar {
   white-space: nowrap;
 }
 .studio-navigation-tools button:is(:hover,:focus-visible) {
-  color: #172d4a;
+  color: #422a1d;
   background: var(--theme-accent-soft,#eaf3ff);
   outline: 2px solid var(--theme-accent,#a36b17);
   outline-offset: -2px;
@@ -9209,7 +9209,7 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   min-height: 0;
   overflow: hidden;
   background: var(--studio-drawer-background,#fff);
-  color: var(--studio-drawer-color,#172d4a);
+  color: var(--studio-drawer-color,#422a1d);
   box-shadow: -8px 0 30px rgba(0,0,0,.2);
 }
 .studio-attention-drawer > header,.studio-message-bell-panel > header {
