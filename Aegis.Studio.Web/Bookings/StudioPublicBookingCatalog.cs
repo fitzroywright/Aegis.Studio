@@ -11,9 +11,10 @@ using Npgsql;
 
 namespace Aegis.Studio.Web.Bookings;
 
-public sealed record PublicBookingSessionType(string Id,string Name,string Description,int DurationMinutes,int SetupBufferMinutes,int CleanupBufferMinutes,long PriceMinor,long DepositMinor,string Currency,IReadOnlyList<string> Locations,IReadOnlyDictionary<string,int> ResourceRequirements,bool IsActive,bool IsPublished,Guid? DefaultWorkspaceId=null);
+public sealed record PublicBookingSessionType(string Id,string Name,string Description,int DurationMinutes,int SetupBufferMinutes,int CleanupBufferMinutes,long PriceMinor,long DepositMinor,string Currency,IReadOnlyList<string> Locations,IReadOnlyDictionary<string,int> ResourceRequirements,bool IsActive,bool IsPublished,Guid? DefaultWorkspaceId=null,string? Category=null);
 public sealed record PublicBookingCatalog(long Revision,IReadOnlyList<PublicBookingSessionType> SessionTypes);
 public sealed record PublicBookingHours(string LocationCode,int DayOfWeek,string OpensAt,string ClosesAt,int SlotStepMinutes);
+public sealed record PublicBookingPublicationRequest(bool IsPublished,long ExpectedRevision);
 
 public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
 {
@@ -32,7 +33,7 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
         while(r.Read()){var item=JsonSerializer.Deserialize<PublicBookingSessionType>(r.GetString(0),JsonOptions)!;if(!publishedOnly||item.IsPublished&&item.IsActive)rows.Add(item);}
         return new(revision,rows);
     }
-    public PublicBookingCatalog Save(IReadOnlyList<PublicBookingSessionType> items)
+    public PublicBookingCatalog Save(IReadOnlyList<PublicBookingSessionType> items,long? expectedRevision=null)
     {
         Validate(items);using var c=database.OpenConnection();using var tx=c.BeginTransaction();
         foreach(var item in items.Where(x=>x.DefaultWorkspaceId.HasValue))
@@ -41,7 +42,11 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
             verify.Parameters.AddWithValue(item.DefaultWorkspaceId!.Value);
             if(Convert.ToInt64(verify.ExecuteScalar())!=1)throw new ArgumentException("Default Workspace must be an enabled Studio workspace.");
         }
-        using(var lockRow=new NpgsqlCommand("select revision from studio_public_booking_catalog_state where id=1 for update",c,tx))_ = lockRow.ExecuteScalar();
+        using(var lockRow=new NpgsqlCommand("select revision from studio_public_booking_catalog_state where id=1 for update",c,tx))
+        {
+            long current=(long)lockRow.ExecuteScalar()!;
+            if(expectedRevision is long expected&&current!=expected)throw new InvalidOperationException("Booking settings changed. Reload before saving.");
+        }
         using(var clear=new NpgsqlCommand("delete from studio_public_booking_session_types",c,tx))clear.ExecuteNonQuery();
         foreach(var item in items){using var q=new NpgsqlCommand("insert into studio_public_booking_session_types(id,payload) values($1,$2::jsonb)",c,tx);q.Parameters.AddWithValue(item.Id);q.Parameters.AddWithValue(JsonSerializer.Serialize(item,JsonOptions));q.ExecuteNonQuery();}
         using(var bump=new NpgsqlCommand("update studio_public_booking_catalog_state set revision=revision+1 where id=1 returning revision",c,tx)){long revision=(long)bump.ExecuteScalar()!;tx.Commit();return new(revision,items);}
@@ -50,13 +55,35 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
     {
         using var c=database.OpenConnection();using var q=new NpgsqlCommand("select payload::text from studio_public_booking_hours order by location_code,day_of_week,opens_at",c);using var r=q.ExecuteReader();var values=new List<PublicBookingHours>();while(r.Read())values.Add(JsonSerializer.Deserialize<PublicBookingHours>(r.GetString(0),JsonOptions)!);return values;
     }
-    public long SaveHours(IReadOnlyList<PublicBookingHours> hours)
+    public object SetPublication(string id,PublicBookingPublicationRequest request)
+    {
+        using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        using var guard=new NpgsqlCommand("select revision from studio_public_booking_catalog_state where id=1 for update",c,tx);
+        long current=(long)guard.ExecuteScalar()!;
+        if(current!=request.ExpectedRevision)throw new InvalidOperationException("Booking settings changed. Reload before changing online booking.");
+        using var find=new NpgsqlCommand("select payload::text from studio_public_booking_session_types where id=$1",c,tx);find.Parameters.AddWithValue(id);
+        if(find.ExecuteScalar() is not string payload)throw new KeyNotFoundException("Save this service before enabling online booking.");
+        var row=JsonSerializer.Deserialize<PublicBookingSessionType>(payload,JsonOptions)!;
+        if(request.IsPublished&&!row.IsActive)throw new InvalidOperationException("Activate and save this service before enabling online booking.");
+        if(row.IsPublished==request.IsPublished){tx.Commit();return new{revision=current,sessionType=row};}
+        row=row with{IsPublished=request.IsPublished};
+        using var update=new NpgsqlCommand("update studio_public_booking_session_types set payload=$2::jsonb where id=$1",c,tx);
+        update.Parameters.AddWithValue(id);update.Parameters.AddWithValue(JsonSerializer.Serialize(row,JsonOptions));update.ExecuteNonQuery();
+        using var bump=new NpgsqlCommand("update studio_public_booking_catalog_state set revision=revision+1 where id=1 returning revision",c,tx);
+        long revision=(long)bump.ExecuteScalar()!;tx.Commit();return new{revision,sessionType=row};
+    }
+    public long SaveHours(IReadOnlyList<PublicBookingHours> hours,long? expectedRevision=null)
     {
         var keys=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if(hours.Count>56)throw new ArgumentException("Configure up to four opening windows per location and weekday.");
         foreach(var x in hours){if(x.LocationCode is not ("BK" or "BE")||x.DayOfWeek is <0 or >6||!TimeOnly.TryParse(x.OpensAt,out var opens)||!TimeOnly.TryParse(x.ClosesAt,out var closes)||closes<=opens||x.SlotStepMinutes is <5 or >240||!keys.Add(x.LocationCode+":"+x.DayOfWeek+":"+opens.ToString("HH:mm")))throw new ArgumentException("Hours need unique opening and closing ranges in Jamaica time for each Studio location and weekday.");}
         foreach(var day in hours.GroupBy(x=>x.LocationCode+":"+x.DayOfWeek)){var ordered=day.OrderBy(x=>TimeOnly.Parse(x.OpensAt)).ToArray();for(int i=1;i<ordered.Length;i++)if(TimeOnly.Parse(ordered[i].OpensAt)<TimeOnly.Parse(ordered[i-1].ClosesAt))throw new ArgumentException("Opening windows for the same location and weekday cannot overlap.");}
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        using(var guard=new NpgsqlCommand("select revision from studio_public_booking_catalog_state where id=1 for update",c,tx))
+        {
+            long current=(long)guard.ExecuteScalar()!;
+            if(expectedRevision is long expected&&current!=expected)throw new InvalidOperationException("Booking settings changed. Reload before saving hours.");
+        }
         using(var clear=new NpgsqlCommand("delete from studio_public_booking_hours",c,tx))clear.ExecuteNonQuery();
         foreach(var x in hours){using var q=new NpgsqlCommand("insert into studio_public_booking_hours(location_code,day_of_week,opens_at,payload) values($1,$2,$3,$4::jsonb)",c,tx);q.Parameters.AddWithValue(x.LocationCode);q.Parameters.AddWithValue(x.DayOfWeek);q.Parameters.AddWithValue(TimeOnly.Parse(x.OpensAt));q.Parameters.AddWithValue(JsonSerializer.Serialize(x,JsonOptions));q.ExecuteNonQuery();}
         using var bump=new NpgsqlCommand("update studio_public_booking_catalog_state set revision=revision+1 where id=1 returning revision",c,tx);long revision=(long)bump.ExecuteScalar()!;tx.Commit();return revision;
@@ -70,6 +97,7 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
             string id=x.Id??"";
             if(!Regex.IsMatch(id,@"^[A-Za-z0-9._-]{1,100}$")||!ids.Add(id))throw new ArgumentException("Session type IDs must be unique stable values.");
             if(string.IsNullOrWhiteSpace(x.Name)||x.Name.Trim().Length>160||!names.Add(x.Name.Trim()))throw new ArgumentException("Session names must be unique and are limited to 160 characters.");
+            if((x.Category?.Length??0)>80)throw new ArgumentException("Session categories are limited to 80 characters.");
             if(x.Description?.Length>1000||x.DurationMinutes is <15 or >1440||x.SetupBufferMinutes is <0 or >480||x.CleanupBufferMinutes is <0 or >480||x.PriceMinor<0||x.DepositMinor<0||x.DepositMinor>x.PriceMinor||x.Currency!="JMD")throw new ArgumentException("Set a JMD price and deposit, a valid duration, and buffers of no more than eight hours.");
             if(x.Locations is null||x.Locations.Count==0||x.Locations.Any(l=>l is not ("BK" or "BE"))||x.Locations.Distinct().Count()!=x.Locations.Count)throw new ArgumentException("Choose Kings Plaza (BK), East Queen Street (BE), or both.");
             if(x.ResourceRequirements is null||x.ResourceRequirements.Any(p=>!Regex.IsMatch(p.Key,@"^[A-Za-z0-9._-]{1,80}$")||p.Value is <0 or >20))throw new ArgumentException("Resource rules must use active Studio resource types and whole-number counts.");
@@ -82,11 +110,32 @@ public static class StudioPublicBookingCatalogEndpoints
     public static void MapStudioPublicBookingCatalog(this WebApplication app)
     {
         var group=app.MapGroup("/api/admin/public-booking/session-types").RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
+        group.MapGet("/settings",(IConfiguration configuration)=>
+        {
+            string? bookingUrl=null;
+            if(Uri.TryCreate(configuration["PublicSite:WebBaseUrl"]??configuration["PublicSite:BaseUrl"],UriKind.Absolute,out var origin)&&
+                origin.Scheme=="https"&&string.IsNullOrEmpty(origin.UserInfo)&&origin.AbsolutePath=="/"&&string.IsNullOrEmpty(origin.Query)&&string.IsNullOrEmpty(origin.Fragment))
+                bookingUrl=new Uri(origin,"/#booking").AbsoluteUri;
+            return Results.Ok(new{bookingUrl,publishingEnabled=configuration.GetValue<bool>("PublicSite:BookingCatalogPublishingEnabled")});
+        });
         group.MapGet("/",(StudioPublicBookingCatalogStore store)=>Results.Ok(store.Get()));
         group.MapGet("/workspaces",(StudioDatabase db)=>{using var c=db.OpenConnection();using var q=new NpgsqlCommand("select id,name from studio_workspaces where is_enabled order by sort_order,name",c);using var r=q.ExecuteReader();var items=new List<object>();while(r.Read())items.Add(new{id=r.GetGuid(0),name=r.GetString(1)});return Results.Ok(items);});
-        group.MapPut("/",(PublicBookingSessionType[] items,StudioPublicBookingCatalogStore store)=>{try{return Results.Ok(store.Save(items));}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}});
+        group.MapPut("/",(PublicBookingSessionType[] items,HttpRequest request,StudioPublicBookingCatalogStore store)=>{try{return Results.Ok(store.Save(items,ExpectedRevision(request)));}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}});
+        group.MapPatch("/{id}/publication",(string id,PublicBookingPublicationRequest request,StudioPublicBookingCatalogStore store)=>
+        {
+            try{return Results.Ok(store.SetPublication(id,request));}
+            catch(KeyNotFoundException e){return Results.NotFound(new{error=e.Message});}
+            catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}
+        });
         app.MapGet("/api/admin/public-booking/hours",(StudioPublicBookingCatalogStore store)=>Results.Ok(store.GetHours())).RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
-        app.MapPut("/api/admin/public-booking/hours",(PublicBookingHours[] hours,StudioPublicBookingCatalogStore store)=>{try{return Results.Ok(new{revision=store.SaveHours(hours)});}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}}).RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
+        app.MapPut("/api/admin/public-booking/hours",(PublicBookingHours[] hours,HttpRequest request,StudioPublicBookingCatalogStore store)=>{try{return Results.Ok(new{revision=store.SaveHours(hours,ExpectedRevision(request))});}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}}).RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
+    }
+    private static long? ExpectedRevision(HttpRequest request)
+    {
+        string value=request.Headers["If-Match"].ToString().Trim('"');
+        if(string.IsNullOrEmpty(value))return null;
+        if(!long.TryParse(value,out long revision)||revision<0)throw new ArgumentException("A valid booking revision is required.");
+        return revision;
     }
 }
 

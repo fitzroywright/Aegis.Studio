@@ -365,7 +365,7 @@
     const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Products and Services','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',dashboard:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
-        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioDashboardQueue:options.queue||null,studioWorkspaceId:['jobs','frontdesk','production','delivery','schedule'].includes(view)?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioTemplateKind:view==='templates'?(['Job','WorkOrder','Automation'].includes(options.kind)?options.kind:'Job'):null,studioCatalogTab:view==='catalog'?(options.tab==='booking-sessions'?'booking-sessions':'products'):null,studioJobId:['workspaces','session-plan','session-plan-import'].includes(view)&&options.jobId?String(options.jobId):null};
+        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioDashboardQueue:options.queue||null,studioWorkspaceId:['jobs','frontdesk','production','delivery','schedule'].includes(view)?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioTemplateKind:view==='templates'?(['Job','WorkOrder','Automation'].includes(options.kind)?options.kind:'Job'):null,studioCatalogTab:view==='catalog'?(['products','hours'].includes(options.tab)?options.tab:'booking-sessions'):null,studioJobId:['workspaces','session-plan','session-plan-import'].includes(view)&&options.jobId?String(options.jobId):null};
     }
     function recordNavigation(view,options={}){
         const next=navigationContext(view,options),previous=window.history.state;
@@ -448,7 +448,7 @@
     function destinationFromLocation(state){
         const params=new URLSearchParams(window.location.hash.replace(/^#/,''));
         const view=canonicalRoute(state?.studioView&&routes[canonicalRoute(state.studioView)]?state.studioView:params.get('studio'));
-        return {view:view&&routes[view]?view:'dashboard',kind:(state?.studioView==='workflows-admin'||(!state?.studioView&&params.get('studio')==='workflows-admin'))?'Automation':(state?.studioView==='work-order-templates'||(!state?.studioView&&params.get('studio')==='work-order-templates'))?'WorkOrder':state?.studioTemplateKind||params.get('kind')||'Job',panel:state?.studioView?(state.studioSchedulePanel||'workers'):(params.get('panel')||'workers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),tab:(state?.studioView==='booking-sessions'||(!state?.studioView&&params.get('studio')==='booking-sessions'))?'booking-sessions':state?.studioView?(state.studioView==='catalog'?(state.studioCatalogTab||'products'):(state.studioClientTab||'')):(params.get('tab')||''),clientId:state?.studioView?(state.studioClientId||''):(params.get('client')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),queue:state?.studioDashboardQueue||params.get('queue')||'',jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
+        return {view:view&&routes[view]?view:'dashboard',kind:(state?.studioView==='workflows-admin'||(!state?.studioView&&params.get('studio')==='workflows-admin'))?'Automation':(state?.studioView==='work-order-templates'||(!state?.studioView&&params.get('studio')==='work-order-templates'))?'WorkOrder':state?.studioTemplateKind||params.get('kind')||'Job',panel:state?.studioView?(state.studioSchedulePanel||'workers'):(params.get('panel')||'workers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),tab:(state?.studioView==='booking-sessions'||(!state?.studioView&&params.get('studio')==='booking-sessions'))?'booking-sessions':state?.studioView?(state.studioView==='catalog'?(state.studioCatalogTab||'booking-sessions'):(state.studioClientTab||'')):(params.get('tab')||''),clientId:state?.studioView?(state.studioClientId||''):(params.get('client')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),queue:state?.studioDashboardQueue||params.get('queue')||'',jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
     }
     window.addEventListener('popstate',event=>{
         const destination=destinationFromLocation(event.state);
@@ -472,15 +472,3 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
-
-
-
-
-
-
-
-
-
-
-
-
