@@ -315,22 +315,14 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 app.MapGet("/login", (IWebHostEnvironment e) => Results.File(Path.Combine(e.WebRootPath, "login.html"), "text/html; charset=utf-8")).AllowAnonymous();
- // Only the three non-sensitive login artwork files are available before sign-in.
+ // Explicitly allow only the login artwork needed before sign-in.
  // Keep the authorization fallback in place for every other static asset and API.
 app.MapGet("/assets/studio-login-logo.png", (IWebHostEnvironment e) =>
     Results.File(Path.Combine(e.WebRootPath, "assets", "studio-login-logo.png"), "image/png")).AllowAnonymous();
 app.MapGet("/assets/bryan-studios-logo.png", (IWebHostEnvironment e) =>
     Results.File(Path.Combine(e.WebRootPath, "assets", "bryan-studios-logo.png"), "image/png")).AllowAnonymous();
-app.MapGet("/assets/studio-login-background.jpg", (IWebHostEnvironment e) =>
-    Results.File(Path.Combine(e.WebRootPath, "assets", "studio-login-background.jpg"), "image/jpeg")).AllowAnonymous();
-app.MapGet("/assets/studio-login-exact.jpg", (IWebHostEnvironment e) =>
-    Results.File(Path.Combine(e.WebRootPath, "assets", "studio-login-exact.jpg"), "image/jpeg")).AllowAnonymous();
 app.MapGet("/assets/studio-login-clean-background.jpg", (IWebHostEnvironment e) =>
     Results.File(Path.Combine(e.WebRootPath, "assets", "studio-login-clean-background.jpg"), "image/jpeg")).AllowAnonymous();
-app.MapGet("/assets/studio-login-master-background.jpg", (IWebHostEnvironment e) =>
-    Results.File(Path.Combine(e.WebRootPath, "assets", "studio-login-master-background.jpg"), "image/jpeg")).AllowAnonymous();
-app.MapGet("/assets/studio-login-mirrored-background.jpg", (IWebHostEnvironment e) =>
-    Results.File(Path.Combine(e.WebRootPath, "assets", "studio-login-mirrored-background.jpg"), "image/jpeg")).AllowAnonymous();
 app.MapGet("/", (HttpContext context,IWebHostEnvironment e) => { context.Response.Headers.CacheControl = "no-cache"; return Results.File(Path.Combine(e.WebRootPath, "index.html"), "text/html; charset=utf-8"); }).RequireAuthorization();
 app.MapStudioAuthentication();
 app.MapStudioOutboundMailbox();
