@@ -1765,7 +1765,7 @@ color:var(--studio-grid-header-text);}
 .studio-about-key { margin-top: 8px; }
 .studio-about-demo { grid-column: 1 / -1; }
 .studio-about-demo-warning { margin: 0 0 8px; font-size: 11px; line-height: 1.4; }
-.studio-about-demo-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.studio-about-demo-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 @media (max-width: 720px) {
   .studio-about-grid { grid-template-columns: minmax(0,1fr); grid-template-rows: repeat(3,minmax(0,1fr)); max-height: none; }
 }
