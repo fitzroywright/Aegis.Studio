@@ -1747,6 +1747,10 @@ color:var(--studio-grid-header-text);}
 .studio-about-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .studio-about-card-heading h2 { margin: 0; font-size: 13px; }
 .studio-about-card-tools { display: flex; gap: 5px; flex-wrap: wrap; }
+.studio-about-card-tools [data-refresh-service-status] { background: #e0ebf7; border: 1px solid #8aaaca; color: #274f75; }
+.studio-about-card-tools [data-refresh-service-status]:is(:hover,:focus-visible) { background: #cbdff2; border-color: #648eb8; color: #193f65; }
+.studio-about-card-tools [data-service-audit] { background: #773e24; border: 1px solid #603019; color: #fff7eb; font-weight: 700; }
+.studio-about-card-tools [data-service-audit]:is(:hover,:focus-visible) { background: #5e2d17; border-color: #48200f; color: #fff; }
 .studio-about-card-body { flex: 1; min-height: 0; overflow: auto; }
 .studio-about-logo {
   display: block;
