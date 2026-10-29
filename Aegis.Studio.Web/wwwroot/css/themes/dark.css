@@ -9,6 +9,10 @@ body[data-theme="fluent-dark"] {
   --theme-text:#e8f1f8;
   --theme-muted:#a8bfd0;
   --theme-header:#081b30;
+  --catalog-header-surface:#203244;
+  --catalog-chip-surface:#294257;
+  --catalog-header-ink:#e8f1f8;
+  --catalog-link-ink:#e0b76c;
   --theme-accent:#82bfff;
   --theme-accent-soft:#294257;
   --studio-bg:var(--theme-bg);
@@ -129,4 +133,3 @@ body[data-theme="fluent-dark"] :is(.sj-pill.sj-purple) {background:#392d4d;color
 body[data-theme="fluent-dark"] :is(.sj-pill.sj-teal,.sj-pill.sj-green,.jd-status-pill) {background:#254338;color:#a0e0bd;border-color:#579f83;}
 body[data-theme="fluent-dark"] :is(.sj-pill.sj-amber,.jd-compact-exception.current) {background:#483b26;color:#f5d395;border-color:#aa874e;}
 body[data-theme="fluent-dark"] :is(.sj-pill.sj-red,.jd-flow-terminal) {background:#482d37;color:#ffb9c7;border-color:#bb6f83;}
-
