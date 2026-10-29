@@ -1749,8 +1749,6 @@ color:var(--studio-grid-header-text);}
 .studio-about-card-tools { display: flex; gap: 5px; flex-wrap: wrap; }
 .studio-about-card-tools [data-refresh-service-status] { background: #e0ebf7; border: 1px solid #8aaaca; color: #274f75; }
 .studio-about-card-tools [data-refresh-service-status]:is(:hover,:focus-visible) { background: #cbdff2; border-color: #648eb8; color: #193f65; }
-.studio-about-card-tools [data-service-audit] { background: #773e24; border: 1px solid #603019; color: #fff7eb; font-weight: 700; }
-.studio-about-card-tools [data-service-audit]:is(:hover,:focus-visible) { background: #5e2d17; border-color: #48200f; color: #fff; }
 .studio-about-card-body { flex: 1; min-height: 0; overflow: auto; }
 .studio-about-logo {
   display: block;
@@ -1768,7 +1766,10 @@ color:var(--studio-grid-header-text);}
 .studio-health-details dt { color: var(--theme-muted,#667383); font-size: 10px; margin-bottom: 3px; }
 .studio-about-details dd,
 .studio-health-details dd { margin: 0; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
-.studio-about-key { margin-top: 8px; background: #dceee9; border: 1px solid #78ad9d; color: #21594d; }
+.studio-about-key-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+.studio-about-key-actions [data-service-audit] { background: #773e24; border: 1px solid #603019; color: #fff7eb; font-weight: 700; }
+.studio-about-key-actions [data-service-audit]:is(:hover,:focus-visible) { background: #5e2d17; border-color: #48200f; color: #fff; }
+.studio-about-key { margin-top: 0; background: #dceee9; border: 1px solid #78ad9d; color: #21594d; }
 .studio-about-key:is(:hover,:focus-visible) { background: #c4e3d9; border-color: #508e7c; color: #164438; }
 .studio-about-demo { grid-column: 1 / -1; }
 .studio-about-demo-main { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
