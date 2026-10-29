@@ -217,6 +217,16 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .workspace-create-form [role]{margin:0;font-size:12px;overflow-wrap:anywhere}
 .workspace-create-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .workspace-admin-actions{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}.workspace-admin-actions button{font-size:10px;padding:5px 7px}
+.workspace-appearance-picker{display:block;max-width:100%;min-height:30px;border:1px solid var(--studio-control-border,#cdd8e2);border-radius:5px;background:var(--studio-card-surface,#fff);color:var(--studio-control-text,#233e57);font:inherit}
+.workspace-appearance-picker[type="color"]{width:76px;padding:2px;cursor:pointer}
+.workspace-admin-actions [data-workspace-mail]{background:#e5edf5;border:1px solid #93afc8;color:#294d6d}
+.workspace-admin-actions [data-workspace-mail]:is(:hover,:focus-visible){background:#d2e2f0;border-color:#6d96b9;color:#183b5b}
+.workspace-admin-actions [data-workspace-members]{background:#dceee9;border:1px solid #78ad9d;color:#21594d;font-weight:600}
+.workspace-admin-actions [data-workspace-members]:is(:hover,:focus-visible){background:#c4e3d9;border-color:#508e7c;color:#164438}
+.workspace-management-actions [data-create-workspace]{background:#8b5729;border:1px solid #71421e;color:#fff8ed;font-weight:700}
+.workspace-management-actions [data-create-workspace]:is(:hover,:focus-visible){background:#70411e;border-color:#583015;color:#fff}
+.workspace-create-actions [type="submit"]{background:#8b5729;border:1px solid #71421e;color:#fff8ed}
+.workspace-create-actions [type="submit"]:is(:hover,:focus-visible){background:#70411e;color:#fff}
 /* Dedicated import content mirrors the reference's steps, mapping, preview and review. */
 .session-import-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:18px;margin-top:18px}
 .session-import-sidebar{color:#29445e;padding:22px;background:#f3f6f8;border:1px solid #cdd8e2;border-radius:10px}.session-import-sidebar h2,.session-import-content h2,.session-import-review h2{font-size:14px;margin:0 0 15px}
