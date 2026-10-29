@@ -76,7 +76,7 @@
             scroll.append(tools);
             const account = document.createElement('div');
             account.className = 'studio-navigation-account';
-            for (const control of [document.getElementById('notificationButton'), document.getElementById('studioMessageBellPanel'), banner.querySelector('.user-menu')]) {
+            for (const control of [document.getElementById('notificationButton'), document.getElementById('studioMessageBellPanel'), banner.querySelector('.studio-user-identity')]) {
                 if (control) account.append(control);
             }
             host.append(scroll);
