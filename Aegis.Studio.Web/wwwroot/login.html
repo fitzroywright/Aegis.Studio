@@ -8,10 +8,10 @@
 :root {font-family:Inter,"Segoe UI",Arial,sans-serif;color-scheme:light}
 * {box-sizing:border-box}
 body {margin:0;min-height:100vh;background:#f8f8f8;color:#101828}
-.screen {min-height:100vh;display:grid;grid-template-columns:59.5% 40.5%}
-.hero {background:linear-gradient(90deg,#130d0833,#130d0808),url('/assets/studio-login-exact.jpg') left center/auto 100% no-repeat,#30251c}
-.login-side {display:grid;place-items:center;padding:36px;background:#f8f8f8}
-.card {width:min(100%,625px);padding:clamp(28px,3vw,60px);border-radius:23px;background:white;box-shadow:0 20px 65px #0000000c}
+.screen {min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,59.5fr) minmax(0,40.5fr)}
+.hero {min-width:0;min-height:100%;background:linear-gradient(90deg,#130d0814,#130d0805),url('/assets/studio-login-exact.jpg') left center/auto 100% no-repeat,#30251c}
+.login-side {min-width:0;display:grid;place-items:center;padding:clamp(16px,2.4vw,44px);background:#f8f8f8}
+.card {width:min(100%,625px);padding:clamp(22px,3vw,60px);border-radius:23px;background:white;box-shadow:0 20px 65px #0000000c}
 .brand {display:flex;align-items:center;justify-content:center;margin-bottom:32px}
 .brand img {width:min(100%,315px);height:auto;max-height:110px;object-fit:contain}
 h1 {font-size:clamp(29px,2.25vw,43px);letter-spacing:-.035em;line-height:1.2;margin:0;text-align:center}
@@ -29,8 +29,8 @@ input:focus {outline:2px solid #9dc1e8;outline-offset:1px}
 #error {color:#b42318;font-size:13px;text-align:center;margin-top:12px}
 #environment {text-align:center;font-size:13px;color:#64748b;margin-top:23px}
 [hidden] {display:none!important}
-@media(max-width:950px) {.screen {grid-template-columns:1fr}.hero {height:180px;background-size:cover;background-position:left top}.login-side {padding:28px 18px}.card {max-width:520px;padding:32px 25px}.brand {margin-bottom:25px}}
-@media(max-width:480px) {.hero {height:120px}.card {padding:25px 18px}h1 {font-size:30px}.intro {font-size:15px}}
+@media(max-width:760px) {.screen {grid-template-columns:minmax(0,1fr);grid-template-rows:180px minmax(0,1fr)}.hero {min-height:180px;background-size:cover;background-position:left 12%}.login-side {padding:24px 18px;align-items:start}.card {max-width:520px;padding:32px 25px}.brand {margin-bottom:25px}}
+@media(max-width:480px) {.screen {grid-template-rows:125px minmax(0,1fr)}.hero {min-height:125px}.card {padding:25px 18px}h1 {font-size:30px}.intro {font-size:15px}}
 </style>
 </head>
 <body>
