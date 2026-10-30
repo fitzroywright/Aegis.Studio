@@ -14,7 +14,7 @@ function setup(t,view){
  const jobs=[{id:'j',conversationId:'cv',title:'Campion Graduation',clientName:'Campion College',clientId:'client',status:'Ready for Delivery'},{id:'j2',title:'Carter Wedding',clientName:'Carter',status:'Published'}];
  w.json=async(url,options)=>{calls.push({url,options});if(options?.method==='PUT')return {...roster,revision:8};if(url==='/api/jobs')return jobs;if(url==='/api/jobs/j')return jobs[0];if(url.endsWith('/session-plan'))return subjects;if(url.endsWith('/access'))return {permissions:{editJob:true}};if(url.endsWith('/session-plan/roster')||url.includes('/intake/')&&url.endsWith('/roster'))return roster;if(url.endsWith('/finance-release')){if(url.includes('j2'))throw Error('Accounts unavailable');return {decision:{balance:12500}};}if(url==='/api/auth/me')return {user:{isAdministrator:true}};return [];};
  w.fetch=async()=>({ok:true,json:async()=>[]});
- for(const file of ['studio-page.js','management.js','frontdesk.js','studio-workflow-views.js','studio-shell-nav.js'])w.eval(read(file)+(file==='frontdesk.js'?'\nwindow.configureFrontDesk=rows=>{frontDeskDate="2026-10-30";frontDeskRequests=rows;renderFrontDesk();};':''));
+ for(const file of ['studio-page.js','management.js','frontdesk.js','studio-workflow-views.js','studio-shell-nav.js'])w.eval(read(file)+(file==='frontdesk.js'?'\nwindow.configureFrontDesk=rows=>{frontDeskDate="2026-10-30";frontDeskTab="today";frontDeskRequests=rows;renderFrontDesk();};':''));
  w.eval(fs.readFileSync(path.resolve(root,'../../Aegis.Studio.PublicSite/public/roster-editor.js'),'utf8'));
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
  return {w,calls,navigation,roster,subjects,jobs};
@@ -109,7 +109,7 @@ test('Front Desk retains the scrolled seventh row, radio and double-click target
  list.scrollTop=300;row.focus();row.click();
  assert.equal(w.genericView.querySelector('.fd-appointment-scroll'),list);
  assert.equal(list.querySelector('[data-fd-row-open="r6"]'),row);assert.equal(list.scrollTop,300);
- assert.equal(w.document.activeElement,row);assert.equal(row.getAttribute('aria-selected'),'true');assert.equal(row.tagName,'BUTTON');
+ assert.equal(w.document.activeElement,row);assert.equal(row.getAttribute('aria-selected'),'true');assert.equal(row.tagName,'TR');assert.equal(row.tabIndex,0);
  assert.match(w.genericView.querySelector('.fd-selected-request').textContent,/Client 6/);
  row.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));await settle();
  assert.equal(navigation.at(-1).options.jobId,'j6');
@@ -207,4 +207,5 @@ test('assignment and remainder actions use the existing workflow editor and sche
  assert.deepEqual(opened.map(x=>x[1]),['[data-wf-session]:not([data-wf-remainder])','[data-wf-remainder]']);
  roster.canSchedule=false;await w.StudioWorkflowViews.showSessionPlan('j');assert.equal(w.genericView.querySelector('[data-session-plan]').disabled,true);await assert.rejects(()=>w.StudioWorkflowViews.run('assign-session'),/permission/);
 });
+
 

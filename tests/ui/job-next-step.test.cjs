@@ -8,7 +8,7 @@ function setup(t){
  const dom=new JSDOM('<body><section id="next"></section></body>',{runScripts:'outside-only',url:'https://studio.test'});
  const w=dom.window;t.after(()=>w.close());
  w.json=async()=>{throw Error('Unexpected request');};
- for(const file of ['workflow-graph.js','job-details.js','job-workflow-graph.js'])w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/'+file),'utf8'));
+ for(const file of ['workflow-graph.js','job-details.js','job-workflow-graph.js','studio-next-actions.js'])w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/'+file),'utf8'));
  w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML=html;d.close=()=>d.remove();w.document.body.append(d);return d;};
  return{w,host:w.document.querySelector('#next')};
 }
@@ -26,12 +26,12 @@ function graph(statuses){
  nodes.push({id:'end',label:'Complete',kind:'End'});
  return{graph:{nodes,edges:[]},evaluation:{nodes:states,edges:{}},tasks};
 }
-test('next action uses the graph task long description and opens its node',t=>{
+test('next action uses the server projection and opens its assigned graph task',async t=>{
  const{w,host}=setup(t),view=graph(['Completed','Available','Blocked']);let selected;
- view.tasks[1].description='Photograph the scheduled subjects';
- w.StudioJobDetails.nextActionLink(host,view,id=>selected=id);
- assert.match(host.querySelector('[data-next-action]').textContent,/Photograph the scheduled subjects/);
- host.querySelector('button').click();assert.equal(selected,'shoot');assert.equal(w.StudioJobDetails.workflowAction(view).status,'Available');
+ const row={kind:'job',entityId:'job',jobId:'job',action:{key:'task:shoot',title:'Photograph the scheduled subjects',reason:'Scheduled photography is ready.',route:'task',taskId:'task-shoot'}};
+ w.json=async()=>[row];w.StudioJobGraph.launchTask=async(job,id)=>selected={job,id};
+ w.StudioNextActions.mount(host,row);assert.match(host.querySelector('[data-next-activate]').textContent,/Photograph the scheduled subjects/);
+ host.querySelector('button').click();await new Promise(r=>setImmediate(r));assert.deepEqual(selected,{job:'job',id:'task-shoot'});assert.equal(w.StudioJobDetails.workflowAction(view).status,'Available');
 });
 test('blocked graph task dialog escapes its reason and offers no transition',async t=>{
  const{w,host}=setup(t),view=graph(['Completed','Blocked','NotStarted']);
@@ -41,15 +41,16 @@ test('blocked graph task dialog escapes its reason and offers no transition',asy
  assert.equal(d.querySelector('[data-start],[data-complete]'),null);
 });
 test('a completed graph has no outstanding action and leaves no stale action link',t=>{
- const{w,host}=setup(t);w.StudioJobDetails.nextActionLink(host,graph(['Completed','Available','Blocked']),()=>{});
- w.StudioJobDetails.nextActionLink(host,graph(['Completed','Completed','Completed']),()=>{});
+ const{w,host}=setup(t);w.StudioNextActions.mount(host,{action:{title:'Complete photography',reason:'Photography is active.'}});
+ w.StudioNextActions.mount(host,null);
  assert.equal(w.StudioJobDetails.workflowAction(graph(['Completed','Completed','Completed'])),null);assert.equal(host.querySelector('button'),null);
 });
 test('Job Details uses one display workflow and its next action opens the assigned task dialog',async t=>{
  const{environment}=require('./job-detail-fixture.cjs'),{w,fixture}=environment(t);
  w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML='<div class="studio-dialog-body">'+html+'</div>';d.close=()=>d.remove();w.document.body.append(d);return d;};
+ const api=w.json;w.json=(url,options)=>url.startsWith('/api/work/next-actions')?Promise.resolve([{kind:'job',entityId:'job',jobId:'job',action:{key:'task:production',title:'Production',reason:'Production is in progress.',route:'task',taskId:'activity-production'}}]):api(url,options);
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,40));
- const next=w.document.querySelector('.job-detail-heading [data-next-action]');assert.ok(next);assert.match(next.textContent,/Production/);
+ const next=w.document.querySelector('.job-detail-heading [data-next-activate]');assert.ok(next);assert.match(next.textContent,/Production/);
  assert.ok(fixture.calls.some(c=>c.url.endsWith('/workflow-graph')));assert.equal(fixture.calls.some(c=>c.url.endsWith('/connected-workflow')),true);
  next.click();await new Promise(r=>setTimeout(r,20));assert.match(w.document.querySelector('dialog:not([id])').textContent,/Production/);
  assert.equal(w.document.querySelectorAll('.job-detail-workflow-dialog').length,0);
@@ -62,3 +63,4 @@ test('workflow load failure remains visible in the shared attention drawer and R
  const retry=[...drawer.querySelectorAll('button')].find(b=>b.textContent==='Retry workflow →');assert.ok(retry);failed=false;await retry.onclick();
  assert.ok(w.document.querySelector('.jd-workflow-track [role=listitem]'));assert.doesNotMatch(drawer.textContent,/Workflow unavailable/);
 });
+

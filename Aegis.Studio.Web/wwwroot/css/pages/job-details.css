@@ -50,8 +50,6 @@
 .jd-job-identity-menu .jd-status-label { cursor:default; }
 .jd-job-identity-menu .jd-status-label::after { content:none; }
 .jd-job-identity-menu [data-stage-age] { color:var(--theme-text,#162b50); font-size:12px; font-weight:650; }
-.jd-next-action-link { align-self:flex-start; max-width:100%; min-width:0; padding:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; text-align:left; }
-.jd-next-action-link span { display:inline-block; margin-left:3px; }
 @media(max-width:900px) {
  .job-detail-title.jd-job-identity { gap:clamp(6px,1vw,14px); }
 }

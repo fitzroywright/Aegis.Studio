@@ -6,7 +6,7 @@
  function workflowAction(view){
   const tasks=new Map((view?.tasks||[]).map(task=>[task.nodeId,task]));
   const states=new Map((view?.evaluation?.nodes||[]).map(node=>[node.id,node]));
-  const order=(view?.graph?.nodes||[]).filter(node=>node.kind==='Task').map(node=>node.id);
+  const order=(view?.tasks||[]).map(task=>task.nodeId);
   const open=order.map(id=>({id,task:tasks.get(id),status:states.get(id)?.status||'Unknown'})).filter(x=>x.task&&!['Completed','Skipped','Inactive','Cancelled'].includes(x.status));
   const current=open.find(x=>x.status==='InProgress')||open.find(x=>x.status==='Available')||open[0]||null;
   return current?{nodeId:current.id,task:current.task,status:current.status}:null;
@@ -22,12 +22,6 @@
   if(!Number.isFinite(started)||!Number.isFinite(now))return 'Timing unavailable';
   const minutes=Math.floor(Math.max(0,now-started)/60000),days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60);
   return days?`${days}d ${hours}h`:minutes>=60?`${hours}h ${minutes%60}m`:minutes?`${minutes}m`:'Less than a minute';
- }
- function nextActionLink(host,view,activate){
-  if(!host)return;
-  const current=workflowAction(view),task=current?.task;
-  host.innerHTML=current?'<button type="button" class="jd-link jd-next-action-link" data-next-action>'+escape(task.description||task.title)+' <span aria-hidden="true">→</span></button>':'';
-  host.querySelector('[data-next-action]')?.addEventListener('click',()=>activate(current.nodeId));
  }
  const photoPreview=(job,asset)=>`/api/jobs/${job.id}/versions/by-id/${asset.versionId}/preview`;
   function bindImages(container){
@@ -359,5 +353,5 @@
   host.studioJobMedia?.dispose();host.studioJobMedia=controller;
   await load();return controller;
  }
- root.StudioJobDetails={media,openGallery,nextActionLink,workflowAction,stageAge};
+ root.StudioJobDetails={media,openGallery,workflowAction,stageAge};
 })(window);
