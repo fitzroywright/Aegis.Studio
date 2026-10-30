@@ -1,4 +1,4 @@
-name: Historical Studio baseline regression evidence
+name: Studio base revision regression evidence
 on:
   pull_request:
   workflow_dispatch:
@@ -26,58 +26,74 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: f0c97f6f8d146596f0c36b6633989d128d171369
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
           path: Aegis.Studio
+      - name: Read base revision library pins
+        id: baseline
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          pins = json.load(open('security-baseline.json'))['commonLibraries']
+          libraries = {"Common.Security":"security","Common.Diagnostics":"diagnostics","Common.Secrets":"secrets","Common.Messaging":"messaging","Common.Storage":"storage","Common.Registration":"registration"}
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for library, key in libraries.items():
+                  revision = pins[library]
+                  if not re.fullmatch(r'[0-9a-f]{40}', revision):
+                      raise ValueError('Expected an immutable revision for ' + library)
+                  print(key + '=' + revision, file=output)
+          PY
       - uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Security
-          ref: be02071b608cd810ca8fc4c0545d55bc48eebed8
+          ref: ${{ steps.baseline.outputs.security }}
           path: Common/Common.Security
       - uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Diagnostics
-          ref: 4f90c9fd31aaa16ffbada97e33084a5356a45859
+          ref: ${{ steps.baseline.outputs.diagnostics }}
           path: Common/Common.Diagnostics
       - uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Secrets
-          ref: 0e081a55d5885a148decb0c86c1baad263448948
+          ref: ${{ steps.baseline.outputs.secrets }}
           path: Common/Common.Secrets
       - uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Messaging
-          ref: cc015e8fcd9ea0c163859b3ed094243e4cddfbf4
+          ref: ${{ steps.baseline.outputs.messaging }}
           path: Common/Common.Messaging
       - uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Storage
-          ref: bface4498b63f6e0b9dae1228bd9234a3a94b4d7
+          ref: ${{ steps.baseline.outputs.storage }}
           path: Common/Common.Storage
       - uses: actions/checkout@v4
         with:
           repository: fitzroywright/Common.Registration
-          ref: e673815b7e1f29ac1c713e849762e1af522a784d
+          ref: ${{ steps.baseline.outputs.registration }}
           path: Common/Common.Registration
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - name: Historical baseline PostgreSQL tests
+      - name: Verify base revision shared sources
+        run: python3 ../Common/Common.Security/scripts/verify-source-baseline.py security-baseline.json --common-root ../Common
+      - name: Base revision PostgreSQL tests
         run: dotnet test Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common" --logger trx --results-directory TestResults
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: historical-baseline-postgres-evidence
+          name: base-revision-postgres-evidence
           path: Aegis.Studio/TestResults
   baseline-ui:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: f0c97f6f8d146596f0c36b6633989d128d171369
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
           path: Aegis.Studio
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Historical baseline UI tests
+      - name: Base revision UI tests
         working-directory: Aegis.Studio/tests/ui
         run: npm ci && npm test
