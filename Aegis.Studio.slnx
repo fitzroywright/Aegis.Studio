@@ -10,6 +10,8 @@
   <Project Path="Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj" />
   <Project Path="Aegis.Studio.WorkDay.Core/Aegis.Studio.WorkDay.Core.csproj" />
   <Project Path="../Common/Common.Security/Common.Security.csproj" />
+  <Project Path="../Common/Common.Security/Common.Security.Plugin.ActiveDirectory/Common.Security.Plugin.ActiveDirectory.csproj" />
+  <Project Path="../Common/Common.Security/Common.Security.Hosting/Common.Security.Hosting.csproj" />
   <Project Path="../Common/Common.Secrets/Common.Secrets.csproj" />
   <Project Path="../Common/Common.Messaging/Common.Messaging.csproj" />
   <Project Path="../Common/Common.Messaging/Common.Messaging.Hosting/Common.Messaging.Hosting.csproj" />
