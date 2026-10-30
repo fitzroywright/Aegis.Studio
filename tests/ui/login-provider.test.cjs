@@ -26,9 +26,10 @@ test('Entra uses the single Sign in button and never posts credentials',async t=
  await submit();assert.deepEqual(navigation,['/api/auth/entra']);assert.equal(requests.length,1);
 });
 test('isolated demo uses configured identity without displaying provider details',async t=>{
- const {d}=await fixture(t,{defaultSource:'Mock',defaultUserName:'known',mockPasswordRequired:false});
+ const {d,requests,submit}=await fixture(t,{defaultSource:'Mock',defaultUserName:'known',mockPasswordRequired:true});
  assert.equal(d.getElementById('userName').value,'known');assert.equal(d.getElementById('password').disabled,true);assert.equal(d.getElementById('passwordLabel').hidden,true);
  assert.equal(d.getElementById('recoveryToggle').hidden,true);
+ await submit();assert.deepEqual(JSON.parse(requests.at(-1).request.body),{userName:'known',password:''});
 });
 test('an unknown configured provider leaves sign-in disabled',async t=>{
  const {d,requests,submit}=await fixture(t,{defaultSource:'unknown'});

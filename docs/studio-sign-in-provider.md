@@ -31,3 +31,7 @@ validation continue to apply to every provider.
 Changing configuration does not migrate identity bindings or grant application
 access. Follow the existing cutover procedure and deploy the complete Studio
 bundle to apply this source change.
+
+Studio mock sign-in is password-free. The password field is hidden and a legacy
+`MockAuthentication:Password` value is ignored. Only the server allowlisted identity
+is accepted, and isolation, account approval and role restrictions still apply.
