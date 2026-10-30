@@ -338,17 +338,18 @@ async function loadStaffWorkspaceGrants(employee,holder){
                 return {item,member:members.find(m=>String(m.userName).toLowerCase()===String(employee.userName).toLowerCase())||null};
             }catch{return {item,error:'Access unavailable'};}
         }));
-        holder.innerHTML='<h3>Workspace access</h3><p class="muted">Grants are enforced by the existing workspace authorization service.</p>'+rows.map((r,i)=>`<div class="staff-workspace-grant" data-grant-index="${i}"><strong>${esc(r.item.workspace.name)}</strong> ${r.error?'<span>Access unavailable</span>':`<select aria-label="Access for ${esc(r.item.workspace.name)}" data-grant-select><option value="none" ${!r.member?.isActive?'selected':''}>No access</option><option value="view" ${r.member?.isActive&&r.member.permissions?.accessWorkspace&&!r.member.permissions?.manageMembers?'selected':''}>Member</option><option value="manager" ${r.member?.isActive&&r.member.permissions?.manageMembers?'selected':''}>Workspace manager</option></select><button type="button" class="action" data-grant-save>Apply</button>`}</div>`).join('');
+        holder.innerHTML='<h3>Workspace access</h3><p class="muted">Grants are enforced by the existing workspace authorization service.</p>'+rows.map((r,i)=>`<div class="staff-workspace-grant" data-grant-index="${i}"><strong>${esc(r.item.workspace.name)}</strong> ${r.error?'<span>Access unavailable</span>':`<select aria-label="Access for ${esc(r.item.workspace.name)}" data-grant-select><option value="none" ${!r.member?.isActive?'selected':''}>No access</option><option value="view" ${r.member?.isActive&&r.member.permissions?.accessWorkspace&&!r.member.permissions?.manageMembers&&!r.member.permissions?.adminWorkspace?'selected':''}>Member</option><option value="existing" ${r.member?.isActive&&r.member.permissions?.adminWorkspace?'selected':''} disabled>Workspace administrator (manage in Workspaces)</option><option value="manager" ${r.member?.isActive&&r.member.permissions?.manageMembers?'selected':''}>Workspace manager</option></select><button type="button" class="action" data-grant-save>Apply</button>`}</div>`).join('');
         holder.querySelectorAll('[data-grant-save]').forEach(button=>{
             button.onclick=async()=>{
                 const row=button.closest('[data-grant-index]'),record=rows[Number(row.dataset.grantIndex)],id=record.item.workspace.id,mode=row.querySelector('[data-grant-select]').value;
                 button.disabled=true;
                 try{
                     const endpoint='/api/workspaces/'+encodeURIComponent(id)+'/members/'+encodeURIComponent(employee.userName);
+                    if(mode==='existing')return;
                     if(mode==='none'){
                         if(record.member){const response=await fetch(endpoint,{method:'DELETE'});if(!response.ok)throw Error(await response.text());}
                     }else{
-                        const permissions=mode==='manager'?permissionsForPreset('manager'):(record.member?.permissions?.accessWorkspace?record.member.permissions:permissionsForPreset('view'));
+                        const permissions=mode==='manager'?permissionsForPreset('manager'):permissionsForPreset('view');
                         await json(endpoint,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:employee.userName,displayName:employee.displayName||employee.userName,isActive:true,permissions})});
                     }
                     row.querySelector('[data-grant-save]').textContent='Saved';
