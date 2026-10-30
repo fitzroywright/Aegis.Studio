@@ -1,26 +1,42 @@
 async function renderGlobalRoleAdministration(current=()=>true) {
     try {
-        const me = await json('/api/auth/me');
-        if (!current() || (me?.user||me)?.isAdministrator !== true) return;
-        const roles = await json('/api/security/global-roles/');
+        const me=await json('/api/auth/me');
+        if(!current()||(me?.user||me)?.isAdministrator!==true)return;
+        const [roles,staff]=await Promise.all([json('/api/security/global-roles/'),json('/api/admin/studio-employees/')]);
         if(!current())return;
-        const frontDesk = roles.find(role => role.name === 'Front Desk');
-        const operationsManager = roles.find(role => role.name === 'Operations Manager');
-        if (!frontDesk && !operationsManager) return;
-
-        const section = document.createElement('section');
-        section.className = 'staff-global-role-section';
-        section.innerHTML = `<h2>Global operational roles</h2><div class="staff-global-role-columns">${[
-            frontDesk&&{role:frontDesk,title:'Front Desk',description:'Cross-workspace reception and client service.',user:'frontDeskRoleUser',display:'frontDeskRoleDisplay',target:'frontDeskRoleMembers',save:'saveFrontDeskRoleMember'},
-            operationsManager&&{role:operationsManager,title:'Operations Manager',description:'Cross-workspace escalation and operational oversight.',user:'operationsManagerRoleUser',display:'operationsManagerRoleDisplay',target:'operationsManagerRoleMembers',save:'saveOperationsManagerRoleMember'}
-        ].filter(Boolean).map(x=>`<section class="staff-editor"><h3>${x.title}</h3><p class="muted">${x.description}</p><div class="staff-entry"><label>User name<input id="${x.user}" placeholder="domain user name"></label><label>Display name<input id="${x.display}"></label><button type="button" class="primary" onclick="${x.save}('${x.role.id}')">Assign user</button></div><div class="staff-grid-scroll" id="${x.target}"></div></section>`).join('')}</div>`;
-        const holder=genericView.querySelector('[data-staff-global-roles]');if(!holder)return;holder.replaceChildren(section);
-        if(frontDesk) await refreshFrontDeskRoleMembers(frontDesk.id);
-        if(operationsManager) await refreshOperationsManagerRoleMembers(operationsManager.id);
-    } catch (error) {
-        console.warn('Global role administration unavailable', error);
-    }
-};
+        const holder=genericView.querySelector('[data-staff-global-roles]');if(!holder)return;
+        const supported=roles.filter(role=>['Front Desk','Operations Manager'].includes(role.name));
+        holder.innerHTML=`<div class="staff-global-role-section"><p class="muted">Select an existing Studio staff member to assign an operational role. This does not grant workspace security permissions.</p><div class="staff-global-role-columns">${supported.map(role=>`<section class="staff-editor"><h3>${esc(role.name)}</h3><p class="muted">${esc(role.description||'Cross-workspace operational responsibility')}</p><form data-global-role-form="${esc(role.id)}"><label>Staff member<select name="staff" required><option value="">Choose staff member</option>${staff.filter(e=>e.isActive).map(e=>`<option value="${esc(e.userName)}">${esc(e.displayName||e.userName)} (${esc(e.userName)})</option>`).join('')}</select></label><button type="submit" class="primary">Assign role</button><p role="alert"></p></form><div class="staff-grid-scroll" id="${role.name==='Front Desk'?'frontDeskRoleMembers':'operationsManagerRoleMembers'}"></div></section>`).join('')}</div></div>`;
+        holder.querySelectorAll('[data-global-role-form]').forEach(form=>{
+            form.onsubmit=async event=>{
+                event.preventDefault();const userName=form.elements.staff.value;
+                const employee=staff.find(e=>e.userName===userName);if(!employee)return;
+                const button=form.querySelector('[type=submit]');button.disabled=true;
+                try{
+                    const roleId=form.dataset.globalRoleForm;
+                    await json(`/api/security/global-roles/${encodeURIComponent(roleId)}/members/${encodeURIComponent(userName)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName,displayName:employee.displayName||userName,isActive:true})});
+                    await refreshGlobalRoleMembers(roleId,roles.find(r=>String(r.id)===roleId)?.name==='Front Desk'?'frontDeskRoleMembers':'operationsManagerRoleMembers',async(id,name)=>{
+                        if(!confirm(`Remove ${name} from this role?`))return;
+                        const response=await fetch(`/api/security/global-roles/${encodeURIComponent(id)}/members/${encodeURIComponent(name)}`,{method:'DELETE'});
+                        if(!response.ok)throw Error(await response.text());
+                        await renderGlobalRoleAdministration(current);
+                    });
+                    form.querySelector('[role=alert]').textContent='Role assigned.';
+                }catch(error){form.querySelector('[role=alert]').textContent=error.message||String(error);}
+                finally{button.disabled=false;}
+            };
+        });
+        for(const role of supported){
+            const target=role.name==='Front Desk'?'frontDeskRoleMembers':'operationsManagerRoleMembers';
+            await refreshGlobalRoleMembers(role.id,target,async(id,userName)=>{
+                if(!confirm(`Remove ${userName} from ${role.name}?`))return;
+                const response=await fetch(`/api/security/global-roles/${encodeURIComponent(id)}/members/${encodeURIComponent(userName)}`,{method:'DELETE'});
+                if(!response.ok)throw Error(await response.text());
+                await renderGlobalRoleAdministration(current);
+            });
+        }
+    }catch(error){console.warn('Global role administration unavailable',error);}
+}
 
 async function refreshGlobalRoleMembers(roleId,targetId,remove){
     const members=await json(`/api/security/global-roles/${roleId}/members`),target=document.getElementById(targetId);if(!target)return;

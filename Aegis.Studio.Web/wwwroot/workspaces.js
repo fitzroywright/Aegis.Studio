@@ -251,7 +251,57 @@ async function runMailboxImport(workspaceId) {
 }
 
 function renderEmployeeDirectorySection() {
-    return `<section class="staff-administration"><div class="staff-editors"><section class="staff-editor"><h2>Add staff member</h2><div class="staff-entry"><label>User name<input id="employeeUserName" autocomplete="off"></label><label>Display name<input id="employeeDisplayName"></label><label>Email<input id="employeeEmail" type="email"></label><label>Assignable<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><button type="button" class="primary" onclick="saveStudioEmployee()">Save employee</button></div></section>${renderStudioRoleEditor()}<div class="staff-global-roles" data-staff-global-roles></div></div><section class="staff-grid-section"><header><h2>Staff directory</h2><span>Edit a row, then Save. User names identify existing accounts.</span></header><div id="studioEmployeeList" class="staff-grid-scroll"><p role="status">Loading…</p></div></section>${renderStudioRoleGrid()}</section>`;
+    return `<section class="staff-administration">
+        <nav class="staff-role-tabs" aria-label="Staff and roles sections">
+            <button type="button" class="primary" data-staff-tab="staff" aria-selected="true" onclick="selectStaffRoleTab('staff')">Staff</button>
+            <button type="button" class="action" data-staff-tab="roles" aria-selected="false" onclick="selectStaffRoleTab('roles')">Roles &amp; Permissions</button>
+            <button type="button" class="action" data-staff-tab="assignments" aria-selected="false" onclick="selectStaffRoleTab('assignments')">Assignments</button>
+        </nav>
+        <div data-staff-panel="staff">
+            <header class="staff-directory-toolbar"><div><h2>Staff directory</h2><p class="muted">Studio-wide staff identities. Workspace access is granted separately.</p></div><button type="button" class="primary" onclick="openStudioStaffDialog()">Add staff</button></header>
+            <section class="staff-grid-section"><div id="studioEmployeeList" class="staff-grid-scroll"><p role="status">Loading…</p></div></section>
+        </div>
+        <div data-staff-panel="roles" hidden>
+            <header class="staff-directory-toolbar"><div><h2>Roles &amp; Permissions</h2><p class="muted">Reusable job and workspace security roles.</p></div><button type="button" class="primary" onclick="openStudioRoleDialog()">Create role</button></header>
+            ${renderStudioRoleGrid()}
+        </div>
+        <div data-staff-panel="assignments" hidden>
+            <header class="staff-directory-toolbar"><div><h2>Global operational assignments</h2><p class="muted">Cross-workspace responsibilities; separate from job and workspace permissions.</p></div></header>
+            <div class="staff-global-roles" data-staff-global-roles></div>
+        </div>
+    </section>`;
+}
+function selectStaffRoleTab(tab) {
+    const root=document.querySelector('.staff-administration');
+    if(!root)return;
+    root.querySelectorAll('[data-staff-panel]').forEach(panel=>{panel.hidden=panel.dataset.staffPanel!==tab;});
+    root.querySelectorAll('[data-staff-tab]').forEach(button=>{
+        const active=button.dataset.staffTab===tab;
+        button.setAttribute('aria-selected',String(active));
+        button.classList.toggle('primary',active);
+        button.classList.toggle('action',!active);
+    });
+}
+function openStudioStaffDialog() {
+    const dialog=studioDialog('Add staff member',`<form class="request-form" id="staffCreateForm"><label>User name<input id="employeeUserName" required autocomplete="off"></label><label>Display name<input id="employeeDisplayName" required></label><label>Email<input id="employeeEmail" type="email"></label><label>Assignable<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Add staff</button></div></form>`);
+    dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
+    dialog.querySelector('form').onsubmit=async event=>{
+        event.preventDefault();
+        const button=dialog.querySelector('[type=submit]');button.disabled=true;
+        try{await saveStudioEmployee();dialog.close();}catch(error){dialog.querySelector('[role=alert]').textContent=error.message||String(error);}
+        finally{button.disabled=false;}
+    };
+}
+function openStudioRoleDialog() {
+    const dialog=studioDialog('Create reusable role',`<form class="request-form" id="roleCreateForm">${renderStudioRoleEditor()}<p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Create role</button></div></form>`);
+    const embedded=dialog.querySelector('.staff-editor > .staff-entry > button');
+    if(embedded)embedded.remove();
+    dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
+    dialog.querySelector('form').onsubmit=async event=>{
+        event.preventDefault();const button=dialog.querySelector('[type=submit]');button.disabled=true;
+        try{await createStudioRole();dialog.close();}catch(error){dialog.querySelector('[role=alert]').textContent=error.message||String(error);}
+        finally{button.disabled=false;}
+    };
 }
 async function refreshStudioEmployees(){
     const holder=document.getElementById('studioEmployeeList');if(!holder)return;
@@ -261,6 +311,7 @@ async function refreshStudioEmployees(){
     holder.innerHTML=`<table class="staff-editable-grid"><caption class="sr-only">Editable staff directory</caption><thead><tr><th>User name</th><th>Display name</th><th>Email</th><th>Active</th><th>Assignable</th><th>Roles / source</th><th>Actions</th></tr></thead><tbody>${employees.map((e,i)=>`<tr data-employee-row="${i}"><td>${esc(e.userName)}</td><td><input data-employee-name aria-label="Display name for ${esc(e.userName)}" required value="${esc(e.displayName)}"></td><td><input data-employee-email type="email" aria-label="Email for ${esc(e.userName)}" value="${esc(e.emailAddress||'')}"></td><td><input data-employee-active type="checkbox" aria-label="Active: ${esc(e.userName)}" ${e.isActive?'checked':''}></td><td><input data-employee-assignable type="checkbox" aria-label="Assignable: ${esc(e.userName)}" ${e.isAssignable?'checked':''}></td><td>${esc((e.roles||[]).join(', ')||e.source||'Studio')}</td><td><div class="staff-row-actions"><button type="button" class="action" data-employee-save disabled>Save</button><button type="button" class="action" data-employee-undo disabled>Undo</button>${registered.has(String(e.userName).toLowerCase())?'<span class="studio-status-pill">Photographer</span>':`<button type="button" class="action" data-register-photographer ${!e.isActive||!e.isAssignable?'disabled':''}>Register photographer</button>`}</div><span data-row-status role="status"></span></td></tr>`).join('')||'<tr><td colspan="7">No staff members yet.</td></tr>'}</tbody></table>`;
     holder.querySelectorAll('[data-employee-row]').forEach(row=>{
         const employee=employees[Number(row.dataset.employeeRow)],save=row.querySelector('[data-employee-save]'),undo=row.querySelector('[data-employee-undo]'),status=row.querySelector('[data-row-status]');
+        row.ondblclick=event=>{if(event.target.closest('input,button'))return;openStudioStaffDetails(employee);};
         const dirty=()=>{save.disabled=false;undo.disabled=false;status.textContent='Unsaved';};row.querySelectorAll('input').forEach(input=>input.oninput=dirty);
         undo.onclick=()=>{row.querySelector('[data-employee-name]').value=employee.displayName||'';row.querySelector('[data-employee-email]').value=employee.emailAddress||'';row.querySelector('[data-employee-active]').checked=employee.isActive;row.querySelector('[data-employee-assignable]').checked=employee.isAssignable;save.disabled=undo.disabled=true;status.textContent='';};
         save.onclick=async()=>{
@@ -273,6 +324,73 @@ async function refreshStudioEmployees(){
         };
         const register=row.querySelector('[data-register-photographer]');if(register)register.onclick=()=>registerStudioPhotographer(employee);
     });
+}
+async function loadStaffWorkspaceGrants(employee,holder){
+    try{
+        const [access,me]=await Promise.all([json('/api/workspace-access'),json('/api/auth/me')]);
+        const admin=(me.user||me).isAdministrator===true;
+        const candidates=access.filter(x=>admin||x.permissions?.manageMembers||x.permissions?.adminWorkspace);
+        if(!candidates.length){holder.textContent='No workspaces available to manage.';return;}
+        const rows=await Promise.all(candidates.map(async item=>{
+            const id=item.workspace.id;
+            try{
+                const members=await json('/api/workspaces/'+encodeURIComponent(id)+'/members');
+                return {item,member:members.find(m=>String(m.userName).toLowerCase()===String(employee.userName).toLowerCase())||null};
+            }catch{return {item,error:'Access unavailable'};}
+        }));
+        holder.innerHTML='<h3>Workspace access</h3><p class="muted">Grants are enforced by the existing workspace authorization service.</p>'+rows.map((r,i)=>`<div class="staff-workspace-grant" data-grant-index="${i}"><strong>${esc(r.item.workspace.name)}</strong> ${r.error?'<span>Access unavailable</span>':`<select aria-label="Access for ${esc(r.item.workspace.name)}" data-grant-select><option value="none" ${!r.member?.isActive?'selected':''}>No access</option><option value="view" ${r.member?.isActive&&r.member.permissions?.accessWorkspace&&!r.member.permissions?.manageMembers&&!r.member.permissions?.adminWorkspace?'selected':''}>Member</option><option value="existing" ${r.member?.isActive&&r.member.permissions?.adminWorkspace?'selected':''} disabled>Workspace administrator (manage in Workspaces)</option><option value="manager" ${r.member?.isActive&&r.member.permissions?.manageMembers?'selected':''}>Workspace manager</option></select><button type="button" class="action" data-grant-save>Apply</button>`}</div>`).join('');
+        holder.querySelectorAll('[data-grant-save]').forEach(button=>{
+            button.onclick=async()=>{
+                const row=button.closest('[data-grant-index]'),record=rows[Number(row.dataset.grantIndex)],id=record.item.workspace.id,mode=row.querySelector('[data-grant-select]').value;
+                button.disabled=true;
+                try{
+                    const endpoint='/api/workspaces/'+encodeURIComponent(id)+'/members/'+encodeURIComponent(employee.userName);
+                    if(mode==='existing')return;
+                    if(mode==='none'){
+                        if(record.member){const response=await fetch(endpoint,{method:'DELETE'});if(!response.ok)throw Error(await response.text());}
+                    }else{
+                        const permissions=mode==='manager'?permissionsForPreset('manager'):permissionsForPreset('view');
+                        await json(endpoint,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:employee.userName,displayName:employee.displayName||employee.userName,isActive:true,permissions})});
+                    }
+                    row.querySelector('[data-grant-save]').textContent='Saved';
+                }catch(error){window.alert(error.message||String(error));}
+                finally{button.disabled=false;}
+            };
+        });
+    }catch(error){holder.textContent='Workspace access could not be loaded: '+(error.message||error);}
+}
+async function loadStaffOperationalRoles(employee,holder){
+    try{
+        const roles=(await json('/api/security/global-roles/')).filter(r=>['Front Desk','Operations Manager'].includes(r.name));
+        const records=await Promise.all(roles.map(async role=>({role,members:await json('/api/security/global-roles/'+encodeURIComponent(role.id)+'/members')})));
+        holder.innerHTML='<h3>Operational roles</h3>'+records.map((r,i)=>`<label><input type="checkbox" data-operational-role="${i}" ${r.members.some(m=>m.isActive&&String(m.userName).toLowerCase()===String(employee.userName).toLowerCase())?'checked':''}> ${esc(r.role.name)}</label>`).join('')+'<button type="button" class="action" data-operational-save>Save roles</button><p role="status"></p>';
+        holder.querySelector('[data-operational-save]').onclick=async()=>{
+            const button=holder.querySelector('[data-operational-save]');button.disabled=true;
+            try{
+                for(const [i,r] of records.entries()){
+                    const checked=holder.querySelector('[data-operational-role="'+i+'"]').checked;
+                    const present=r.members.some(m=>m.isActive&&String(m.userName).toLowerCase()===String(employee.userName).toLowerCase());
+                    if(checked===present)continue;
+                    const endpoint='/api/security/global-roles/'+encodeURIComponent(r.role.id)+'/members/'+encodeURIComponent(employee.userName);
+                    if(checked)await json(endpoint,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:employee.userName,displayName:employee.displayName||employee.userName,isActive:true})});
+                    else {const response=await fetch(endpoint,{method:'DELETE'});if(!response.ok)throw Error(await response.text());}
+                }
+                holder.querySelector('[role=status]').textContent='Roles saved.';
+            }catch(error){holder.querySelector('[role=status]').textContent=error.message||String(error);}
+            finally{button.disabled=false;}
+        };
+    }catch(error){holder.textContent='Operational roles unavailable: '+(error.message||error);}
+}
+function openStudioStaffDetails(employee) {
+    const d=studioDialog('Staff details',`<form class="request-form" data-staff-details><p><strong>${esc(employee.userName)}</strong> · Studio staff identity</p><label>Display name<input name="displayName" required value="${esc(employee.displayName||'')}"></label><label>Email<input name="email" type="email" value="${esc(employee.emailAddress||'')}"></label><label><input name="active" type="checkbox" ${employee.isActive?'checked':''}> Active</label><label><input name="assignable" type="checkbox" ${employee.isAssignable?'checked':''}> Assignable</label><p><strong>Roles:</strong> ${esc((employee.roles||[]).join(', ')||'None')}</p><div data-staff-operational><p>Loading operational roles…</p></div><div data-staff-workspaces><p>Loading workspace grants…</p></div><p class="muted">Job-specific assignments remain managed within each job.</p><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`);
+    const form=d.querySelector('form');void loadStaffOperationalRoles(employee,form.querySelector('[data-staff-operational]'));void loadStaffWorkspaceGrants(employee,form.querySelector('[data-staff-workspaces]'));form.querySelector('[data-cancel]').onclick=()=>d.close();
+    form.onsubmit=async event=>{event.preventDefault();const save=form.querySelector('[type=submit]');save.disabled=true;try{
+        const latest=(await json('/api/admin/studio-employees/')).find(e=>String(e.userName).toLowerCase()===String(employee.userName).toLowerCase());if(!latest)throw Error('Staff member no longer exists.');
+        const payload={...latest,displayName:form.elements.displayName.value.trim(),emailAddress:form.elements.email.value.trim()||null,isActive:form.elements.active.checked,isAssignable:form.elements.assignable.checked};
+        if(!payload.displayName)throw Error('Display name is required.');
+        await json('/api/admin/studio-employees/'+encodeURIComponent(employee.userName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        d.close();await refreshStudioEmployees();
+    }catch(error){form.querySelector('[role=alert]').textContent=error.message||String(error);}finally{save.disabled=false;}};
 }
 function registerStudioPhotographer(employee){
     if(!employee.isActive||!employee.isAssignable)return;
