@@ -12,7 +12,7 @@ test('pending login shows approval state and clears the password without navigat
  w.eval(fs.readFileSync(path.join(root,'login.js'),'utf8'));await settle();w.document.getElementById('userName').value='approved-alias';w.document.getElementById('password').value='temporary-local-password';
  w.document.getElementById('loginForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await settle();
  assert.match(w.document.getElementById('error').textContent,/Pending Access/);assert.equal(w.location.pathname,'/login');assert.equal(w.document.getElementById('password').value,'');
- assert.equal(JSON.parse(requests.at(-1).options.body).source,'LocalDatabase');
+ assert.equal(Object.hasOwn(JSON.parse(requests.at(-1).options.body),'source'),false);
 });
 test('account provisioning retry preserves the pending account after a profile save failure',async t=>{
  const dom=new JSDOM('<div id="genericView"></div>',{url:'https://studio.test',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
@@ -25,3 +25,4 @@ test('account provisioning retry preserves the pending account after a profile s
  await w.saveStudioEmployee();assert.equal(creates,1);assert.match(w.document.getElementById('employeeAccountStatus').textContent,/Profile save unavailable/);assert.equal(w.document.getElementById('employeeLocalPassword').value,'');
  await w.saveStudioEmployee();assert.equal(creates,1);assert.equal(profileAttempts,2);assert.match(w.document.getElementById('employeeAccountStatus').textContent,/Approve access/);assert.match(w.document.getElementById('studioEmployeeList').textContent,/LocalDatabase/);
 });
+

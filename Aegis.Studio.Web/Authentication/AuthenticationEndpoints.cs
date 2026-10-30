@@ -22,21 +22,20 @@ public static class AuthenticationEndpoints
         bool mockEnabled = MockEnvironmentPolicy.IsPermitted(mock.Enabled, mock.EnvironmentName, mock.IsolationConfirmed);
         if (mock.Enabled && !mockEnabled) throw new InvalidOperationException("Mock authentication requires an explicitly isolated Development or Demo environment.");
         bool entraEnabled = app.Configuration.GetValue("Authentication:Entra:Enabled", false);
+        string provider = StudioAuthenticationProvider.Resolve(app.Configuration, mockEnabled, entraEnabled);
         app.MapGet("/api/auth/options", () => Results.Ok(new
         {
-            mockAuthentication = mockEnabled,
-            mockPasswordRequired = !string.IsNullOrEmpty(mock.Password),
-            defaultUserName = mockEnabled ? mock.Identities.FirstOrDefault()?.LoginName ?? "" : "",
-            defaultSource = mockEnabled ? "Mock" : "ActiveDirectory",
-            entraEnabled,
-            sources = mockEnabled ? new[] { "Mock", "ActiveDirectory", "LocalDatabase" } : new[] { "ActiveDirectory", "LocalDatabase" }
+            mockPasswordRequired = provider == "Mock" && !string.IsNullOrEmpty(mock.Password),
+            defaultUserName = provider == "Mock" ? mock.Identities.FirstOrDefault()?.LoginName ?? "" : "",
+            defaultSource = provider
         })).AllowAnonymous();
 
         app.MapPost("/api/auth/login", async (LoginRequest request, IServiceProvider services, HttpContext context) =>
         {
             if (string.IsNullOrWhiteSpace(request.UserName)) return Results.BadRequest(new { error = "User name is required." });
-            string source = request.Source ?? (mockEnabled ? "Mock" : "ActiveDirectory");
-            AuthenticationResult result = source switch
+            if (provider == "EntraId" || !StudioAuthenticationProvider.AcceptsSource(provider, request.Source))
+                return Results.BadRequest(new { error = "Use the configured sign-in service." });
+            AuthenticationResult result = provider switch
             {
                 "ActiveDirectory" => services.GetService<IAuthenticator>()?.Authenticate(request.UserName, request.Password)
                     ?? AuthenticationResult.Failed(AuthenticationFailure.ProviderUnavailable),
@@ -59,7 +58,7 @@ public static class AuthenticationEndpoints
             }
         }).AllowAnonymous().RequireRateLimiting(AccountSecurityHosting.LoginRateLimit);
 
-        app.MapGet("/api/auth/entra", () => entraEnabled
+        app.MapGet("/api/auth/entra", () => provider == "EntraId"
             ? Results.Challenge(new AuthenticationProperties { RedirectUri = "/" }, ["StudioEntra"])
             : Results.NotFound()).AllowAnonymous().RequireRateLimiting(AccountSecurityHosting.LoginRateLimit);
 

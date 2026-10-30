@@ -20,15 +20,14 @@ h1 {font-size:clamp(29px,2.1vw,40px);letter-spacing:-.035em;line-height:1.2;marg
 .form-field {display:block;font-size:15px;font-weight:600;margin:0 0 23px}
 .input-wrap {display:flex;align-items:center;position:relative;margin-top:9px}
 .input-wrap svg {position:absolute;left:17px;width:21px;height:21px;stroke:#344054;pointer-events:none}
-input,select {width:100%;height:52px;padding:0 50px;border:1px solid rgba(255,255,255,.65);border-radius:9px;font:400 16px Inter,"Segoe UI",Arial,sans-serif;color:#101828;background:rgba(255,255,255,.4)}
-input:focus,select:focus {outline:2px solid #9dc1e8;outline-offset:1px}
+input {width:100%;height:52px;padding:0 50px;border:1px solid rgba(255,255,255,.65);border-radius:9px;font:400 16px Inter,"Segoe UI",Arial,sans-serif;color:#101828;background:rgba(255,255,255,.4)}
+input:focus {outline:2px solid #9dc1e8;outline-offset:1px}
 .toggle-password {position:absolute;right:12px;border:0;background:transparent;padding:8px;cursor:pointer;color:#344054;display:grid;place-items:center}
 .toggle-password svg {position:static;width:20px;height:20px}
-#signInButton,#entraSignIn,#recoverButton {display:grid;place-items:center;text-decoration:none;width:100%;height:54px;margin-top:2px;border:0;border-radius:8px;background:#222529;color:white;font:600 18px Inter,"Segoe UI",Arial,sans-serif;cursor:pointer}
+#signInButton,#recoverButton {display:grid;place-items:center;text-decoration:none;width:100%;height:54px;margin-top:2px;border:0;border-radius:8px;background:#222529;color:white;font:600 18px Inter,"Segoe UI",Arial,sans-serif;cursor:pointer}
 #signInButton:disabled {opacity:.65;cursor:wait}
 #signInButton:hover:not(:disabled) {background:#34373b}
 #error {color:#b42318;font-size:13px;text-align:center;margin-top:12px}
-#environment {text-align:center;font-size:13px;color:#64748b;margin-top:23px}
 [hidden] {display:none}
 @media(max-width:760px) {.screen {grid-template-columns:minmax(0,1fr);grid-template-rows:180px minmax(0,1fr)}.hero {min-height:180px}.login-side {padding:24px 18px;align-items:start}.card {max-width:520px;padding:32px 25px}.brand {margin-bottom:25px}}
 @media(max-width:480px) {.screen {grid-template-rows:125px minmax(0,1fr)}.hero {min-height:125px}.card {padding:25px 18px}h1 {font-size:30px}.intro {font-size:15px}}
@@ -43,19 +42,16 @@ input:focus,select:focus {outline:2px solid #9dc1e8;outline-offset:1px}
 <h1>Welcome to Studio</h1>
 <p id="signInHelp" class="intro">Sign in to access your workspace.</p>
 <form id="loginForm">
-<label class="form-field" for="authenticationSource">Sign-in method<span class="input-wrap"><select id="authenticationSource" aria-label="Sign-in method"></select></span></label>
-<label class="form-field" for="userName">Username
+<label class="form-field" id="userNameLabel" for="userName">Username
 <span class="input-wrap"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg><input id="userName" autocomplete="username" required placeholder="Enter your username"></span>
 </label>
 <label class="form-field" id="passwordLabel" for="password">Password
 <span class="input-wrap"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><input id="password" type="password" autocomplete="current-password" required placeholder="Enter your password"><button class="toggle-password" type="button" id="togglePassword" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="3"/></svg></button></span>
 </label>
 <button id="signInButton" type="submit" disabled>Sign in →</button>
-<a id="entraSignIn" href="/api/auth/entra" hidden>Sign in with Microsoft</a>
-<div id="environment" hidden></div>
 </form>
 <form id="recoveryForm" hidden><label class="form-field" for="recoveryToken">Recovery proof<span class="input-wrap"><input id="recoveryToken" autocomplete="off" required></span></label><label class="form-field" for="recoveryPassword">New local password<span class="input-wrap"><input id="recoveryPassword" type="password" autocomplete="new-password" minlength="15" maxlength="256" required></span></label><button id="recoverButton" type="submit">Reset local password</button></form>
-<button id="recoveryToggle" type="button">Recover a local account</button>
+<button id="recoveryToggle" type="button" hidden>Recover a local account</button>
 <div id="error" role="alert" aria-live="polite"></div>
 </div>
 </section>
