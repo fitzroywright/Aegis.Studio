@@ -26,8 +26,7 @@ internal sealed class RawPreviewDecoder(IConfiguration configuration, IWebHostEn
         start.ArgumentList.Add(helper);
         start.ArgumentList.Add(sourcePath);
         start.ArgumentList.Add(output);
-        start.Environment["OMP_NUM_THREADS"] = "1";
-        start.Environment["OPENBLAS_NUM_THREADS"] = "1";
+        PhotoProcessEnvironment.Configure(start);
         using var process = new Process { StartInfo = start };
         try { process.Start(); }
         catch (Win32Exception error) { throw new InvalidOperationException("RAW preview Python runtime is unavailable.", error); }

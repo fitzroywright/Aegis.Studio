@@ -17,7 +17,7 @@ Output JPEGs are limited to 1600 pixels and verified before Common.Storage write
 Temporary files are deleted after success, failure, timeout or cancellation.
 Existing storage permissions, original-download permissions, versioning and job
 workflow rules remain in effect. Browser fallback requests queue RAW work rather
-than decoding RAWs synchronously. The existing upload limit remains 100 MB per file.
+than decoding RAWs synchronously. Original uploads now support up to 512 MiB using disk-backed ingestion. WorkDay uses resumable four MiB transfers; see [WorkDay RAW ingestion](WORKDAY-RAW-INGESTION.md).
 
 Unsupported/corrupt RAWs are marked Unsupported; missing Python/dependencies,
 crashes and timeouts are Failed and use the existing bounded retry mechanism.

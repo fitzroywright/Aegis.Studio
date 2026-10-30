@@ -48,6 +48,12 @@ public sealed class TodayStartupTests
         {
             await database.InitializeAsync();
             await new StudioFeatureDatabase(source).InitializeAsync();
+            new Aegis.Studio.Web.WorkspaceJobs.WorkspaceJobStore(database).EnsureSchema();
+            Aegis.Studio.Web.Versioning.StudioVersionSchema.EnsureCreated(database);
+            Aegis.Studio.Web.Media.MediaProductionStore.Migrate(database);
+            new GlobalOperationalRoleStore(database).EnsureSchema();
+            new StudioEmployeeDirectoryStore(database).EnsureSchema();
+            Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(database);
             var roles = new GlobalOperationalRoleStore(database);
             roles.EnsureSchema();
             roles.EnsureDefaultUserRole("staff");

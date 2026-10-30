@@ -10,7 +10,6 @@ public sealed class UploadReceiptPersistenceTests
     public void LostResponseReplaysStoredVersionAndRejectsChangedBytes()
     {
         using var context=new IntegratedWorkflowTests.WorkflowContext();
-        using(var schema=new NpgsqlCommand("create table studio_workflow_sessions(id uuid primary key,job_id uuid,required boolean);create table studio_workflow_crew(session_id uuid,user_name text);",context.Connection))schema.ExecuteNonQuery();
         var store=new MediaUploadReceipts(context.Database,new MediaProductionStore(context.Database,context.Versions));
         var id=Guid.NewGuid();var batch=Guid.NewGuid();
         var declaration=new UploadBatchDeclaration(batch,null,[new(id,"photo.jpg",3)]);

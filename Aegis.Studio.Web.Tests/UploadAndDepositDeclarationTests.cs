@@ -21,9 +21,10 @@ public sealed class UploadAndDepositDeclarationTests
         var file=new UploadFileDeclaration(Guid.NewGuid(),"photo.jpg",1024);
         var manifest=new UploadBatchDeclaration(Guid.NewGuid(),Guid.NewGuid(),[file]);
         MediaUploadReceipts.Validate(manifest);
+        MediaUploadReceipts.Validate(manifest with{Files=[file with{SizeBytes=536_870_912}]});
         Assert.Throws<ArgumentException>(()=>MediaUploadReceipts.Validate(manifest with{Files=[file,file]}));
         Assert.Throws<ArgumentException>(()=>MediaUploadReceipts.Validate(manifest with{Files=[file with{SizeBytes=0}]}));
-        Assert.Throws<ArgumentException>(()=>MediaUploadReceipts.Validate(manifest with{Files=[file with{SizeBytes=100_000_001}]}));
+        Assert.Throws<ArgumentException>(()=>MediaUploadReceipts.Validate(manifest with{Files=[file with{SizeBytes=536_870_913}]}));
         Assert.Throws<ArgumentException>(()=>MediaUploadReceipts.Validate(manifest with{BatchId=Guid.Empty}));
     }
 }

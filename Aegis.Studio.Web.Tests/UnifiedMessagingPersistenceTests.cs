@@ -124,7 +124,7 @@ public sealed class UnifiedMessagingPersistenceTests
         using var q=new NpgsqlCommand("""
             select count(distinct thread_id),count(*)
             from studio_inapp_messages
-            where external_message_id=any($1)
+            where internet_message_id=any($1)
             """,c);
         q.Parameters.AddWithValue(new[] { first.MessageId, second.MessageId });
         using var r=q.ExecuteReader();Assert.True(r.Read());
@@ -202,6 +202,10 @@ public sealed class UnifiedMessagingPersistenceTests
                 create table if not exists studio_global_operational_roles(id uuid,name text,is_active boolean);
                 create table if not exists studio_global_operational_role_members(role_id uuid,user_name text,display_name text,is_active boolean);
                 """,c))q.ExecuteNonQuery();
+            new Aegis.Studio.Web.WorkspaceJobs.WorkspaceJobStore(db).EnsureSchema();
+            Aegis.Studio.Web.Versioning.StudioVersionSchema.EnsureCreated(db);
+            Aegis.Studio.Web.Media.MediaProductionStore.Migrate(db);
+            Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(db);
             var employees=new StudioEmployeeDirectoryStore(db);employees.EnsureSchema();
             var profiles=new UserProfileStore(db);profiles.GetOrCreate(f.Paul);profiles.GetOrCreate(f.Tamara);
             var workspaces=new WorkspaceStore(db);var access=new WorkspaceAccessService(db);var jobs=new JobAccessService(db);

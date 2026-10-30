@@ -98,7 +98,8 @@ public sealed class IntegratedWorkflowTests
     [StudioPostgresFact]
     public void HundredThousandAssetsUseBoundedPagesAndSqlSelections()
     {
-        using var context=new WorkflowContext();
+        // Seed a pre-existing large catalog, then apply startup migrations before exercising any operations.
+        using var context=new WorkflowContext(initializeWorkflow:false);
         var db=context.Database;var c=context.Connection;var versions=context.Versions;var job=context.Job;
         Sql(c,"insert into studio_media_galleries(id) values($1)",job);
         Sql(c,"""
@@ -109,6 +110,7 @@ public sealed class IntegratedWorkflowTests
             insert into studio_job_asset_collections(job_id,asset_key,collection_name)
             select $1,'asset-'||n,case when n%2=0 then 'Even' else 'Odd' end from generate_series(1,100000) n
             """,job);
+        Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(db);
         var media=new MediaProductionStore(db,versions);var first=media.Snapshot(job);Assert.Equal(100000,first.GetProperty("totalAssets").GetInt32());Assert.Equal(100,first.GetProperty("assets").GetArrayLength());
         Assert.Equal(50000,first.GetProperty("collectionCounts").GetProperty("Even").GetInt32());
         Assert.Equal(50000,first.GetProperty("collectionCounts").GetProperty("Odd").GetInt32());
@@ -155,13 +157,21 @@ public sealed class IntegratedWorkflowTests
     {
         using var context=new WorkflowContext();
         var db=context.Database;var c=context.Connection;var versions=context.Versions;var job=context.Job;var root=context.Root;
-        var v3=versions.Add(job,"unsupported-original","portrait.raw","application/octet-stream",new MemoryStream([3]),"Editor");
+        var v3=versions.Add(job,"unsupported-original","portrait.unsupported","application/octet-stream",new MemoryStream([3]),"Editor");
         using var originalPhoto=File.OpenRead(Path.Combine(AppContext.BaseDirectory,"Fixtures","portrait.jpg"));var realPhoto=versions.Add(job,"real-preview","portrait.jpg","image/jpeg",originalPhoto,"Editor");
         var worker=new MediaDerivativeWorker(db,new LocalFileStorage(root),new TestEnvironment(root),NullLogger<MediaDerivativeWorker>.Instance);
         var generate=typeof(MediaDerivativeWorker).GetMethod("Generate",BindingFlags.Instance|BindingFlags.NonPublic)!;
-        await (Task)generate.Invoke(worker,[realPhoto.Id,CancellationToken.None])!;
+        var claim=typeof(MediaDerivativeWorker).GetMethod("Claim",BindingFlags.Instance|BindingFlags.NonPublic)!;
+        async Task GenerateNext()
+        {
+            var queued=await (Task<(Guid Id,Guid Lease)?>)claim.Invoke(worker,[CancellationToken.None])!;
+            Assert.NotNull(queued);
+            await (Task)generate.Invoke(worker,[queued.Value.Id,queued.Value.Lease,CancellationToken.None])!;
+        }
+        // Exercise the real lease transition rather than bypassing queue ownership.
+        await GenerateNext();await GenerateNext();
         using(var state=new NpgsqlCommand("select status,thumbnail_key from studio_media_derivatives where version_id=$1",c)){state.Parameters.AddWithValue(realPhoto.Id);using var row=state.ExecuteReader();Assert.True(row.Read());Assert.Equal("Ready",row.GetString(0));using var thumbnail=new LocalFileStorage(root).OpenReadAsync(row.GetString(1)).GetAwaiter().GetResult();using var image=SKBitmap.Decode(thumbnail);Assert.NotNull(image);Assert.True(Math.Max(image.Width,image.Height)<=384);}
-        await (Task)generate.Invoke(worker,[v3.Id,CancellationToken.None])!;
+
         using(var state=new NpgsqlCommand("select status from studio_media_derivatives where version_id=$1",c)){state.Parameters.AddWithValue(v3.Id);Assert.Equal("Unsupported",state.ExecuteScalar());}
         using(var intact=versions.Open(job,v3.Id,out _))Assert.Equal(3,intact.ReadByte());
     }
@@ -186,7 +196,9 @@ public sealed class IntegratedWorkflowTests
         using var context=new WorkflowContext();
         var db=context.Database;var job=context.Job;
         var photographers=new PhotographerStore(db);photographers.Save(new("a","Photographer A","Employee",true,[],null));photographers.Save(new("b","Photographer B","Employee",true,[],null));
-        Sql(context.Connection,"create table studio_job_owner_assignments(id uuid primary key,status text);alter table studio_jobs add column owner_assignment_id uuid;insert into studio_job_owner_assignments values($1,'Accepted');update studio_jobs set owner_assignment_id=$1,status='Scheduled' where id=$2",Guid.NewGuid(),job);
+        Guid owner=Guid.NewGuid();
+        Sql(context.Connection,"insert into studio_job_owner_assignments(id,job_id,assigned_to,assigned_by,status) values($1,$2,'manager','Test','Accepted')",owner,job);
+        Sql(context.Connection,"update studio_jobs set owner_assignment_id=$1,status='Scheduled' where id=$2",owner,job);
         var scheduler=new WorkDaySchedulingService(db,photographers);var starts=DateTimeOffset.UtcNow.AddDays(5);
         var shoot=scheduler.Create(job,new("a",null,starts,starts.AddHours(1),"Studio",null,null,[]),"Manager");
         var moved=scheduler.Reschedule(job,shoot.Id,new("b",null,starts.AddHours(2),starts.AddHours(3),"Studio",null,null,[]),"Manager");
@@ -231,7 +243,7 @@ public sealed class IntegratedWorkflowTests
         public StudioVersionStore Versions {get;}
         public Guid Job {get;}=Guid.NewGuid();
         public Guid Workspace {get;}=Guid.NewGuid();
-        public WorkflowContext()
+        public WorkflowContext(bool initializeWorkflow=true)
         {
             string connectionString=Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES")!;
             Root=Path.Combine(Path.GetTempPath(),schema);
@@ -254,6 +266,13 @@ public sealed class IntegratedWorkflowTests
                 new WorkspaceJobStore(Database).EnsureSchema();new StudioClientStore(Database).Migrate();new ScheduleStore(Database,new ConfigurationBuilder().Build()).EnsureOperationalSchema();
                 Versions=new StudioVersionStore(Database,new LocalFileStorage(Root));MediaProductionStore.Migrate(Database);
                 Sql(Connection,ProductionItems.Schema);Sql(Connection,ProductionOrderLinker.Schema);Sql(Connection,CommercialSchema.Sql);
+                // This narrow fixture does not enable website intake, but FrontDesk reads its optional reference.
+                Sql(Connection,"alter table studio_conversations add column if not exists intake_reference text");
+                ExternalBookingResourceHolds.EnsureSchema(Database);
+                new GlobalOperationalRoleStore(Database).EnsureSchema();
+                new StudioEmployeeDirectoryStore(Database).EnsureSchema();
+                new WorkDayStore(Database).EnsureSchema();
+                if(initializeWorkflow)Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(Database);
                 Guid conversation=Guid.NewGuid();
                 Sql(Connection,"insert into studio_workspaces(id,name,created_at_utc,updated_at_utc) values($1,'Workflow',now(),now())",Workspace);
                 Sql(Connection,"insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,created_at_utc) values($1,$2,'Workflow','Client','client@example.test','Email',now())",conversation,Workspace);

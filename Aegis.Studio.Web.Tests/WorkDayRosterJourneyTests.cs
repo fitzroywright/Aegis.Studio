@@ -28,7 +28,9 @@ public sealed class WorkDayRosterJourneyTests
         var workflow=new WorkflowStore(db,new JobAccessService(db),new WorkspaceAccessService(db),new UnusedPublisher(),new ConfigurationBuilder().Build());
         ClaimsPrincipal Actor(string name)=>new(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier,name),new Claim(ClaimTypes.Role,"Administrator")],"Test"));
         var manager=Actor("manager");var owner=Actor("owner");
-        Execute("select set_config('studio.connected_command','true',false);update studio_jobs set status='Needs Assignment' where id=$1;select set_config('studio.connected_command','false',false)",context.Job);
+        Execute("select set_config('studio.connected_command','true',false)");
+        Execute("update studio_jobs set status='Needs Assignment' where id=$1",context.Job);
+        Execute("select set_config('studio.connected_command','false',false)");
         JsonElement Snapshot()=>WorkflowStore.Snapshot(c,null,context.Job);
         long Revision()=>Snapshot().GetProperty("revision").GetInt64();
         workflow.Execute(context.Job,new("owner",Revision(),Guid.NewGuid(),UserName:"owner"),manager);
@@ -39,12 +41,13 @@ public sealed class WorkDayRosterJourneyTests
         var original=Snapshot().GetProperty("sessions").EnumerateArray().Single(x=>x.GetProperty("shoot").ValueKind==JsonValueKind.Object).GetProperty("shoot").GetProperty("schedule_entry_id").GetGuid();
         var photographed=Guid.NewGuid();var deferred=Guid.NewGuid();
         Execute("insert into studio_job_subjects(id,job_id,name,reference,updated_by,collection_name) values($1,$3,'One','P1','manager','Portraits'),($2,$3,'Two','P2','manager','Portraits')",photographed,deferred,context.Job);
-        WorkDayOperationRequest Step(WorkDayOperationKind kind,long version)=>new(Guid.NewGuid(),kind,original,DateTimeOffset.UtcNow,"device",null,null,null,version);
+        long initial=workday.GetAssignmentState(original,"photo")!.Value.Version;
+        WorkDayOperationRequest Step(WorkDayOperationKind kind,long version)=>new(Guid.NewGuid(),kind,original,DateTimeOffset.UtcNow,"device",null,null,null,initial+version);
         Assert.Equal(WorkDayOperationState.Acknowledged,workday.Apply("photo",Step(WorkDayOperationKind.AcceptAssignment,0)).State);
         WorkDayOperationRequest Report(Guid id,string state)
         {
             var target=WorkDayFieldReports.Targets(c,null,original).Single(x=>x.TargetId=="subject:"+id);
-            return new(Guid.NewGuid(),WorkDayOperationKind.RecordFieldStatus,original,DateTimeOffset.UtcNow,"device",state,JsonSerializer.Serialize(new WorkDayFieldStatus(target.TargetId,state,target.SourceFingerprint,target.Version,"Field observation")),null,1);
+            return new(Guid.NewGuid(),WorkDayOperationKind.RecordFieldStatus,original,DateTimeOffset.UtcNow,"device",state,JsonSerializer.Serialize(new WorkDayFieldStatus(target.TargetId,state,target.SourceFingerprint,target.Version,"Field observation")),null,initial+1);
         }
         // Prepared reports retain their original IDs and revisions through delayed transmission.
         var first=Report(photographed,"Photographed");var second=Report(deferred,"Deferred");

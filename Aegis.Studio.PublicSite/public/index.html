@@ -95,11 +95,11 @@
               <label>Assigned Job<select name="assignmentId" id="workday-assignment" required></select></label>
               <div id="workday-dropzone" class="workday-dropzone" role="group" aria-labelledby="workday-drop-title" aria-describedby="workday-upload-help">
                 <strong id="workday-drop-title">Drop your photographs here</strong>
-                <p id="workday-upload-help">JPEG, PNG or WebP · Up to 25 MB each · Select up to 100 at a time</p>
+                <p id="workday-upload-help">JPEG, PNG, WebP, TIFF, HEIC or camera RAW · Up to 512 MiB each · Select up to 100 at a time</p>
                 <button type="button" class="button" id="workday-browse">Choose photographs</button>
-                <input type="file" id="workday-photos" name="photos" accept="image/jpeg,image/png,image/webp" multiple hidden>
+                <input type="file" id="workday-photos" name="photos" accept="image/*,.cr2,.cr3,.nef,.nrw,.arw,.raf,.orf,.rw2,.dng,.tif,.tiff,.heic,.heif" multiple hidden>
               </div>
-              <div class="workday-upload-actions"><button type="submit" class="button" id="workday-upload">Upload photographs</button><button type="button" class="text-button" id="workday-clear">Clear selection</button></div>
+              <div class="workday-upload-actions"><button type="submit" class="button" id="workday-upload">Upload photographs</button><button type="button" class="text-button" id="workday-pause" disabled>Pause upload</button><button type="button" class="text-button" id="workday-clear">Clear selection</button></div>
             </form>
             <p class="privacy-note">Uploads are queued for Studio processing; uploading does not publish client galleries.</p>
             <section class="workday-upload-gallery" aria-labelledby="workday-gallery-title">

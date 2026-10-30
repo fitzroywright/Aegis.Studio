@@ -70,6 +70,13 @@ export function createServer(env = process.env) {
         json(res,200,{service:'Bryan\'s Studio API',status:'available'});return;
       }
       if (req.method === 'GET' && url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(await readFile(new URL('index.html', ROOT))); return; }
+      if(req.method==='GET'&&/^\/vendor\/noble\/(sha2|_md|_u64|utils)\.js$/.test(url.pathname)){
+        res.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'public, max-age=86400'});
+        res.end(await readFile(new URL('./node_modules/@noble/hashes/'+url.pathname.split('/').at(-1),import.meta.url)));return;
+      }
+      if(req.method==='GET'&&url.pathname==='/upload-hash-worker.js'){
+        res.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache'});res.end(await readFile(new URL('upload-hash-worker.js',ROOT)));return;
+      }
       if (req.method === 'GET' && ['/styles.css', '/app.js', '/roster-editor.js', '/workday-web.js'].includes(url.pathname)) {
         const type = url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
         res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=300' }); res.end(await readFile(new URL(url.pathname.slice(1), ROOT))); return;
@@ -154,7 +161,7 @@ export function createServer(env = process.env) {
       else res.end();
     }
   });
-  server.on('close',()=>{intake.workdayStore.close();intake.store.close();});
+  server.on('close',()=>{intake.largeUploads.close();intake.workdayStore.close();intake.store.close();});
   return server;
 }
 

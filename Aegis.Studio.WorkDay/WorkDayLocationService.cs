@@ -1,6 +1,6 @@
 namespace Aegis.Studio.WorkDay;
 
-public sealed class WorkDayLocationService(WorkDayLocalStore store,WorkDayDeviceIdentity device)
+public sealed class WorkDayLocationService(WorkDayLocalStore store)
 {
     private CancellationTokenSource? trackingCts;
     private bool appSuspended;

@@ -8,7 +8,7 @@ namespace Aegis.Studio.WorkDay;
 public sealed class WorkDayApiClient
 {
     public static readonly Uri ApiBaseUri=new("https://api.bryanstudiosltd.com/api/v1/");
-    private readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(15)};
+    private readonly HttpClient http=new(){Timeout=TimeSpan.FromMinutes(2)};
     public Uri? Server=>http.BaseAddress;
     public void SetServer(Uri server)
     {
@@ -87,20 +87,35 @@ public sealed class WorkDayApiClient
         throw new HttpRequestException("The API Site has stored this update and is waiting for Studio to process it.");
     }
 
-    public async Task<UploadResultDto> UploadAsync(LocalUpload upload,CancellationToken ct=default)
+    public async Task CancelUploadAsync(LocalUpload upload,CancellationToken ct=default)
     {
-        using MultipartFormDataContent form=new();
-        form.Add(new StringContent(upload.UploadId.ToString("D")),"uploadId");
-        await using FileStream fs=File.OpenRead(upload.LocalPath);
-        using StreamContent file=new(fs);
-        file.Headers.ContentType=new MediaTypeHeaderValue(upload.ContentType);
-        form.Add(file,"file",upload.FileName);
-        using HttpResponseMessage submitted=await http.PostAsync($"workday/assignments/{upload.AssignmentId:D}/uploads",form,ct);
-        submitted.EnsureSuccessStatusCode();
-        if(submitted.StatusCode!=System.Net.HttpStatusCode.Accepted)
-            return await submitted.Content.ReadFromJsonAsync<UploadResultDto>(cancellationToken:ct)
-                ??throw new InvalidOperationException("The API Site returned no upload receipt.");
+        if(upload.AttemptCount==0)return;
+        bool resumable=System.Text.RegularExpressions.Regex.IsMatch(upload.FileName,@"\.(cr2|cr3|nef|nrw|arw|raf|orf|rw2|dng|tif|tiff|heic|heif)$",System.Text.RegularExpressions.RegexOptions.IgnoreCase)||upload.SizeBytes>25_000_000;
+        if(!resumable)throw new InvalidOperationException("The JPEG may already be queued. Its original remains on this device until Studio acknowledges it.");
+        using var response=await http.DeleteAsync($"workday/assignments/{upload.AssignmentId:D}/upload-sessions/{upload.UploadId:D}",ct);
+        if(response.StatusCode!=System.Net.HttpStatusCode.NotFound)response.EnsureSuccessStatusCode();
+    }
 
+    public async Task<UploadResultDto> UploadAsync(LocalUpload upload,CancellationToken ct=default,IProgress<PhotoTransferProgress>? progress=null)
+    {
+        bool resumable=System.Text.RegularExpressions.Regex.IsMatch(upload.FileName,@"\.(cr2|cr3|nef|nrw|arw|raf|orf|rw2|dng|tif|tiff|heic|heif)$",System.Text.RegularExpressions.RegexOptions.IgnoreCase)||upload.SizeBytes>25_000_000;
+        string? checksum=null;
+        if(resumable)checksum=await ResumablePhotoTransfer.SendAsync(http,new(upload.UploadId,upload.AssignmentId,upload.LocalPath,upload.FileName,upload.SizeBytes),progress,ct);
+        else
+        {
+            using MultipartFormDataContent form=new();
+            form.Add(new StringContent(upload.UploadId.ToString("D")),"uploadId");
+            await using FileStream fs=File.OpenRead(upload.LocalPath);
+            using StreamContent file=new(fs);
+            file.Headers.ContentType=new MediaTypeHeaderValue(upload.ContentType);
+            form.Add(file,"file",upload.FileName);
+            using HttpResponseMessage submitted=await http.PostAsync($"workday/assignments/{upload.AssignmentId:D}/uploads",form,ct);
+            submitted.EnsureSuccessStatusCode();
+            if(submitted.StatusCode!=System.Net.HttpStatusCode.Accepted)
+                return await submitted.Content.ReadFromJsonAsync<UploadResultDto>(cancellationToken:ct)
+                    ??throw new InvalidOperationException("The API Site returned no upload receipt.");
+
+        }
         DateTimeOffset deadline=DateTimeOffset.UtcNow.AddMinutes(5);
         while(DateTimeOffset.UtcNow<deadline)
         {
@@ -118,7 +133,13 @@ public sealed class WorkDayApiClient
                 throw new HttpRequestException(message,null,System.Net.HttpStatusCode.Conflict);
             }
             if(state=="Acknowledged"&&root.TryGetProperty("result",out JsonElement stored)&&stored.TryGetProperty("result",out JsonElement value))
-                return value.Deserialize<UploadResultDto>()??throw new InvalidOperationException("Studio returned no saved upload.");
+            {
+                var receipt=value.Deserialize<UploadResultDto>(new JsonSerializerOptions(JsonSerializerDefaults.Web))??throw new InvalidOperationException("Studio returned no saved upload.");
+                if(receipt.UploadId!=upload.UploadId||receipt.AssignmentId!=upload.AssignmentId||receipt.SizeBytes!=upload.SizeBytes||receipt.StorageStatus!="Stored"||
+                    (resumable&&!string.Equals(receipt.Sha256,checksum,StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("Studio has not acknowledged the retained original checksum and identity.");
+                return receipt;
+            }
         }
         throw new HttpRequestException("The API Site has stored this upload and is waiting for Studio to save it.");
     }

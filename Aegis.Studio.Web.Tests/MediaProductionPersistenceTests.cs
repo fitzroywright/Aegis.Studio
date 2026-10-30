@@ -30,9 +30,10 @@ public sealed class MediaProductionPersistenceTests
         {
             using(var c=db.OpenConnection())
             {
-                Sql(c,"create table studio_workspaces(id uuid primary key)");Sql(c,"create table studio_jobs(id uuid primary key,workspace_id uuid,title text,assigned_to text,event_date date,status text not null default 'New')");
+                Sql(c,"create table studio_workspaces(id uuid primary key)");Sql(c,"create table studio_jobs(id uuid primary key,workspace_id uuid,title text,assigned_to text,event_date date,status text not null default 'New',created_at_utc timestamptz not null default now())");
                 Sql(c,"create table studio_operational_audit(id uuid primary key,job_id uuid,action text,user_name text,detail text,created_at_utc timestamptz)");
             }
+            using(var c=db.OpenConnection())Sql(c,"create table studio_schedule_entries(id uuid primary key)");
             new WorkspaceJobStore(db).EnsureSchema();var versions=new StudioVersionStore(db,new LocalFileStorage(Path.Combine(root,"storage")));
             MediaProductionStore.Migrate(db);MediaProductionStore.Migrate(db);var store=new MediaProductionStore(db,versions);
             Guid job=Guid.NewGuid(),wedding=Guid.NewGuid();using(var c=db.OpenConnection()){Sql(c,"insert into studio_jobs(id,workspace_id,title) values($1,$2,'Employee IDs'),($3,$4,'Brown wedding')",job,Guid.NewGuid(),wedding,Guid.NewGuid());}
@@ -53,7 +54,8 @@ public sealed class MediaProductionPersistenceTests
             Assert.Contains(store.Snapshot(job).GetProperty("collections").EnumerateArray(),x=>x.GetString()=="School portraits");
             Assert.Equal("School portraits",store.Snapshot(job).GetProperty("gallery").GetProperty("default_collection").GetString());
             Guid subject=snapshot.GetProperty("subjects")[0].GetProperty("id").GetGuid();
-            store.UpdateAsset(job,assetId,new("Needs Editing","ID portraits",[subject],"editor"),"editor");
+            Assert.Throws<ArgumentException>(()=>store.UpdateAsset(job,assetId,new("Needs Editing","ID portraits",[subject],"editor"),"editor"));
+            store.UpdateAsset(job,assetId,new("Needs Editing","ID portraits",[subject],"editor"),"manager",canDispatch:true);
             Assert.Equal(1,store.Snapshot(job).GetProperty("assets")[0].GetProperty("subjects").GetArrayLength());
             byte[] zip=store.Export(job,[assetId],"editor");using var archive=new ZipArchive(new MemoryStream(zip));
             Assert.NotNull(archive.GetEntry("studio-editing-manifest.json"));using var bytes=new MemoryStream();using(var file=archive.Entries.Single(e=>e.Name.EndsWith(".jpg")).Open())file.CopyTo(bytes);
@@ -73,7 +75,9 @@ public sealed class MediaProductionPersistenceTests
             using(var c=db.OpenConnection()){
                 Sql(c,"alter table studio_workspaces add column is_enabled boolean default true");Sql(c,"insert into studio_workspaces(id) select workspace_id from studio_jobs");
                 Sql(c,"alter table studio_jobs add column client_name text default 'Client'");Sql(c,"alter table studio_jobs add column conversation_id uuid");
-                Sql(c,"create table studio_conversations(id uuid primary key,contact_address text)");Sql(c,"insert into studio_conversations select id,'client@example.invalid' from studio_jobs");Sql(c,"update studio_jobs set conversation_id=id");
+                Sql(c,"create table studio_conversations(id uuid primary key,workspace_id uuid,subject text,contact_name text,contact_address text,channel text,is_closed boolean,created_at_utc timestamptz,job_id uuid,intake_reference text)");Sql(c,"insert into studio_conversations(id,workspace_id,contact_address) select id,workspace_id,'client@example.invalid' from studio_jobs");Sql(c,"update studio_jobs set conversation_id=id");
+                Sql(c,"create table studio_financial_events(id uuid primary key,job_id uuid,kind text,amount numeric(18,2),note text,recorded_by text,created_at_utc timestamptz)");
+                Sql(c,"create table studio_messages(id uuid primary key,conversation_id uuid,author_display_name text,visibility text,body text,created_at_utc timestamptz)");
                 Sql(c,"create table studio_notifications(id uuid primary key,user_name text,channel text,event_type text,subject text,body text,reference_type text,reference_id text,status text,destination text,attempts int,is_read boolean,created_at_utc timestamptz,last_error text)");
             }
             clients.Link(job,client.Id,"frontdesk");var accounts=new StudioAccountsStore(db);accounts.EnsureSchema();
@@ -84,7 +88,7 @@ public sealed class MediaProductionPersistenceTests
             using(var c=db.OpenConnection()){using var command=new NpgsqlCommand("select workspace_id from studio_jobs where id=$1",c);command.Parameters.AddWithValue(job);workspace=(Guid)command.ExecuteScalar()!;}
             var quote=quotes.Create(new(client.Id,workspace,"ID photos",DateOnly.FromDateTime(DateTime.Today.AddDays(10)),"Bring employee roster",estimate,100),"frontdesk");
             Assert.Throws<ArgumentException>(()=>quotes.ConvertToBooking(quote,"frontdesk"));quotes.Send(quote,"frontdesk");Assert.Equal("Pending",quotes.List(client.Id)[0].GetProperty("deliveryStatus").GetString());
-            Assert.Throws<ArgumentException>(()=>quotes.Send(quote,"frontdesk"));quotes.Accept(quote,"Client email confirmation");Guid pending=quotes.ConvertToBooking(quote,"frontdesk");Assert.Equal(pending,quotes.ConvertToBooking(quote,"frontdesk"));Assert.Null(new FrontDeskBookingRequestStore(db).GetAll().Single().JobId);
+            Assert.Throws<ArgumentException>(()=>quotes.Send(quote,"frontdesk"));quotes.Accept(quote,"Client email confirmation");Guid pending=quotes.ConvertToBooking(quote,"frontdesk");Assert.Equal(pending,quotes.ConvertToBooking(quote,"frontdesk"));Assert.NotNull(new FrontDeskBookingRequestStore(db).GetAll().Single().JobId);
 
         }
         finally {source.Dispose();Sql(admin,$"drop schema {schema} cascade");if(Directory.Exists(root))Directory.Delete(root,true);}
