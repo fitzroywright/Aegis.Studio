@@ -1,11 +1,13 @@
 using System.Text.Json;
 using Npgsql;
 using Common.Storage;
+using Aegis.Studio.Web.FrontDesk;
 
 namespace Aegis.Studio.Web.Operations;
 
 // Broad, deterministic demo dataset used by the click-through Studio demonstration.
-// It only owns IDs in the de000000 demo namespace and never deletes real records.
+// Runs after factory reset. Media uses deterministic demo IDs; pending bookings
+// use the same creation command as Front Desk and retain its generated Job IDs.
 internal static class DemoFullStudioData
 {
     private sealed record DemoWorkspace(int Number,string Name);
@@ -249,10 +251,7 @@ internal static class DemoFullStudioData
     private static void SeedSubjectsAndCollections(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,Guid jobId,int ordinal,DateTimeOffset scheduled)
     {
         Execute(c,tx,"insert into studio_media_galleries(id,name,default_lens,default_collection) values($1,'Media','Auto','Unclassified') on conflict(id) do nothing",jobId);
-        string[] collections=job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?["Getting Ready","Ceremony","Portraits","Reception"]:
-            job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?["Roster","Stage","Groups","Unclassified"]:
-            job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)?["Executives","Team","Selects","Unclassified"]:
-            ["Selects","Proofs","Finals","Unclassified"];
+        string[] collections=SessionCollections(job);
         foreach(string collection in collections)
             Execute(c,tx,"insert into studio_media_collections(job_id,name) values($1,$2) on conflict do nothing",jobId,collection);
 
@@ -262,25 +261,34 @@ internal static class DemoFullStudioData
             Guid subject=MediaId(59,job.Number,i);
             string[] given=["Alicia","Jordan","Samantha","Jason","Amelia","Daniel","Emily","Michael","Anna","Ethan","Sarah","James","Chloe","Liam","Naomi","Noah","Grace","Joshua","Leah","Matthew"];
             string[] family=["Brown","Williams","Clarke","Campbell","Thompson","Henry","Grant","Wright","Johnson","Robinson","Miller","Wilson","Reid","Walker","Smith","Lewis","Morgan","Carter","Peterson","Harrison"];
-            string name=$"{given[i%given.Length]} {family[(i/given.Length+job.Number)%family.Length]}";
+            string name=job.Number==201
+                ? new[]{"Emily Carter","Daniel Carter","Emily & Daniel","Bridal Party","Groomsmen","Carter Family","Parents of the Bride","Parents of the Groom"}[i]
+                : $"{given[i%given.Length]} {family[(i/given.Length+job.Number)%family.Length]}";
             string reference=$"{job.Number}-{i+1:000}";
             string attributes=JsonSerializer.Serialize(new { rosterId=reference, category=job.Type, demo=true });
             string subjectStatus=job.Number==106
                 ? i<4?"Not Photographed":i<7?"Needs Retake":i<11?"Needs Editing":i<15?"Ready for Production":"Ready"
                 : job.DayOffset<0?"Photographed":"Not Photographed";
             Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,production_status,attributes,collection_name,scheduled_at_utc,schedule_location,contact_name,contact_email,contact_phone,photo_notes,is_system) values($1,$2,$2,$3,$4,$5,'demo-seed',$6,$7::jsonb,$8,$9,$10,'','','',$11,false) on conflict(id) do update set name=excluded.name,reference=excluded.reference,production_status=excluded.production_status,attributes=excluded.attributes,collection_name=excluded.collection_name,scheduled_at_utc=excluded.scheduled_at_utc,schedule_location=excluded.schedule_location,photo_notes=excluded.photo_notes,updated_at_utc=now()",
-                subject,jobId,name,reference,$"Roster / subject for {job.Type}",subjectStatus,attributes,collections[Math.Min(i%collections.Length,collections.Length-1)],scheduled,job.Location,$"Capture requirements for {job.Type}");
+                subject,jobId,name,reference,$"Session Plan subject for {job.Type}",subjectStatus,attributes,collections[i%collections.Length],scheduled,job.Location,$"Capture requirements for {job.Type}");
         }
+        var client=Clients.Single(x=>x.Number==job.Client);
+        Execute(c,tx,"update studio_job_subjects set contact_name=$2,contact_email=$3,contact_phone=$4 where job_id=$1 and not is_system",jobId,client.Name,client.Email,client.Phone);
     }
+
+    private static string[] SessionCollections(DemoJob job)=>
+        job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?["Getting Ready","Ceremony","Portraits","Reception"]:
+        job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?["Individual Portraits","Stage","Class Groups"]:
+        job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Employee ID",StringComparison.OrdinalIgnoreCase)?["Executives","Staff Portraits","Team Groups"]:
+        job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)?["Family Group","Parents","Children"]:
+        job.Type.Contains("Product",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)?["Product Details","Catalogue","Campaign"]:
+        ["Individual Portraits","Group Portraits","Details"];
 
     private static void SeedMedia(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,DemoJob job,Guid jobId,string login,int ordinal,Action<DemoSeedProgress>? report)
     {
         int count=Math.Min(MediaCount(job),DemoDataExpansion.PhotoCount(job.Type));
         string[] statuses=["Needs Sorting","Needs Editing","Needs Review","Needs Approval","Ready","Ready for Production","Needs Print","Needs QC","Needs Delivery","Completed","Blocked","Needs Retake"];
-        string[] collections=job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?["Getting Ready","Ceremony","Portraits","Reception"]:
-            job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?["Roster","Stage","Groups","Unclassified"]:
-            job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)?["Executives","Team","Selects","Unclassified"]:
-            ["Selects","Proofs","Finals","Unclassified"];
+        string[] collections=SessionCollections(job);
 
         for(int i=0;i<count;i++)
         {
@@ -294,10 +302,10 @@ internal static class DemoFullStudioData
             string status=statuses[(ordinal+i)%statuses.Length];
             assetId=ExecuteGuid(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status,assigned_to,capture_at_utc) values($1,$2,$2,$3,$4,$5,now()-($6 || ' hours')::interval) on conflict(job_id,asset_key) do update set production_status=excluded.production_status,assigned_to=excluded.assigned_to,capture_at_utc=excluded.capture_at_utc returning id",
                 assetId,jobId,key,status,job.Photographer,(i+1).ToString());
-            Execute(c,tx,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,$3) on conflict(job_id,asset_key) do update set collection_name=excluded.collection_name",
-                jobId,key,collections[i%collections.Length]);
             int subjectCount=DemoSubjectCount(job);
             int subjectIndex=job.Number==106 ? 4+(i%Math.Max(1,subjectCount-4)) : i%Math.Max(1,subjectCount);
+            Execute(c,tx,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,$3) on conflict(job_id,asset_key) do update set collection_name=excluded.collection_name",
+                jobId,key,collections[subjectIndex%collections.Length]);
             Guid subjectId=MediaId(59,job.Number,subjectIndex);
             Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) values($1,$2) on conflict do nothing",assetId,subjectId);
         }
@@ -347,7 +355,8 @@ internal static class DemoFullStudioData
     private static string NormalizeStatus(string status)=>status switch
     {
         "Production" or "QC" or "Printing"=>"In Production",
-        "Editing" or "Culling" or "Retouching"=>"Changes Requested",
+        "Culling"=>"Awaiting Production Review",
+        "Editing" or "Retouching"=>"Changes Requested",
         "Client Review"=>"Needs Review",
         "Ready for Delivery"=>"Ready for Client",
         "Booking"=>"Needs Scheduling",
@@ -505,29 +514,20 @@ internal static class DemoFullStudioData
         {
             var client=Clients.Single(x=>x.Number==item.Item3);
             Guid id=Id(57,item.Item1);
-            var payload=new
-            {
-                workspaceId=Id(1,item.Item2),
-                clientName=client.Name,
-                clientEmail=client.Email,
-                title=item.Item4,
-                eventDate=DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(item.Item8)),
-                requiredDeposit=item.Item6,
-                source=item.Item1%2==0?"Website":"FrontDesk",
-                currency="JMD",
-                notes="DEMO front desk booking request",
-                clientId=Id(40,item.Item3),
-                externalBookingId=$"DEMO-{item.Item1}",
-                startsAtUtc=new DateTimeOffset(DateTime.UtcNow.Date,TimeSpan.Zero).AddDays(item.Item8).AddHours(15),
-                endsAtUtc=new DateTimeOffset(DateTime.UtcNow.Date,TimeSpan.Zero).AddDays(item.Item8).AddHours(17),
-                location="Demo location",
-                clientPhone=client.Phone
-            };
-            Execute(c,tx,"insert into studio_frontdesk_requests(id,workspace_id,payload,status,job_id,created_by,created_at_utc) values($1,$2,$3::jsonb,$4,null,'demo-seed',now()-interval '1 day') on conflict(id) do update set payload=excluded.payload,status=excluded.status",
-                id,Id(1,item.Item2),JsonSerializer.Serialize(payload),item.Item5);
+            var payload=new PendingBookingRequest(Id(1,item.Item2),client.Name,client.Email,item.Item4,
+                DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(item.Item8)),item.Item6,"JMD","DEMO front desk booking request",
+                ClientId:Id(40,item.Item3),ExternalBookingId:$"DEMO-{item.Item1}",
+                StartsAtUtc:new DateTimeOffset(DateTime.UtcNow.Date,TimeSpan.Zero).AddDays(item.Item8).AddHours(15),
+                EndsAtUtc:new DateTimeOffset(DateTime.UtcNow.Date,TimeSpan.Zero).AddDays(item.Item8).AddHours(17),
+                Location:"Demo location",ClientPhone:client.Phone,BookingSource:item.Item1%2==0?"Website":"FrontDesk");
+            Guid job=FrontDeskBookingRequestStore.CreatePendingJob(c,tx,payload,"demo-seed");
+            Execute(c,tx,"insert into studio_frontdesk_requests(id,workspace_id,payload,status,job_id,created_by,created_at_utc) values($1,$2,$3::jsonb,$4,$5,'demo-seed',now()-interval '1 day') on conflict(id) do update set payload=excluded.payload,status=excluded.status,job_id=excluded.job_id",
+                id,Id(1,item.Item2),JsonSerializer.Serialize(payload,new JsonSerializerOptions(JsonSerializerDefaults.Web)),item.Item5,job);
             if(item.Item7>0)
                 Execute(c,tx,"insert into studio_frontdesk_deposits(id,request_id,amount,currency,provider,reference,recorded_by,created_at_utc) values($1,$2,$3,'JMD','demo','DEMO-RECEIPT-'||$4,'demo-seed',now()) on conflict(id) do update set amount=excluded.amount",
                     Id(58,item.Item1),id,item.Item7,item.Item1.ToString());
+            if(item.Item7>0)
+                Execute(c,tx,"insert into studio_financial_events(id,job_id,kind,amount,note,recorded_by,created_at_utc) values($1,$2,'Deposit',$3,'DEMO verified booking deposit','demo-seed',now()) on conflict do nothing",Id(58,item.Item1),job,item.Item7);
         }
     }
 

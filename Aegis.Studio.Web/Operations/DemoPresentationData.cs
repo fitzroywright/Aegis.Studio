@@ -70,7 +70,7 @@ internal static class DemoPresentationData
             DemoDataExpansion.Id(32, 404));
 
         Execute(connection, transaction,
-            "insert into studio_workspace_announcements(id,workspace_id,title,body,created_by) values($1,$2,'Carter Wedding demo','Open Carter Wedding to see the reference presentation with 50 wedding photos, linked People, production work and job details.',$3) on conflict (id) do update set body=excluded.body",
+            "insert into studio_workspace_announcements(id,workspace_id,title,body,created_by) values($1,$2,'Carter Wedding demo','Open Carter Wedding to explore its Session Plan, linked local photographs, production work and job details.',$3) on conflict (id) do update set body=excluded.body",
             DemoDataExpansion.Id(33, 4), workspace, login);
 
         Execute(connection, transaction,
