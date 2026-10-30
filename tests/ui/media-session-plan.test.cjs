@@ -87,3 +87,50 @@ test('failed batch can be explicitly cancelled without removing stored photos',a
 test('out-of-order job loads cannot overwrite the current job or its destination',async t=>{
  const f=fixture(t),read=f.w.json;let finish;const held=new Promise(r=>finish=r);f.w.json=async(url,o)=>{if(url.startsWith('/api/jobs/j/media?'))await held;return read(url,o);};await f.w.showMediaReview();const first=f.chooseJob('j');await settle();await f.chooseJob('other');finish();await first;assert.equal(f.q('[data-job]').value,'other');assert.match(f.q('[data-destination-session]').textContent,/Wedding/);
 });
+
+function withShell(f){
+ const w=f.w;w.document.body.dataset.studioView='media';
+ w.document.body.insertAdjacentHTML('afterbegin','<header class="topbar"></header><div class="shell"><main></main></div>');
+ w.fetch=async()=>({ok:true,json:async()=>[]});
+ w.eval(fs.readFileSync(path.join(root,'studio-shell-nav.js'),'utf8'));
+ w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+ return ()=>f.q('#studioFooterWorkspaces');
+}
+test('footer is the only workspace selector and filters Media jobs without navigation',async t=>{
+ const f=fixture(t),footer=withShell(f);
+ f.w.sessionStorage.setItem('studio.footer.workspace.selection','ws');
+ await f.w.showMediaReview();
+ assert.equal(f.q('[data-workspace]'),null);assert.equal(footer().value,'ws');
+ assert.deepEqual(Array.from(f.q('[data-job]').options,o=>o.value),['','j']);
+ await f.chooseJob();footer().value='';await footer().onchange();
+ assert.equal(f.q('[data-job]').value,'j');
+ assert.deepEqual(Array.from(f.q('[data-job]').options,o=>o.value),['','j','other']);
+ footer().value='ws2';await footer().onchange();
+ assert.deepEqual(Array.from(f.q('[data-job]').options,o=>o.value),['','other']);
+ assert.equal(f.q('[data-job]').value,'');assert.equal(f.q('[data-open-job]').disabled,true);
+ assert.equal(f.w.sessionStorage.getItem('studio.footer.workspace.selection'),'ws2');
+ assert.deepEqual(f.navigation,[]);
+ await f.w.showMediaReview();assert.equal(footer().value,'ws2');
+ assert.deepEqual(Array.from(f.q('[data-job]').options,o=>o.value),['','other']);
+});
+test('footer cannot change the destination of an unfinished upload and unlocks on cancellation',async t=>{
+ const f=fixture(t),footer=withShell(f),read=f.w.json;
+ f.w.json=async(url,o)=>{if(url.endsWith('/uploads'))throw Error('Offline');return read(url,o);};
+ await f.w.showMediaReview();await f.chooseJob();await f.files(['fail.jpg']);
+ assert.equal(footer().disabled,true);
+ footer().value='ws2';await footer().onchange();
+ assert.equal(footer().value,'');assert.equal(f.q('[data-job]').value,'j');
+ assert.match(f.q('[data-feedback]').textContent,/current upload/);
+ await f.w.showMediaReview();assert.equal(footer().disabled,true);assert.equal(f.q('[data-job]').value,'j');
+ await f.q('[data-cancel-upload]').onclick();assert.equal(footer().disabled,false);
+ footer().value='ws2';await footer().onchange();assert.equal(f.q('[data-job]').value,'');
+});
+test('opening a specific job aligns the footer workspace and successful uploads release it',async t=>{
+ const f=fixture(t),footer=withShell(f);
+ f.w.sessionStorage.setItem('studio.footer.workspace.selection','ws2');
+ f.w.history.replaceState({studioJobId:'j'},'');
+ await f.w.showMediaReview();
+ assert.equal(footer().value,'ws');assert.equal(f.q('[data-job]').value,'j');
+ await f.files(['photo.jpg']);assert.equal(footer().disabled,false);
+ assert.equal(f.writes[0].body.collection,'Unclassified');
+});
