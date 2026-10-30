@@ -202,16 +202,21 @@
  }
  async function media(job,host,selectedHost,isCurrent,onCounts){
   let disposed=false,request=0,selectedId='',data=null,canEdit=false,uploading=false,search='',list=false;
-  let pendingBatch=null,photoDialog=null;const favourites=new Set();
+  let pendingBatch=null,photoDialog=null,selectionDialog=null;const favourites=new Set(),selected=new Set();
   let collection='',subject='',assetId='',after='',page=1;const previous=[];
   const focus=root.studioMediaFocus?.jobId===job.id?root.studioMediaFocus:root.studioMediaPage?.[job.id];
   if(focus){subject=focus.subjectId||'';assetId=focus.assetId||'';root.studioMediaFocus=null;}
   const current=()=>!disposed&&isCurrent()&&host.isConnected;
-  const announce=message=>{if(!current())return;let output=host.querySelector('[data-media-result]');if(!output){output=document.createElement('p');output.className='jd-media-result';output.dataset.mediaResult='';output.setAttribute('role','status');host.append(output);}output.textContent=message;};
+  const announce=message=>{if(!current())return;let output=host.querySelector('[data-media-result]');if(!output){output=document.createElement('p');output.className='jd-media-result';output.dataset.mediaResult='';output.setAttribute('role','status');host.append(output);}output.textContent=message;if(pendingBatch&&!uploading)retryButton();};
   const picture=(asset,large=false)=>photoPicture(job,asset,large);
+  const collectionNames=()=>[...new Set([...(data.collections||[]),...(data.subjects||[]).map(person=>person.collection),...data.assets.map(asset=>asset.collection),'Unclassified'].filter(Boolean))];
   function select(asset){
-   selectedId=asset.id;
-   host.querySelectorAll('[data-jd-asset]').forEach(tile=>{const active=tile.dataset.jdAsset===asset.id;tile.classList.toggle('selected',active);tile.setAttribute('aria-pressed',String(active));});
+   selectedId=asset.id;selected.clear();selected.add(asset.id);syncSelection();
+  }
+  function syncSelection(){
+   host.querySelectorAll('[data-jd-asset]').forEach(tile=>{const active=selected.has(tile.dataset.jdAsset);tile.classList.toggle('selected',active);tile.setAttribute('aria-pressed',String(active));});
+   const count=host.querySelector('[data-selection-count]');if(count)count.textContent=selected.size+' selected';
+   for(const button of host.querySelectorAll('[data-assign-selected],[data-move-selected]'))button.disabled=!selected.size||uploading||Boolean(pendingBatch);
   }
   function openPreview(asset=null){
    photoDialog?.close();
@@ -220,18 +225,25 @@
   function renderTiles(){
    const assets=data.assets.filter(asset=>!search||String(asset.fileName||'').toLowerCase().includes(search.toLowerCase()));
    const grid=host.querySelector('.jd-contact-sheet');grid.classList.toggle('list',list);
-   grid.innerHTML=assets.map(asset=>`<button type="button" class="jd-photo ${selectedId===asset.id?'selected':''}" data-jd-asset="${escape(asset.id)}" aria-pressed="${selectedId===asset.id}"><span class="jd-photo-image">${picture(asset)}</span><strong>${escape(asset.fileName)}</strong><small>${escape(asset.collection||'Unclassified')} · ${escape(asset.status)}</small></button>`).join('')||'<p class="jd-empty">'+(search?'No matching files on this page.':'No media here. Drop photos or use Upload to add them.')+'</p>';
+   grid.innerHTML=assets.map(asset=>`<button type="button" class="jd-photo ${selected.has(asset.id)?'selected':''}" data-jd-asset="${escape(asset.id)}" aria-pressed="${selected.has(asset.id)}"><span class="jd-photo-image">${picture(asset)}</span><strong>${escape(asset.fileName)}</strong><small>${escape(asset.collection||'Unclassified')} · ${escape(asset.status)}</small></button>`).join('')||'<p class="jd-empty">'+(search?'No matching files on this page.':'No media here. Drop photos or use Upload to add them.')+'</p>';
    bindImages(grid);
-   grid.querySelectorAll('[data-jd-asset]').forEach(tile=>{const asset=data.assets.find(a=>a.id===tile.dataset.jdAsset);tile.onclick=()=>select(asset);tile.ondblclick=()=>openPreview(asset);tile.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();openPreview(asset);}};});
+   grid.querySelectorAll('[data-jd-asset]').forEach(tile=>{const asset=data.assets.find(a=>a.id===tile.dataset.jdAsset);tile.onclick=()=>{selectedId=asset.id;if(selected.has(asset.id))selected.delete(asset.id);else selected.add(asset.id);syncSelection();};tile.ondblclick=()=>openPreview(asset);tile.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();openPreview(asset);}};});
+   syncSelection();
   }
   async function change(changes){
+   if(uploading||pendingBatch){host.querySelector('[data-collection]').value=collection;host.querySelector('[data-job-subject]').value=subject;announce('Finish or retry the current upload before changing its destination.');return;}
    if('collection' in changes){collection=changes.collection;if(collection&&data.subjects.find(s=>s.id===subject)?.collection!==collection)subject='';}
    if('subject' in changes)subject=changes.subject;
-   after='';page=1;previous.length=0;assetId='';selectedId='';await load();
+   after='';page=1;previous.length=0;assetId='';selectedId='';selected.clear();await load();
   }
   function draw(){
-   const counts=data.collectionCounts||{},collections=[...new Set(['Unclassified',...(data.collections||[])])];
-   host.innerHTML=`<header class="jd-gallery-toolbar"><h2>All Media</h2><button type="button" class="jd-tool-button" data-open-gallery aria-haspopup="dialog">Gallery</button><select data-collection aria-label="Filter media by collection"><option value="">All collections</option>${collections.map(name=>`<option ${name===collection?'selected':''}>${escape(name)}</option>`).join('')}</select><select data-subject-picker data-job-subject aria-label="Filter media by subject"><option value="">All subjects</option>${StudioSubjectPicker.options(data.subjects,subject)}<option value="__details">Subject details…</option></select><input type="search" data-media-search placeholder="Search this page…" aria-label="Search photos on this page" value="${escape(search)}"><button type="button" class="jd-tool-button" data-job-tasks aria-haspopup="dialog">☑ Tasks</button><span class="jd-drop-hint">⇧ Drop photos or folders to upload</span><div class="jd-view-controls"><button type="button" data-grid aria-label="Grid view" aria-pressed="${!list}">▦</button><button type="button" data-list aria-label="List view" aria-pressed="${list}">☰</button></div>${canEdit?'<button type="button" class="jd-upload" data-add>＋ Upload</button><input type="file" data-files multiple hidden>':''}</header><nav class="jd-collections" aria-label="Media collections"><button type="button" data-filter="" class="${collection?'':'active'}">All <span>${Object.values(counts).length?Object.values(counts).reduce((a,b)=>a+Number(b),0):data.totalAssets}</span></button>${collections.map(name=>`<button type="button" data-filter="${escape(name)}" class="${collection===name?'active':''}">${escape(name)}${counts[name]!=null?` <span>${counts[name]}</span>`:''}</button>`).join('')}${subject?'<button type="button" data-clear-subject>Clear subject filter ×</button>':''}</nav><div class="jd-contact-sheet" tabindex="0" aria-label="Job photos and upload target"></div><footer class="jd-gallery-footer"><span>${search?`${data.assets.filter(a=>String(a.fileName||'').toLowerCase().includes(search.toLowerCase())).length} visible on this page · `:''}Showing ${data.assets.length?(page-1)*12+1:0}–${(page-1)*12+data.assets.length} of ${data.totalAssets??data.assets.length}</span><div><button type="button" data-previous ${previous.length?'':'disabled'} aria-label="Previous media page">‹</button><span>Page ${page}</span><button type="button" data-next ${data.hasMore?'':'disabled'} aria-label="Next media page">›</button></div></footer><p class="jd-media-result" role="status" data-media-result></p>`;
+   const counts=data.collectionCounts||{},collections=collectionNames();
+   const total=Object.keys(counts).length?Object.values(counts).reduce((sum,count)=>sum+Number(count),0):data.totalAssets??data.assets.length;
+   const row=(name,label,count)=>`<button type="button" data-filter="${escape(name)}" aria-pressed="${collection===name}" class="${collection===name?'active':''}"><span>${escape(label)}</span>${count!=null?`<small>${Number(count)}</small>`:''}</button>`;
+   const subjects=(data.subjects||[]).filter(person=>!collection||(person.collection||'Unclassified')===collection);
+   const retained=[...selected].filter(id=>data.assets.some(asset=>asset.id===id));selected.clear();retained.forEach(id=>selected.add(id));
+   if(!selectedId&&data.assets[0]){selectedId=data.assets[0].id;selected.add(selectedId);}
+   host.innerHTML=`<header class="jd-gallery-toolbar"><h2>All Media</h2><button type="button" class="jd-tool-button" data-open-gallery aria-haspopup="dialog">Gallery</button><select data-collection aria-label="Filter media by collection"><option value="">All collections</option>${collections.map(name=>`<option ${name===collection?'selected':''}>${escape(name)}</option>`).join('')}</select><select data-subject-picker data-job-subject aria-label="Filter media by subject"><option value="">All subjects</option>${StudioSubjectPicker.options(data.subjects,subject)}<option value="__details">Subject details…</option></select><input type="search" data-media-search placeholder="Search this page…" aria-label="Search photos on this page" value="${escape(search)}"><button type="button" class="jd-tool-button" data-job-tasks aria-haspopup="dialog">☑ Tasks</button><span class="jd-drop-hint">⇧ Drop photos or folders to upload</span><div class="jd-view-controls"><button type="button" data-grid aria-label="Grid view" aria-pressed="${!list}">▦</button><button type="button" data-list aria-label="List view" aria-pressed="${list}">☰</button></div>${canEdit?'<button type="button" class="jd-upload" data-add>＋ Upload</button><input type="file" data-files multiple hidden>':''}</header><div class="jd-gallery-workspace"><aside class="jd-plan-nav" aria-label="Session Plan media navigation"><header><h3>Session Plan</h3><span>${data.totalSubjects??data.subjects.length} subjects</span></header><nav class="jd-plan-collections" aria-label="Media collections">${row('','All media',total)}${collections.map(name=>row(name,name,counts[name])).join('')}</nav><details class="jd-plan-subjects" ${subject?'open':''}><summary>Subjects${collection?' in this collection':''}</summary><div><button type="button" data-plan-subject="" aria-pressed="${!subject}">All subjects</button>${subjects.map(person=>`<button type="button" data-plan-subject="${escape(person.id)}" aria-pressed="${subject===String(person.id)}"><span>${escape(person.name)}${person.reference?`<small>${escape(person.reference)}</small>`:''}</span><small>${Number(person.imageCount)||0}</small></button>`).join('')||'<p>No subjects planned in this collection.</p>'}</div></details><p class="jd-plan-hint">Choose a collection or subject to review its photographs.</p>${subject?'<button type="button" class="jd-link" data-clear-subject>Clear subject filter ×</button>':''}</aside><div class="jd-gallery-main"><div class="jd-media-selection" aria-label="Selected photographs"><span data-selection-count aria-live="polite">${selected.size} selected</span>${canEdit?'<button type="button" class="jd-link" data-assign-selected>Assign subject</button><button type="button" class="jd-link" data-move-selected>Move</button>':''}<button type="button" class="jd-link" data-clear-selected>Clear</button></div><div class="jd-contact-sheet" tabindex="0" aria-label="Job photos and upload target"></div><footer class="jd-gallery-footer"><span>${search?`${data.assets.filter(a=>String(a.fileName||'').toLowerCase().includes(search.toLowerCase())).length} visible on this page · `:''}Showing ${data.assets.length?(page-1)*12+1:0}–${(page-1)*12+data.assets.length} of ${data.totalAssets??data.assets.length}</span><div><button type="button" data-previous ${previous.length?'':'disabled'} aria-label="Previous media page">‹</button><span>Page ${page}</span><button type="button" data-next ${data.hasMore?'':'disabled'} aria-label="Next media page">›</button></div></footer></div></div><p class="jd-media-result" role="status" data-media-result></p>`;
    renderTiles();
    host.querySelector('[data-open-gallery]').onclick=()=>openPreview();
    host.querySelector('[data-collection]').value=collection;
@@ -239,22 +251,51 @@
    const subjectControl=host.querySelector('[data-job-subject]');
    subjectControl.onchange=async()=>{if(subjectControl.value==='__details'){subjectControl.value=subject;await host.studioOpenSubjects?.();return;}await change({subject:subjectControl.value});};
    host.querySelectorAll('[data-filter]').forEach(button=>{button.onclick=()=>change({collection:button.dataset.filter});if(canEdit){button.ondragover=e=>{if(e.dataTransfer?.types?.includes('Files'))e.preventDefault();};button.ondrop=async e=>{e.preventDefault();e.stopPropagation();await upload(await studioDroppedPhotos(e.dataTransfer),button.dataset.filter||'Unclassified');};}});
+   host.querySelectorAll('[data-plan-subject]').forEach(button=>button.onclick=()=>change({subject:button.dataset.planSubject}));
+   host.querySelector('[data-clear-selected]').onclick=()=>{selected.clear();syncSelection();};
+   const assign=host.querySelector('[data-assign-selected]');if(assign)assign.onclick=()=>editSelection(false);
+   const move=host.querySelector('[data-move-selected]');if(move)move.onclick=()=>editSelection(true);
    const clear=host.querySelector('[data-clear-subject]');if(clear)clear.onclick=()=>change({subject:''});
    const sessionButton=document.createElement('button');sessionButton.type='button';sessionButton.className='jd-tool-button';sessionButton.dataset.jobSessionPlan='';sessionButton.textContent='Session Plan';sessionButton.onclick=()=>root.studioNavigate('session-plan',{jobId:job.id});host.querySelector('.jd-gallery-toolbar')?.append(sessionButton);
    host.querySelector('[data-media-search]').oninput=e=>{search=e.target.value;renderTiles();};
    host.querySelector('[data-job-tasks]').onclick=event=>host.studioOpenTasks?.(event);
    for(const [selector,value] of [['[data-grid]',false],['[data-list]',true]])host.querySelector(selector).onclick=()=>{list=value;renderTiles();host.querySelector('[data-grid]').setAttribute('aria-pressed',String(!list));host.querySelector('[data-list]').setAttribute('aria-pressed',String(list));};
-   host.querySelector('[data-previous]').onclick=async()=>{after=previous.pop()||'';page--;await load();};
-   host.querySelector('[data-next]').onclick=async()=>{previous.push(after);after=data.assets.map(a=>a.id).sort().at(-1)||'';page++;await load();};
+   host.querySelector('[data-previous]').onclick=async()=>{if(uploading||pendingBatch){announce('Finish or retry the current upload before changing pages.');return;}selected.clear();selectedId='';after=previous.pop()||'';page--;await load();};
+   host.querySelector('[data-next]').onclick=async()=>{if(uploading||pendingBatch){announce('Finish or retry the current upload before changing pages.');return;}selected.clear();selectedId='';previous.push(after);after=data.assets.map(a=>a.id).sort().at(-1)||'';page++;await load();};
    if(canEdit){
     const files=host.querySelector('[data-files]');host.querySelector('[data-add]').onclick=()=>files.click();files.onchange=()=>upload(Array.from(files.files));
     host.ondragover=e=>{if(e.dataTransfer?.types?.includes('Files')){e.preventDefault();host.classList.add('jd-drag-over');}};
     host.ondragleave=e=>{if(!host.contains(e.relatedTarget))host.classList.remove('jd-drag-over');};
     host.ondrop=async e=>{e.preventDefault();host.classList.remove('jd-drag-over');try{await upload(await studioDroppedPhotos(e.dataTransfer));}catch(error){announce(error.message);}};
    }
-   const selected=data.assets.find(a=>a.id===selectedId)||data.assets[0];
-   if(selected)select(selected);else selectedId='';
+   syncSelection();
   }
+  function editSelection(move){
+   if(!current()||!canEdit||!selected.size||uploading||pendingBatch)return;
+   const assets=data.assets.filter(asset=>selected.has(asset.id)),jobId=job.id;
+   const choices=collectionNames();
+   selectionDialog?.close();
+   const dialog=studioDialog(move?'Move selected photographs':'Assign subjects',`<form class="jd-file-form"><p>${assets.length} selected photograph${assets.length===1?'':'s'}. ${move?'Subject assignments are retained.':'Replaces the subjects assigned to these photographs.'}</p><label>${move?'Collection':'Subjects'}<select name="target" ${move?'':'multiple size="8"'} required>${move?choices.map(name=>`<option value="${escape(name)}">${escape(name)}</option>`).join(''):StudioSubjectPicker.options(data.subjects||[],[])}</select></label><button type="submit" class="jd-save">Save changes</button><p role="alert"></p></form>`);
+   selectionDialog=dialog;dialog.addEventListener('close',()=>{if(selectionDialog===dialog)selectionDialog=null;},{once:true});
+   const form=dialog.querySelector('form'),saved=new Set();
+   form.onsubmit=async event=>{
+    event.preventDefault();if(!current()||!canEdit)return;
+    const button=form.querySelector('[type=submit]');button.disabled=true;
+    const values=Array.from(form.elements.target.selectedOptions,option=>option.value);
+    if(!values.length){form.querySelector('[role=alert]').textContent='Choose a destination.';button.disabled=false;return;}
+    try{
+     for(const asset of assets){
+      if(!current())return;
+      if(saved.has(asset.id))continue;
+      const changes={status:asset.status,collection:move?values[0]:asset.collection||'Unclassified',subjects:move?asset.subjects:values,assignedTo:asset.assignedTo||null,captureAtUtc:asset.captureAtUtc||null,tags:asset.tags||[]};
+      await put(`/api/jobs/${jobId}/media/assets/${asset.id}`,changes);saved.add(asset.id);Object.assign(asset,changes);
+     }
+     dialog.close();if(current())await load();
+    }catch(error){if(dialog.isConnected){form.querySelector('[role=alert]').textContent=`${saved.size} of ${assets.length} saved. ${error.message} Retry to finish the remaining photographs.`;form.elements.target.disabled=saved.size>0;}}
+    finally{if(button.isConnected)button.disabled=false;}
+   };
+  }
+
   async function load(){
    const version=++request;
    host.setAttribute('aria-busy','true');
@@ -268,7 +309,7 @@
    finally{if(current()&&version===request)host.removeAttribute('aria-busy');}
   }
   async function upload(files,target=collection||data?.gallery?.default_collection||'Unclassified'){
-   if(!canEdit||uploading||!files.length)return;uploading=true;
+   if(!canEdit||uploading||!files.length)return;uploading=true;syncSelection();
    try{
     if(pendingBatch)throw Error('Retry the pending batch before adding more files.');
     const view=await json(`/api/jobs/${job.id}/shoot-sessions`),sessions=view||[];
@@ -279,12 +320,12 @@
     }
     pendingBatch={declaration:{batchId:crypto.randomUUID(),sessionId,subjectId:subject||null,collection:target,files:files.map(file=>({uploadId:crypto.randomUUID(),fileName:file.name,sizeBytes:file.size}))},files};
     await sendBatch();
-   }catch(error){announce(error.message);if(pendingBatch)retryButton();}finally{uploading=false;}
+   }catch(error){announce(error.message);if(pendingBatch)retryButton();}finally{uploading=false;syncSelection();}
   }
   function retryButton(){
    const output=host.querySelector('[data-media-result]');if(!output||output.querySelector('button'))return;
    const b=document.createElement('button');b.type='button';b.className='jd-save';b.textContent='Retry original batch';output.append(b);
-   b.onclick=async()=>{if(uploading)return;uploading=true;b.disabled=true;try{await sendBatch();}catch(e){announce(e.message);retryButton();}finally{uploading=false;}};
+   b.onclick=async()=>{if(uploading)return;uploading=true;b.disabled=true;try{await sendBatch();}catch(e){announce(e.message);retryButton();}finally{uploading=false;syncSelection();}};
   }
   async function sendBatch(){
    const batch=pendingBatch;
@@ -302,12 +343,9 @@
    await root.studioNavigate('session-plan',{jobId:job.id});
   }
 
-  const controller={reload:()=>{const focus=root.studioMediaFocus?.jobId===job.id?root.studioMediaFocus:root.studioMediaPage?.[job.id];if(focus?.subjectId!==undefined){subject=focus.subjectId||'';root.studioMediaFocus=null;after='';page=1;previous.length=0;}return load();},upload:()=>host.querySelector('[data-add]')?.click(),importRoster,dispose:()=>{disposed=true;request++;photoDialog?.close();host.ondrop=null;host.ondragover=null;}};
+  const controller={reload:()=>{const focus=root.studioMediaFocus?.jobId===job.id?root.studioMediaFocus:root.studioMediaPage?.[job.id];if(focus?.subjectId!==undefined){subject=focus.subjectId||'';root.studioMediaFocus=null;after='';page=1;previous.length=0;}return load();},upload:()=>host.querySelector('[data-add]')?.click(),importRoster,dispose:()=>{disposed=true;request++;photoDialog?.close();selectionDialog?.close();host.ondrop=null;host.ondragover=null;}};
   host.studioJobMedia?.dispose();host.studioJobMedia=controller;
   await load();return controller;
  }
  root.StudioJobDetails={media,openGallery,nextActionLink,workflowAction};
 })(window);
-
-
-
