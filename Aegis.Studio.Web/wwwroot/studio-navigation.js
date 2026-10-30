@@ -256,7 +256,7 @@
                 <section class="studio-about-card studio-about-demo" id="studioDemoLoader"><div class="studio-about-demo-main"><div class="studio-about-demo-copy"><h2>Demo Data</h2><p class="studio-about-demo-warning">Reset clears business records and files.<span class="studio-about-demo-line">Staff accounts, configuration and Unassigned are preserved.</span></p></div><div class="studio-about-demo-actions"><button class="action" type="button" data-demo-remove>Remove demo data</button><button class="primary" type="button" data-load-demo>Clear and recreate</button></div></div><div class="studio-about-card-body"><progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress><p class="admin-demo-status" data-demo-status role="status" aria-live="polite"></p><small data-demo-elapsed hidden></small></div></section>`;break;
             case 'staff-roles': content=renderEmployeeDirectorySection();break;
         }
-        genericView.innerHTML=StudioPage.html({title,showHeader:false,scroll:view!=='about',summary:view==='about'?'<p>Product information, support, service health and administrator demo tools.</p>':view==='staff-roles'?'<p>Maintain staff identities, reusable job and workspace roles, and global operational access.</p>':'',content:view==='about'?`<div class="studio-about-scene"><div class="studio-about-panel"><div class="studio-about-grid">${content}</div></div></div>`:`<div class="admin-generated-sections">${content}</div>`});
+        genericView.innerHTML=StudioPage.html({title,showHeader:false,scroll:view!=='about',summary:view==='about'?'<p>Product information, support, service health and administrator demo tools.</p>':'',content:view==='about'?`<div class="studio-about-scene"><div class="studio-about-panel"><div class="studio-about-grid">${content}</div></div></div>`:`<div class="admin-generated-sections">${content}</div>`});
         StudioPage.bind(genericView,current);
 
         if(!current())return;
@@ -276,8 +276,7 @@
             observer.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});observer.observe(genericView,{childList:true});
             dialog.addEventListener('close',()=>observer.disconnect(),{once:true});
         };
-        if(view==='staff-roles')await refreshStudioEmployees();
-        if(view==='staff-roles'&&current())await renderGlobalRoleAdministration(current);
+        if(view==='staff-roles')await refreshStudioEmployees(current);
         if(!current())return;
         const adminGrid=genericView.querySelector('.admin-generated-sections');
         for(const section of [...genericView.children].filter(el=>el.classList.contains('job-section'))){section.classList.add('admin-card');adminGrid.appendChild(section);}
@@ -472,3 +471,4 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+

@@ -17,12 +17,13 @@ test('pending login shows approval state and clears the password without navigat
 test('account provisioning retry preserves the pending account after a profile save failure',async t=>{
  const dom=new JSDOM('<div id="genericView"></div>',{url:'https://studio.test',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
  w.esc=x=>String(x??'');w.showFeedback=()=>{};w.studioFirstName=x=>x.displayName;w.eval(fs.readFileSync(path.join(root,'workspaces.js'),'utf8'));w.document.getElementById('genericView').innerHTML=w.renderEmployeeDirectorySection();
- w.document.getElementById('employeeUserName').value='local.operator';w.document.getElementById('employeeAuthSource').value='LocalDatabase';w.document.getElementById('employeeLocalPassword').value='new-local-password';
  let account=null,creates=0,profileAttempts=0;
  w.json=async(url,options)=>{if(url==='/api/admin/security/accounts/'){if(options){creates++;account={id:'stable-account',loginName:'local.operator',displayName:'Operator',providerKind:'LocalDatabase',status:'PendingAccess'};return account;}return account?[account]:[];}
  if(url.startsWith('/api/admin/studio-employees/')){if(options){profileAttempts++;if(profileAttempts===1)throw Error('Profile save unavailable');return {};}return [];}
- if(url==='/api/photographers')return [];throw Error('Unexpected API '+url);};
+ if(url==='/api/photographers'||url==='/api/security/global-roles/')return [];throw Error('Unexpected API '+url);};
+ await w.refreshStudioEmployees();w.openStaffEditor(null);w.document.getElementById('employeeUserName').value='local.operator';w.document.getElementById('employeeAuthSource').value='LocalDatabase';w.document.getElementById('employeeLocalPassword').value='new-local-password';
  await w.saveStudioEmployee();assert.equal(creates,1);assert.match(w.document.getElementById('employeeAccountStatus').textContent,/Profile save unavailable/);assert.equal(w.document.getElementById('employeeLocalPassword').value,'');
- await w.saveStudioEmployee();assert.equal(creates,1);assert.equal(profileAttempts,2);assert.match(w.document.getElementById('employeeAccountStatus').textContent,/Approve access/);assert.match(w.document.getElementById('studioEmployeeList').textContent,/LocalDatabase/);
+ await w.saveStudioEmployee();assert.equal(creates,1);assert.equal(profileAttempts,2);assert.match(w.document.querySelector('[data-staff-approvals]').textContent,/awaiting approval/);assert.equal(w.document.querySelector('.staff-person-form input[readonly]').value,'Local account');
 });
+
 
