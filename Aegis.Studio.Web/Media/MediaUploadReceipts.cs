@@ -78,7 +78,7 @@ public sealed class MediaUploadReceipts(StudioDatabase database,MediaProductionS
             WorkflowStore.Sql(c,null,"update studio_media_upload_receipts set status='Uploading',file_hash=$2,last_error=null,received_at_utc=coalesce(received_at_utc,now()) where id=$1",uploadId,hash);
             try
             {
-                var result=JsonSerializer.SerializeToElement(media.Ingest(job,file,declaration.Returned,declaration.AssetId,actor,declaration.Note,declaration.Collection=="Unclassified"?null:declaration.Collection,uploadId),json);
+                var result=JsonSerializer.SerializeToElement(media.Ingest(job,file,declaration.Returned,declaration.AssetId,actor,declaration.Note,declaration.Collection,uploadId),json);
                 bool unmatched=result.GetProperty("unmatched").GetBoolean();Guid identity=result.GetProperty("id").GetGuid();
                 using(var lookup=WorkflowStore.Command(c,null,unmatched?
                     "select v.id,v.sha256,v.size_bytes,null::uuid from studio_media_unmatched u join studio_asset_versions v on v.id=u.version_id where u.id=$1 and u.job_id=$2":
