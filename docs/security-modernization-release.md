@@ -1,20 +1,20 @@
 # Security modernization candidate — deployment gate closed
 
-## Continuation checks
+## Candidate verification
 
-The follow-up removes the obsolete gallery wrapper around the deleted workspace row renderer. A full-script startup regression now exercises the actual index script order, the embedded Session Plan editor mapping, and navigation to Staff & Roles. The targeted provisioning, shell ownership and startup tests pass (14 tests, zero failures/skips) under Node 24 in the editing workspace. Five catalog/booking tests also pass after replacing a fixed history timer with the actual browser history event. This is not a Mac application build or live-provider acceptance.
+Coordinated [CI 41074891503](https://github.com/fitzroywright/Aegis.Studio/actions/runs/41074891503), tested source `d08f496f82a80aaab887f8a344e167c2d2d0bb0c`, passes **443 Web tests, 3 Domain tests and 476 UI tests**, with **zero failures or skips**. The evidence gate confirms nonempty passing results, shared-source pins match the release manifest, and the CSS ownership workflow passes. All fourteen previously remaining server failures are resolved. Common.Security, Cafeteria, RequestPortal, Operations, Configuration and Diagnostics also retain passing candidate CI at their current draft PR heads.
 
-The continuation UI suite is green: both `npm test` from `tests/ui` and `node --test --test-concurrency=4 tests/ui/*.test.cjs` recorded **473 passed, zero failed, zero skipped** under Node 24. Current fixtures exercise the approved overlay, shared drawer, footer workspace scope and canonical stylesheet owners. New regressions cover HTTP status propagation, clearing protected cached data after 401/403, and visible job/workflow error recovery. Production fixes also restore notification/message context, remove a retired planning binding, and retain closed status filter options. No browser screenshot or Mac application validation has been completed.
+The corrections initialize current isolated-fixture schema, reuse the shared application fixture for the media/billing/booking journey, and split parameterized setup statements. Assertions remain enabled. Coverage preserves nonzero WorkDay assignment generations, replay/conflict protection, denied production dispatch for ordinary callers, permitted manager dispatch, and a Pending Job after quote conversion. UI fixes clear protected caches on 401/403, restore error/retry paths and visible context, and use current canonical renderers and stylesheet owners.
 
-Coordinated [CI 41073632178](https://github.com/fitzroywright/Aegis.Studio/actions/runs/41073632178), source `f170a141324a5b22c983fb703fdac654d7957b21`, passed **441 Web tests / 2 failed / zero skipped**, **3 Domain tests**, and **476 UI tests / zero failures or skips**. Twelve of the original fourteen remaining server failures are resolved, including the connected WorkDay journey, permission, booking, rescheduling and media/billing/booking tests.
+The historical baseline workflow intentionally tests unchanged pre-modernization source and still reports its original failures. It is diagnostic evidence, not the current candidate or a runtime compatibility layer. No tests in the candidate are skipped to waive a release gate.
 
-The two remaining failures are fixture setup commands in ManualPhotographerPersistenceTests and WorkDayShootCompletionTests: PostgreSQL rejects multiple parameterized statements in one prepared command. The latest draft splits each insert and update into separate commands; assertions remain enabled. This final follow-up awaits coordinated CI. The editing workspace has no .NET SDK, so no local .NET or Mac validation is claimed.
+CI uses disposable PostgreSQL 16. Real provider callbacks, representative restored databases and operational acceptance have not been exercised. The editing workspace has no .NET SDK or browser executable; no local .NET build, Mac validation or browser screenshot acceptance is claimed.
 
 This is a coordinated source candidate, not an approved production rollout. `security-baseline.json` pins every shared library; no application may substitute a floating Common.Security checkout or overwrite shared running binaries. Build in an isolated output directory and deploy a complete application bundle independently.
 
 ## Build and evidence
 
-Run `python3 ../Common/Common.Security/scripts/verify-source-baseline.py security-baseline.json --common-root ../Common` before building. Run the existing application tests and the coordinated security workflow. Failed, skipped, missing or empty results block release. The workflow uses disposable PostgreSQL 16 and cannot replace live provider or operational acceptance.
+Run `python3 ../Common/Common.Security/scripts/verify-source-baseline.py security-baseline.json --common-root ../Common` before building. Run the existing application tests and the coordinated security workflow. Failed, skipped, missing or empty candidate results block release. The workflow uses disposable PostgreSQL 16 and cannot replace live provider or operational acceptance.
 
 ## Data and identity preparation
 
@@ -35,7 +35,7 @@ Use the existing **Staff & Roles** page for authentication source, explicit immu
 
 Configure optional Entra through `Authentication:Entra`, the existing Common.Secrets provider, and the registered callback. Local credentials and recovery use the shared account store. Development/demo mock identities require `IsolationConfirmed`, a server allowlist and an isolated database/storage/integration configuration; do not confirm isolation for a configuration pointing at production resources. Explicitly enroll/approve any demo operator and app roles; no default User/Admin role is created at login.
 
-Run Studio's PostgreSQL persistence tests, UI ownership and behavioral tests, real AD/Entra login and the Staff & Roles approval/revocation matrix. The local UI suite passes; the PostgreSQL suite, live-provider checks and operational acceptance remain release gates.
+Run Studio's PostgreSQL persistence tests, UI ownership and behavioral tests, real AD/Entra login and the Staff & Roles approval/revocation matrix. The candidate UI and PostgreSQL suites pass; live-provider checks, migration/restore/recovery rehearsal and operational acceptance remain release gates.
 
 Global role and directory-group changes, workspace membership and job membership writes use the shared security transaction for their existing Studio tables, account session-version change and security audit. Staff aliases resolve within the approved account directory; unenrolled metadata records cannot acquire operational roles through an alias match. Rehearse the approved account import before enabling these administration endpoints.
 
