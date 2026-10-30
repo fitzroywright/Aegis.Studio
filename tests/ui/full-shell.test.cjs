@@ -41,7 +41,7 @@ function api(u){const p=u.pathname;
 
 test('the full shell loads every operational screen with a shared data graph',async t=>{const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc}),w=dom.window;t.after(()=>dom.window.close());
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.remove()};w.HTMLElement.prototype.scrollIntoView=function(){};w.alert=e=>errors.push(String(e));w.fetch=async url=>({ok:true,status:200,json:async()=>api(new URL(url,'http://studio.test')),text:async()=>JSON.stringify(api(new URL(url,'http://studio.test')))});
- for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(fs.readFileSync(path.join(root,new URL(script.src).pathname),'utf8'),dom.getInternalVMContext());
+ for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(require('./studio-script-fixture.cjs')(new URL(script.src).pathname),dom.getInternalVMContext());
  await new Promise(r=>setTimeout(r,25));await w.studioTodayReady;
  for(const view of ['today','workspaces','pipeline','production','frontdesk','finance','management','admin']){try{await w.studioNavigate(view);assert.ok(w.document.querySelector('#genericView').textContent.trim().length>0,view);}catch(e){errors.push(view+': '+e.message)}}
  const routeField=w.document.getElementById('workspaceRouteKey');assert.ok(routeField.closest('details'));assert.equal(routeField.closest('details').open,false);
@@ -60,7 +60,7 @@ test('cold workspace opening loads server permissions and keeps actual denial on
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.remove()};w.HTMLElement.prototype.scrollIntoView=function(){};w.alert=e=>errors.push(String(e));
  w.fetch=async url=>{const u=new URL(url,'http://studio.test');requests.push(u.pathname);const body=u.pathname==='/api/workspace-access'?workspaces.map(workspace=>({workspace,permissions:{...permissions,view:!denied}})):api(u);return {ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body)};};
  try{
-  for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(fs.readFileSync(path.join(root,new URL(script.src).pathname),'utf8'),dom.getInternalVMContext());
+  for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(require('./studio-script-fixture.cjs')(new URL(script.src).pathname),dom.getInternalVMContext());
   await new Promise(r=>setTimeout(r,25));await w.studioTodayReady;
   assert.ok(w.eval('workspaceCache.length')>=0);
   await w.studioNavigate('workspaces');
@@ -77,4 +77,5 @@ test('cold workspace opening loads server permissions and keeps actual denial on
   assert.equal(w.document.getElementById('genericView').classList.contains('hidden'),false);
  }finally{dom.window.close();}
 });
+
 

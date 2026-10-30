@@ -28,7 +28,9 @@ public sealed class WorkDayRosterJourneyTests
         var workflow=new WorkflowStore(db,new JobAccessService(db),new WorkspaceAccessService(db),new UnusedPublisher(),new ConfigurationBuilder().Build());
         ClaimsPrincipal Actor(string name)=>new(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier,name),new Claim(ClaimTypes.Role,"Administrator")],"Test"));
         var manager=Actor("manager");var owner=Actor("owner");
-        Execute("select set_config('studio.connected_command','true',false);update studio_jobs set status='Needs Assignment' where id=$1;select set_config('studio.connected_command','false',false)",context.Job);
+        Execute("select set_config('studio.connected_command','true',false)");
+        try { Execute("update studio_jobs set status='Needs Assignment' where id=$1",context.Job); }
+        finally { Execute("select set_config('studio.connected_command','false',false)"); }
         JsonElement Snapshot()=>WorkflowStore.Snapshot(c,null,context.Job);
         long Revision()=>Snapshot().GetProperty("revision").GetInt64();
         workflow.Execute(context.Job,new("owner",Revision(),Guid.NewGuid(),UserName:"owner"),manager);
@@ -71,3 +73,4 @@ public sealed class WorkDayRosterJourneyTests
     private sealed class UnusedPublisher:IClientGalleryPublisher
     {public Task<ClientGalleryPublication> PublishAsync(ClientGalleryPublishRequest request,CancellationToken token)=>throw new InvalidOperationException("This journey does not publish galleries.");}
 }
+

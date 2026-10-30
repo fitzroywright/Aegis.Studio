@@ -30,7 +30,8 @@ public sealed class WorkDayFieldSyncTests
     public void TwoAssignmentsShareRosterRevisionAndCannotOverwriteEachOther()
     {
         using var context=new IntegratedWorkflowTests.WorkflowContext();var c=context.Connection;var workday=new WorkDayStore(context.Database);workday.EnsureSchema();
-        using(var q=new NpgsqlCommand("update studio_jobs set status='Scheduled' where id=$1;create function studio_workflow_notify(uuid,text,text,text,text) returns void language plpgsql as 'begin return; end';",c)){q.Parameters.AddWithValue(context.Job);q.ExecuteNonQuery();}
+        using(var q=new NpgsqlCommand("update studio_jobs set status='Scheduled' where id=$1",c)){q.Parameters.AddWithValue(context.Job);q.ExecuteNonQuery();}
+        using(var q=new NpgsqlCommand("create function studio_workflow_notify(uuid,text,text,text,text) returns void language plpgsql as 'begin return; end';",c))q.ExecuteNonQuery();
         var profile=new PhotographerStore(context.Database).Save(new("a","Photographer A","Employee",true,[],null));
         var scheduler=new ScheduleStore(context.Database,new ConfigurationBuilder().Build());var start=DateTimeOffset.UtcNow.AddDays(1);
         var first=scheduler.Create(new(context.Job,null,"First",start,start.AddHours(1),"Studio","Scheduled",null,[profile.ScheduleResourceId]));
@@ -80,3 +81,4 @@ public sealed class WorkDayFieldSyncTests
         object? Scalar(string sql,params object[] values){using var q=new NpgsqlCommand(sql,c);foreach(var v in values)q.Parameters.AddWithValue(v);return q.ExecuteScalar();}
     }
 }
+

@@ -14,8 +14,8 @@ async function environment(t,full=false,url='https://studio.test/'){
  return {ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body),headers:{get:()=>null}};
  };
  if(!full)w.studioOpenJobs=async()=>{};
- const scripts=full?[...w.document.querySelectorAll('script[src]')].map(el=>new URL(el.src).pathname.slice(1)):['studio-message-card.js','app.js','workspace-access.js','attachments.js','auth.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js'];
- for(const script of scripts)require('vm').runInContext(fs.readFileSync(path.join(root,script),'utf8'),dom.getInternalVMContext());
+ const scripts=full?[...w.document.querySelectorAll('script[src]')].map(el=>new URL(el.src).pathname.slice(1)):['studio-page.js','studio-message-card.js','app.js','workspace-access.js','attachments.js','auth.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js'];
+ for(const script of scripts)require('vm').runInContext(require('./studio-script-fixture.cjs')(script),dom.getInternalVMContext());
  await new Promise(r=>setTimeout(r,0));if(full)await w.studioTodayReady;await w.loadWorkspaces();return {w,calls,alerts,spaces};
 }
 test('navigation remains usable after applying independent rail state',async t=>{const {w}=await environment(t,true);await w.studioNavigate('jobs');assert.equal(w.document.body.dataset.studioView,'jobs');assert.doesNotMatch(w.document.getElementById('genericView').textContent,/Maximum call stack size exceeded/);});
@@ -71,3 +71,4 @@ test('refresh at a Job Details URL restores that job without routing through Tod
 
 test('Jobs and Today status filters follow workflow event order',async t=>{const {w}=await environment(t,true);let control=w.document.querySelector('[data-mw-job-status]');let values=Array.from(control.options,o=>o.value).filter(Boolean);assert.deepEqual(values,Array.from(w.StudioStatusOrder.sort(values)));await w.studioNavigate('jobs');control=w.document.querySelector('[data-sj-status]');values=Array.from(control.options,o=>o.value).filter(Boolean);assert.deepEqual(values,Array.from(w.StudioStatusOrder.sort(values)));});
 test('shared and Front Desk popups place functional Close controls beside the title',async t=>{const {w}=await environment(t,true);const shared=w.studioDialog('Assignments & Workflow','<p>Details</p>');const close=shared.querySelector('[data-close]');assert.equal(close.parentElement,shared.querySelector('.studio-dialog-heading'));assert.equal(close.previousElementSibling.tagName,'H2');close.click();assert.equal(shared.open,false);const front=w.frontDeskDialog('Booking','<p>Details</p>');assert.equal(front.querySelector('.studio-dialog-close').parentElement,front.querySelector('.studio-dialog-heading'));front.querySelector('.studio-dialog-close').click();assert.equal(front.open,false);});
+

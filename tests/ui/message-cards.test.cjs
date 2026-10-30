@@ -8,7 +8,7 @@ async function full(t){
  w.alert=message=>{throw Error(message);};w.confirm=()=>false;w.CSS={escape:v=>String(v)};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};w.HTMLElement.prototype.scrollIntoView=function(){};
  w.fetch=async url=>{const u=new URL(url,'https://studio.test'),body=api(u);return {ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body),headers:{get:()=>null}};};
- for(const script of w.document.querySelectorAll('script[src]'))require('node:vm').runInContext(fs.readFileSync(path.join(root,new URL(script.src).pathname),'utf8'),dom.getInternalVMContext());
+ for(const script of w.document.querySelectorAll('script[src]'))require('node:vm').runInContext(require('./studio-script-fixture.cjs')(new URL(script.src).pathname),dom.getInternalVMContext());
  await settle();await w.studioTodayReady;return w;
 }
 function checkBottom(w,railSelector){
@@ -62,3 +62,4 @@ test('message card and rail styles contain valid declarations and no duplicate p
   visit(ast.children);
  }
 });
+

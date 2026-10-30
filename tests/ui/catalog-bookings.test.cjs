@@ -23,7 +23,7 @@ test('booking settings still deny non-administrators before requesting the catal
 });
 test('old Booking Sessions bookmarks and browser back restore the catalog booking tab',async t=>{
  const {w}=setup(t,'https://studio.test/#studio=booking-sessions');w.StudioClients={render:async()=>{},invalidate(){}};w.eval(read('studio-navigation.js'));w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await settle();assert.equal(w.document.body.dataset.studioView,'catalog');assert.equal(w.history.state.studioCatalogTab,'booking-sessions');assert.equal(w.document.querySelector('[data-catalog-panel="booking-sessions"]').hidden,false);
- await w.studioNavigate('clients');w.history.back();await new Promise(resolve=>setTimeout(resolve,35));assert.equal(w.document.body.dataset.studioView,'catalog');assert.equal(w.history.state.studioCatalogTab,'booking-sessions');assert.equal(w.document.querySelector('[data-catalog-panel="booking-sessions"]').hidden,false);
+ await w.studioNavigate('clients');const restored=new Promise(resolve=>w.addEventListener('popstate',resolve,{once:true}));w.history.back();await restored;await new Promise(resolve=>setImmediate(resolve));assert.equal(w.document.body.dataset.studioView,'catalog');assert.equal(w.history.state.studioCatalogTab,'booking-sessions');assert.equal(w.document.querySelector('[data-catalog-panel="booking-sessions"]').hidden,false);
 });
 test('approved catalog layout has one tab strip, real hours and an inline editor',async t=>{
  const {w,fixture}=setup(t);await w.showCommercialCatalog();
@@ -38,3 +38,4 @@ test('approved catalog layout has one tab strip, real hours and an inline editor
  w.document.querySelector('[data-catalog-tab="products"]').click();await settle();assert.equal(w.document.querySelector('[data-catalog-panel="products"]').hidden,false);
  assert.equal(fixture.calls.filter(call=>call.url==='/api/admin/public-booking/session-types/').length,1);
 });
+

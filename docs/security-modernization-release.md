@@ -1,5 +1,13 @@
 # Security modernization candidate — deployment gate closed
 
+## Continuation checks
+
+The follow-up removes the obsolete gallery wrapper around the deleted workspace row renderer. A full-script startup regression now exercises the actual index script order, the embedded Session Plan editor mapping, and navigation to Staff & Roles. The targeted provisioning, shell ownership and startup tests pass (14 tests, zero failures/skips) under Node 24 in the editing workspace. Five catalog/booking tests also pass after replacing a fixed history timer with the actual browser history event. This is not a Mac application build or live-provider acceptance.
+
+The broader local run recorded 357 passing and 109 failing tests, with zero skipped. Three previously failing navigation/popup cases passed; one previously passing browser-history case failed under concurrent load and was then corrected and passed in the targeted catalog run. The final catalog timing and message-card script-loader adjustments have not received another full-suite run. Existing removed-page/stylesheet expectations and behavioral failures remain unresolved. Do not treat the targeted checks as a passing application regression suite.
+
+Database test corrections split positional-parameter setup commands, use the current incoming Internet Message ID column, and supply the preview worker's required processing lease. The unsupported-image case uses a non-image `.bin` original because Camera RAW now has a supported decoder path. These .NET changes have not been compiled or executed in the editing workspace, which has no .NET SDK. Rerun the PostgreSQL-enabled application suite on the Mac before treating any database failure as resolved. Broad UI regressions remain blocking; no assertions have been skipped or weakened to waive them.
+
 This is a coordinated source candidate, not an approved production rollout. `security-baseline.json` pins every shared library; no application may substitute a floating Common.Security checkout or overwrite shared running binaries. Build in an isolated output directory and deploy a complete application bundle independently.
 
 ## Build and evidence
@@ -28,3 +36,4 @@ Configure optional Entra through `Authentication:Entra`, the existing Common.Sec
 Run Studio's PostgreSQL persistence tests, UI ownership and behavioral tests, real AD/Entra login and the Staff & Roles approval/revocation matrix. Existing UI test failures must be reconciled against the current approved UI before release; do not change unrelated production screens to satisfy stale fixtures.
 
 Global role and directory-group changes, workspace membership and job membership writes use the shared security transaction for their existing Studio tables, account session-version change and security audit. Staff aliases resolve within the approved account directory; unenrolled metadata records cannot acquire operational roles through an alias match. Rehearse the approved account import before enabling these administration endpoints.
+

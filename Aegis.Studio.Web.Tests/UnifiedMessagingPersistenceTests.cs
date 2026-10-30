@@ -124,7 +124,7 @@ public sealed class UnifiedMessagingPersistenceTests
         using var q=new NpgsqlCommand("""
             select count(distinct thread_id),count(*)
             from studio_inapp_messages
-            where external_message_id=any($1)
+            where internet_message_id=any($1)
             """,c);
         q.Parameters.AddWithValue(new[] { first.MessageId, second.MessageId });
         using var r=q.ExecuteReader();Assert.True(r.Read());
@@ -246,4 +246,5 @@ public sealed class UnifiedMessagingPersistenceTests
         }
     }
 }
+
 
