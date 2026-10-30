@@ -68,9 +68,11 @@ jobs:
           dotnet test Aegis.Studio.Domain.Tests/Aegis.Studio.Domain.Tests.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common" --logger trx --results-directory TestResults
           dotnet test Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj -c Release -p:CommonRoot="$GITHUB_WORKSPACE/Common" --logger trx --results-directory TestResults
       - uses: actions/setup-node@v4
+        if: always()
         with:
           node-version: 24
       - name: Studio UI regressions
+        if: always()
         working-directory: Aegis.Studio/tests/ui
         run: npm ci && npm test
       - name: Reject skipped or empty test evidence
