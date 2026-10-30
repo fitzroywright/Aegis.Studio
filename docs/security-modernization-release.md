@@ -1,0 +1,28 @@
+# Security modernization candidate — deployment gate closed
+
+This is a coordinated source candidate, not an approved production rollout. `security-baseline.json` pins every shared library; no application may substitute a floating Common.Security checkout or overwrite shared running binaries. Build in an isolated output directory and deploy a complete application bundle independently.
+
+## Build and evidence
+
+Run `python3 ../Common/Common.Security/scripts/verify-source-baseline.py security-baseline.json --common-root ../Common` before building. Run the existing application tests and the coordinated security workflow. Failed, skipped, missing or empty results block release. The workflow uses disposable PostgreSQL 16 and cannot replace live provider or operational acceptance.
+
+## Data and identity preparation
+
+1. Capture the currently deployed application package, protected configuration, database backup, key rings, plugin versions and credential-store references. Verify a restore into an isolated environment before any production write.
+2. Review an owner-only approved account manifest. Preserve each existing account ID and login alias. Resolve immutable AD domain/user GUIDs or Entra tenant/object IDs through an authorized directory administrator. Email and usernames do not authorize bindings. No production identity import has been executed by this change.
+3. Rehearse the additive common schema and approved imports on a representative restored database. Verify account counts, existing business references, role assignments and security audit. New staff/operators must remain Pending Access until explicitly approved.
+4. Keep at least two approved administrators. Test login, disabling, linking/unlinking, role removal and session revocation before enabling broader access. All pre-cutover human cookies require a fresh login to acquire a verified account/version binding.
+
+## Rollout and recovery
+
+Stage the complete candidate alongside the last known-good package. Keep each application's database and deployment independent. Run its acceptance matrix, verify protected configuration and backups, then cut over only that application. No deployment is authorized by a successful shared-library build alone.
+
+On a stop condition, stop the affected rollout and return traffic to the previous package. Preserve new business records and the additive security tables/audit. Do not restore a stale pre-cutover database after new writes; reconcile identity changes forward or recover current business writes into a restored copy before an explicitly approved restore. Do not drop old identity history or business tables. Re-run smoke and security checks after recovery.
+
+## Required operational acceptance
+
+Use the existing **Staff & Roles** page for authentication source, explicit immutable binding, approval, role assignment, workspace membership, disabling and revocation. Existing staff aliases, operational role tables, workspace/job ownership and historical records are retained. The page has one renderer and login has one script owner. A profile-write failure retains the safe pending account and form details for retry without creating another security account.
+
+Configure optional Entra through `Authentication:Entra`, the existing Common.Secrets provider, and the registered callback. Local credentials and recovery use the shared account store. Development/demo mock identities require `IsolationConfirmed`, a server allowlist and an isolated database/storage/integration configuration; do not confirm isolation for a configuration pointing at production resources. Explicitly enroll/approve any demo operator and app roles; no default User/Admin role is created at login.
+
+Run Studio's PostgreSQL persistence tests, UI ownership and behavioral tests, real AD/Entra login and the Staff & Roles approval/revocation matrix. Existing UI test failures must be reconciled against the current approved UI before release; do not change unrelated production screens to satisfy stale fixtures.

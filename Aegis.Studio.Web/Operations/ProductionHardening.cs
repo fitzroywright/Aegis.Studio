@@ -214,7 +214,6 @@ public static class ProductionRequestPolicy
     {
         string path = request.Path.Value ?? string.Empty;
         if (path.StartsWith("/api/public/v1/", StringComparison.OrdinalIgnoreCase)) return new RateLimitPolicy("public-v1", request.Method=="GET"?300:30, TimeSpan.FromMinutes(1));
-        if (path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase)) return new RateLimitPolicy("auth-login", 10, TimeSpan.FromMinutes(1));
         if (request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase) && path.Equals("/api/bookings", StringComparison.OrdinalIgnoreCase)) return new RateLimitPolicy("public-booking", 20, TimeSpan.FromMinutes(1));
         if (request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase) && path.Contains("/payment-confirmations", StringComparison.OrdinalIgnoreCase)) return new RateLimitPolicy("payment-confirmation", 30, TimeSpan.FromMinutes(1));
         if (path.StartsWith("/public/galleries/", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/g/", StringComparison.OrdinalIgnoreCase)) return new RateLimitPolicy("public-gallery", 300, TimeSpan.FromMinutes(1));

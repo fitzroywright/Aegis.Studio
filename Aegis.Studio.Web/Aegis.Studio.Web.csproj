@@ -10,6 +10,7 @@
     <ProjectReference Include="../Aegis.Pos.Core/Aegis.Pos.Core.csproj" />
     <ProjectReference Include="../Aegis.Pos.DeviceClient/Aegis.Pos.DeviceClient.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.csproj" AdditionalProperties="Configuration=$(Configuration)" />
+    <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.Hosting\Common.Security.Hosting.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\Common.Security.Plugin.ActiveDirectory.csproj"
                       ReferenceOutputAssembly="false"
                       AdditionalProperties="Configuration=$(Configuration)" />

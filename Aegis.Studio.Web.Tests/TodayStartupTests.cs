@@ -50,7 +50,7 @@ public sealed class TodayStartupTests
             await new StudioFeatureDatabase(source).InitializeAsync();
             var roles = new GlobalOperationalRoleStore(database);
             roles.EnsureSchema();
-            roles.EnsureDefaultUserRole("staff");
+            roles.SaveMember(Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc002"), new Aegis.Studio.Web.Operations.GlobalOperationalRoleMemberRequest("staff", "Staff", true));
             var workspaces = new WorkspaceAccessService(database);
             var access = new JobAccessService(database);
             Guid permitted = Guid.NewGuid(), denied = Guid.NewGuid();

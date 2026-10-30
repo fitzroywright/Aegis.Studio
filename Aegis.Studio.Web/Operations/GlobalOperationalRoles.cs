@@ -149,21 +149,6 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         }
     }
 
-    public void EnsureDefaultUserRole(string userName, string? displayName = null)
-    {
-        if (string.IsNullOrWhiteSpace(userName))
-        {
-            return;
-        }
-
-        SaveMember(
-            UserRoleId,
-            new GlobalOperationalRoleMemberRequest(
-                userName.Trim(),
-                string.IsNullOrWhiteSpace(displayName) ? userName.Trim() : displayName.Trim(),
-                true));
-    }
-
     public bool HasRole(ClaimsPrincipal user, string role)
     {
         if (user.IsInRole(role)) return true;

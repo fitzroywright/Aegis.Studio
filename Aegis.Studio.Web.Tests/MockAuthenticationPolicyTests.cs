@@ -1,81 +1,34 @@
-using Xunit;
-using Aegis.Studio.Web.Authentication;
+using Common.Security.Authenticators;
+using Common.Security.Integration;
+using Common.Security.Models;
 using Microsoft.Extensions.Configuration;
+using Xunit;
 
 namespace Aegis.Studio.Web.Tests;
 
 public sealed class MockAuthenticationPolicyTests
 {
     [Fact]
-    public void IsEnabled_RequiresDevelopmentEnvironmentByDefault()
+    public void ServerConfigurationCannotEnableProductionMockThroughOldBypassSettings()
     {
-        IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["MockAuthentication:Enabled"] = "true"
-            })
-            .Build();
-
-        Assert.True(MockAuthenticationPolicy.IsEnabled(configuration, "Development"));
-        Assert.False(MockAuthenticationPolicy.IsEnabled(configuration, "Production"));
-        Assert.False(MockAuthenticationPolicy.IsEnabled(configuration, "Staging"));
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["MockAuthentication:Enabled"]="true", ["MockAuthentication:IsolationConfirmed"]="true",
+            ["MockAuthentication:AllowOutsideDevelopment"]="true",
+            ["MockAuthentication:Identities:0:LoginName"]="known", ["MockAuthentication:Identities:0:SubjectId"]="stable-subject"
+        }).Build();
+        var options = MockAuthenticationConfiguration.Read(configuration.GetSection("MockAuthentication"), "Production", "Aegis.Studio");
+        Assert.Equal(AuthenticationFailure.Prohibited, new MockAuthenticator(options).Authenticate("known", "").Failure);
     }
 
     [Fact]
-    public void IsEnabled_AllowsExplicitOutsideDevelopmentOptIn()
+    public void EmptyServerIdentityConfigurationCannotImpersonateARequestedAdministrator()
     {
-        IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["MockAuthentication:Enabled"] = "true",
-                ["MockAuthentication:AllowOutsideDevelopment"] = "true"
-            })
-            .Build();
-
-        Assert.True(MockAuthenticationPolicy.IsEnabled(configuration, "Production"));
-        Assert.True(MockAuthenticationPolicy.IsEnabled(configuration, "Staging"));
-    }
-
-    [Fact]
-    public void CreateIdentity_UsesConfiguredDevelopmentIdentity()
-    {
-        IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["MockAuthentication:UserName"] = "studio.admin",
-                ["MockAuthentication:DisplayName"] = "Studio Administrator",
-                ["MockAuthentication:Email"] = "studio.admin@localhost",
-                ["MockAuthentication:Department"] = "Studio",
-                ["MockAuthentication:Title"] = "Development Administrator",
-                ["MockAuthentication:Groups:0"] = "Domain Admins"
-            })
-            .Build();
-
-        MockAuthenticationIdentity identity = MockAuthenticationPolicy.CreateIdentity(
-            configuration,
-            "ignored-user",
-            ["Administrators"]);
-
-        Assert.Equal("studio.admin", identity.UserName);
-        Assert.Equal("Studio Administrator", identity.DisplayName);
-        Assert.Equal("studio.admin@localhost", identity.Email);
-        Assert.Equal("Studio", identity.Department);
-        Assert.Equal("Development Administrator", identity.Title);
-        Assert.Contains("Domain Admins", identity.GroupNames);
-    }
-
-    [Fact]
-    public void CreateIdentity_FallsBackToAdministrativeGroups()
-    {
-        IConfiguration configuration = new ConfigurationBuilder().Build();
-
-        MockAuthenticationIdentity identity = MockAuthenticationPolicy.CreateIdentity(
-            configuration,
-            "developer",
-            ["Domain Admins", "Administrators"]);
-
-        Assert.Equal("developer", identity.UserName);
-        Assert.Contains("Domain Admins", identity.GroupNames);
-        Assert.Contains("Administrators", identity.GroupNames);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>
+        {
+            ["MockAuthentication:Enabled"]="true",["MockAuthentication:IsolationConfirmed"]="true"
+        }).Build();
+        var options = MockAuthenticationConfiguration.Read(configuration.GetSection("MockAuthentication"), "Development", "Aegis.Studio");
+        Assert.False(new MockAuthenticator(options).Authenticate("administrator", "").IsAuthenticated);
     }
 }
