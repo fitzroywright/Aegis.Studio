@@ -195,6 +195,7 @@ public sealed class IntegratedWorkflowTests
     {
         using var context=new WorkflowContext();
         var db=context.Database;var job=context.Job;
+        Sql(context.Connection,"create table studio_workflow_sessions(id uuid primary key,shoot_id uuid); create table studio_workflow_crew(session_id uuid not null references studio_workflow_sessions(id),user_name text not null)");
         var photographers=new PhotographerStore(db);photographers.Save(new("a","Photographer A","Employee",true,[],null));photographers.Save(new("b","Photographer B","Employee",true,[],null));
         Sql(context.Connection,"create table studio_job_owner_assignments(id uuid primary key,status text);alter table studio_jobs add column owner_assignment_id uuid;insert into studio_job_owner_assignments values($1,'Accepted');update studio_jobs set owner_assignment_id=$1,status='Scheduled' where id=$2",Guid.NewGuid(),job);
         var scheduler=new WorkDaySchedulingService(db,photographers);var starts=DateTimeOffset.UtcNow.AddDays(5);
@@ -262,6 +263,7 @@ public sealed class IntegratedWorkflowTests
             {
                 Database.InitializeAsync().GetAwaiter().GetResult();new StudioFeatureDatabase(source).InitializeAsync().GetAwaiter().GetResult();
                 new WorkspaceJobStore(Database).EnsureSchema();new StudioClientStore(Database).Migrate();new ScheduleStore(Database,new ConfigurationBuilder().Build()).EnsureOperationalSchema();
+                ExternalBookingResourceHolds.EnsureSchema(Database);
                 // This isolated store fixture does not enable connected-workflow triggers.
                 // Include columns read by current scheduling and booking stores.
                 Sql(Connection,"alter table studio_schedule_entry_resources add column if not exists attendance_start_utc timestamptz; alter table studio_schedule_entry_resources add column if not exists attendance_end_utc timestamptz; alter table studio_conversations add column if not exists intake_reference text");
