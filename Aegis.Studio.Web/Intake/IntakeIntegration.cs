@@ -24,6 +24,7 @@ public sealed class PublicSiteClient : IDisposable
     readonly HttpClient http;readonly Uri root;
     public PublicSiteClient(IConfiguration config,HttpMessageHandler? handler=null)
     {
+        DemoIntegrationIsolation.RequireExternalIntegrations(config);
         root=new Uri(config["PublicSite:BaseUrl"]??throw new InvalidOperationException("Configure PublicSite:BaseUrl."));
         if(root.Scheme!="https"||!string.IsNullOrEmpty(root.UserInfo)||root.AbsolutePath!="/")throw new InvalidOperationException("PublicSite:BaseUrl must be an HTTPS origin.");
         http=new HttpClient(handler??new HttpClientHandler{AllowAutoRedirect=false}){BaseAddress=root,Timeout=TimeSpan.FromSeconds(45)};

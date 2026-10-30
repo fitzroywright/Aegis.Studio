@@ -25,7 +25,6 @@ public static class PosHardeningEndpoints
         });
         services.AddSingleton<AccountingStore>();
         services.AddStudioEngineeringDiagnostics();
-        services.AddHostedService<ConfigurationContractPublisher>();
         return services;
     }
 

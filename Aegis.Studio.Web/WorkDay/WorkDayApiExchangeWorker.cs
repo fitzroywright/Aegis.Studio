@@ -35,6 +35,7 @@ public sealed class WorkDayApiExchangeWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (Aegis.Studio.Web.Operations.DemoIntegrationIsolation.Enabled(configuration)) return;
         string? key=configuration["WorkDay:ApiSyncKey"];
         if(string.IsNullOrWhiteSpace(key))
         {

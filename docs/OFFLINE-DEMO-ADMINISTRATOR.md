@@ -88,3 +88,30 @@ Administrator access, Pending Access denial, ordinary roles, revocation,
 logout/relogin, Front Desk, scheduling, Job Details, gallery metadata and Session
 Plan. This does not verify real AD/Entra/social providers or production readiness.
 Private installation details and protected backup evidence remain local.
+
+## Isolated Demo runtime and reviewed target
+
+A Demo host using mock sign-in also requires
+`Demo:IsolateExternalIntegrations=true`. Production mock sign-in remains
+prohibited. The Demo policy pauses external delivery/ingestion, public-site and
+WorkDay exchanges, webhooks, accounting export and control-plane publishing.
+It retains protected credential values, database/storage configuration and queued
+work. Request-driven named clients and the Public Site client also fail before
+transport. Internal Studio work and its selected Demo database/storage continue.
+No optional AD/Entra provider is enabled by this profile.
+
+`maintenance version` reports the package informational version without loading
+application configuration or secrets. The bootstrap command optionally accepts
+`--expected-database REVIEWED_JSON`; this nonsecret identity contains `name`,
+`schema`, `serverAddress` and `port`. It must match the resolved PostgreSQL
+connection before any account/schema writes. Plan/apply output reports that
+identity without a connection string or credential. The reviewed deployment hook
+always supplies this guard. PostgreSQL addresses are normalized without network
+masks, and a real PostgreSQL regression covers that comparison.
+
+The complete pinned solution passes 486 Web and 3 Domain tests locally, without
+failures/skips, including the Demo-isolation and database-identity regressions.
+The connected restored-database rehearsal verifies both real administrator
+applies before startup and rejection of a deliberately different database before
+security-table/account writes. Service-manager calls are simulated on the Mac;
+actual Linux systemd execution remains part of the authorized cutover.
