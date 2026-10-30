@@ -28,29 +28,32 @@ window.StudioWorkspaceManagement={async render(){
 
   }));
   genericView.querySelectorAll('[data-cover-editable="true"]').forEach(slot=>{
-   slot.tabIndex=0;slot.setAttribute('role','button');slot.setAttribute('aria-label','Double-click to change workspace image');
-   const open=()=>{
-    const id=slot.dataset.workspacePhoto,workspace=visible.find(item=>String(item.workspace.id)===id)?.workspace;
-    if(!workspace)return;
-    const dialog=studioDialog('Change image — '+workspace.name,'<form class="workspace-cover-form"><label>Choose a JPEG, PNG or WebP image (maximum 2 MB)<input type="file" accept="image/jpeg,image/png,image/webp" required></label><img alt="Image preview" style="display:none;max-width:100%;max-height:240px;object-fit:contain"><p role="alert"></p><div class="dialog-actions"><button type="button" class="action" data-cancel>Cancel</button><button type="submit" class="primary">Save image</button></div></form>');
-    const form=dialog.querySelector('form'),input=form.querySelector('input'),preview=form.querySelector('img'),error=form.querySelector('[role=alert]');let url=null;
-    const cleanup=()=>{if(url)URL.revokeObjectURL(url);};dialog.addEventListener('close',cleanup,{once:true});
-    form.querySelector('[data-cancel]').onclick=()=>dialog.close();
-    input.onchange=()=>{if(url)URL.revokeObjectURL(url);const file=input.files[0];url=file?URL.createObjectURL(file):null;preview.style.display=url?'block':'none';if(url)preview.src=url;};
-    form.onsubmit=async event=>{
-     event.preventDefault();const file=input.files[0];if(!file)return;
-     if(file.size>2*1024*1024||!['image/jpeg','image/png','image/webp'].includes(file.type)){error.textContent='Choose a JPEG, PNG or WebP smaller than 2 MB.';return;}
-     const save=form.querySelector('[type=submit]');save.disabled=true;error.textContent='';
-     try{
-      const data=new FormData();data.append('image',file);
-      const response=await fetch('/api/workspaces/'+encodeURIComponent(id)+'/cover',{method:'PUT',body:data,credentials:'same-origin'});
-      if(!response.ok){const detail=await response.json().catch(()=>({}));throw Error(detail.error||'Image could not be saved.');}
-      const image=document.createElement('img');image.alt='';image.src='/api/workspaces/'+encodeURIComponent(id)+'/cover?v='+Date.now();slot.replaceChildren(image);slot.dataset.savedCover='true';dialog.close();
-     }catch(cause){error.textContent=cause.message;save.disabled=false;}
-    };
-   };
+   slot.tabIndex=0;
+   slot.setAttribute('role','button');
+   slot.setAttribute('aria-label','Double-click to change workspace image');
+   const input=document.createElement('input');
+   input.type='file';input.accept='image/jpeg,image/png,image/webp';
+   input.hidden=true;
+   slot.appendChild(input);
+   const open=()=>input.click();
    slot.addEventListener('dblclick',open);
    slot.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();open();}});
+   input.addEventListener('click',event=>event.stopPropagation());
+   input.addEventListener('change',async ()=>{
+    const file=input.files?.[0];if(!file)return;
+    const id=slot.dataset.workspacePhoto;
+    if(file.size>2*1024*1024||!['image/jpeg','image/png','image/webp'].includes(file.type)){
+     window.alert('Choose a JPEG, PNG or WebP smaller than 2 MB.');input.value='';return;
+    }
+    const data=new FormData();data.append('image',file);
+    try{
+     const response=await fetch('/api/workspaces/'+encodeURIComponent(id)+'/cover',{method:'PUT',body:data,credentials:'same-origin'});
+     if(!response.ok){const detail=await response.json().catch(()=>({}));throw Error(detail.error||'Image could not be saved.');}
+     const image=document.createElement('img');image.alt='';image.src='/api/workspaces/'+encodeURIComponent(id)+'/cover?v='+Date.now();
+     slot.querySelector('img')?.remove();slot.prepend(image);slot.dataset.savedCover='true';
+    }catch(error){window.alert(error.message||'Image could not be saved.');}
+    finally{input.value='';}
+   });
   });
   void hydrateWorkspaceManagers(visible);
   // Saved covers take precedence over automatically selected job thumbnails.
