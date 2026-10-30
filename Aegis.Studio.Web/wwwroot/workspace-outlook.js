@@ -166,7 +166,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     <div id="jobIdentityMenu" class="jd-job-identity-menu" role="region" aria-label="Job details" hidden>
                         <dl>
                             <div><dt>Current Status</dt><dd><span class="jd-status-pill jd-status-label">${esc(job.status)}</span></dd></div>
-                            <div><dt>Days in Stage</dt><dd data-stage-age>Loading…</dd></div>
+                            <div><dt>Time in Stage</dt><dd data-stage-age>Loading…</dd></div>
                             <div><dt>Client</dt><dd>${esc(clientName)}</dd></div>
                             <div><dt>Owner</dt><dd data-job-owner>${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</dd></div>
                             <div><dt>Job Type</dt><dd>${esc(jobType)}</dd></div>
@@ -222,7 +222,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 messageDialog.querySelector('.studio-dialog-body').append(messageCard);
                 messageDialog.addEventListener('close',()=>{messageDialog=null;if(current()&&trigger?.isConnected)trigger.focus();},{once:true});
             };
-            window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Status</span><strong>${esc(job.status || 'Not set')}</strong></div><div class="workspace-summary-row"><span>Days in Stage</span><strong data-job-overview-age>Loading…</strong></div><div class="workspace-summary-row"><span>Next Action</span><strong data-job-overview-action>Loading…</strong></div></section>`,'job-detail');
+            window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Status</span><strong>${esc(job.status || 'Not set')}</strong></div><div class="workspace-summary-row"><span>Time in Stage</span><strong data-job-overview-age>Loading…</strong></div><div class="workspace-summary-row"><span>Next Action</span><strong data-job-overview-action>Loading…</strong></div></section>`,'job-detail');
             window.studioShellMountAttention?.(attention,'job-detail');
             const brief=document.createElement('section');brief.className='jd-job-brief';center.prepend(brief);
             board.append(center);detailPane.append(board);
@@ -324,18 +324,26 @@ function mergeJobMessages(teamMessages, clientMessages) {
             messageHeader.querySelector('[data-message-search]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');const term=prompt('Search this conversation');if(term===null)return;messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));};
             messageHeader.querySelector('[data-message-more]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();};
 
-            let workflow=null,workflowRequest=0;
+            let workflow=null,workflowRequest=0,stageTiming=null,timingRequest=0;
             const updateAge=()=>{
                 const action=window.StudioJobDetails.workflowAction(workflow);
-                const started=Date.parse(action?.task?.startedAtUtc||action?.task?.startedAt||'');
-                header.querySelector('[data-stage-age]').textContent=Number.isFinite(started)?'In workflow: '+Math.floor(Math.max(0,Date.now()-started)/86400000)+' days':'Timing unavailable';
-                const age=document.querySelector('#studioPageContext [data-job-overview-age]');
-                if(age)age.textContent=header.querySelector('[data-stage-age]').textContent;
+                header.querySelector('[data-stage-age]').textContent=stageTiming===null?'Loading…':StudioJobDetails.stageAge(stageTiming);
+                document.querySelectorAll('[data-job-overview-age]').forEach(age=>age.textContent=header.querySelector('[data-stage-age]').textContent);
                 const next=document.querySelector('#studioPageContext [data-job-overview-action]');
                 if(next)next.textContent=action?.task?.title || 'No outstanding action';
             };
+            const refreshTiming=async()=>{
+                const request=++timingRequest,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
+                try{
+                    const snapshot=await json('/api/jobs/'+job.id+'/connected-workflow',{signal:controller.signal});
+                    if(!current()||request!==timingRequest)return;
+                    stageTiming=snapshot||{};updateAge();
+                }catch(error){if(current()&&request===timingRequest){stageTiming={};updateAge();}}
+                finally{clearTimeout(timeout);}
+            };
             const openGraphAction=nodeId=>{const task=workflow?.tasks?.find(item=>item.nodeId===nodeId);window.StudioJobGraph.launchTask(job.id,task?.id).catch(error=>console.error('[Studio Job Details] Could not launch next action',error));};
             const refreshWorkflow=async()=>{
+                void refreshTiming();
                 const request=++workflowRequest;
                 const controller=new AbortController();
                 const timeout=setTimeout(()=>controller.abort(),20000);
@@ -369,10 +377,8 @@ function mergeJobMessages(teamMessages, clientMessages) {
                         const message=error?.name==='AbortError'?'Workflow request timed out after 20 seconds.':error?.message||String(error);
                         console.error('[Studio Job Details] Failed to load workflow graph for job '+job.id,error);
                         header.querySelector('.jd-next-action').replaceChildren();
-                        header.querySelector('[data-stage-age]').textContent='Workflow unavailable';
+                        updateAge();
                         const overview=document.getElementById('studioPageContext');
-                        const age=overview?.querySelector('[data-job-overview-age]');
-                        if(age)age.textContent='Timing unavailable';
                         const next=overview?.querySelector('[data-job-overview-action]');
                         if(next)next.textContent='Workflow unavailable';
                         attention.dataset.attentionCount='1';
@@ -393,7 +399,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             const navigationObserver=new MutationObserver(()=>{if(document.body.dataset.studioView!=='workspaces'){disposeJobView();disposeJobView=()=>{};}});
             navigationObserver.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});
             disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);taskDialog?.close();messageDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);drawerViews.forEach(view=>{view.drawer.remove();view.toggle?.removeAttribute('aria-expanded');view.toggle?.removeAttribute('aria-controls');});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
-            const graphChanged=event=>{if(event.detail?.jobId===job.id&&current())refreshWorkflow();};document.addEventListener('studio-workflow-changed',graphChanged);const previousDispose=disposeJobView;disposeJobView=()=>{document.removeEventListener('studio-workflow-changed',graphChanged);previousDispose();};
+            const graphChanged=event=>{if(event.detail?.jobId===job.id&&current())refreshWorkflow();};window.addEventListener('studio-workflow-changed',graphChanged,true);const previousDispose=disposeJobView;disposeJobView=()=>{window.removeEventListener('studio-workflow-changed',graphChanged,true);previousDispose();};
             detailPane.dataset.readyEnabled='true';refreshWorkflow();refreshLocation();selectPanel('media');
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
         } else {
@@ -438,16 +444,3 @@ function mergeJobMessages(teamMessages, clientMessages) {
 
     }
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-

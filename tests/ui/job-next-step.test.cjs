@@ -50,7 +50,7 @@ test('Job Details uses one display workflow and its next action opens the assign
  w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML='<div class="studio-dialog-body">'+html+'</div>';d.close=()=>d.remove();w.document.body.append(d);return d;};
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,40));
  const next=w.document.querySelector('.job-detail-heading [data-next-action]');assert.ok(next);assert.match(next.textContent,/Production/);
- assert.ok(fixture.calls.some(c=>c.url.endsWith('/workflow-graph')));assert.equal(fixture.calls.some(c=>c.url.endsWith('/connected-workflow')),false);
+ assert.ok(fixture.calls.some(c=>c.url.endsWith('/workflow-graph')));assert.equal(fixture.calls.some(c=>c.url.endsWith('/connected-workflow')),true);
  next.click();await new Promise(r=>setTimeout(r,20));assert.match(w.document.querySelector('dialog:not([id])').textContent,/Production/);
  assert.equal(w.document.querySelectorAll('.job-detail-workflow-dialog').length,0);
 });

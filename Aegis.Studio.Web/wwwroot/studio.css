@@ -8845,7 +8845,7 @@ body .shell>.studio-shell-footer {
   padding: 0 12px;
   border: 0;
   border-radius: 0;
-  background: #76543d;
+  background: linear-gradient(90deg,rgba(42,21,12,.86),rgba(53,27,12,.43) 48%,rgba(34,17,10,.86)),url('/assets/aegis-studio-login-background.png') center 48%/cover no-repeat;
   color: #fff;
   box-sizing: border-box;
   z-index: 10;
@@ -9411,4 +9411,3 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 }
 @media(max-width:800px) { .company-dashboard { height:auto; grid-template-rows:auto; } .cd-main,.cd-bottom { grid-template-columns:minmax(0,1fr); } .cd-donut { max-height:none; width:140px; } .cd-week-chart { min-height:180px; } .cd-bottom .cd-card { overflow-x:auto; } .cd-card table { min-width:460px; } }
 @media(max-width:650px) { .cd-heading { align-items:stretch; } .cd-heading>div:first-child { flex-basis:100%; } .cd-card { padding:8px; } }
-

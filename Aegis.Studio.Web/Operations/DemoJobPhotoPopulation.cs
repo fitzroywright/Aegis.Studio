@@ -13,7 +13,7 @@ internal static class DemoJobPhotoPopulation
     {
         using var connection=database.OpenConnection();
         var jobs=new List<(Guid Id,string Title)>();
-        using(var query=new NpgsqlCommand("select id,title from studio_jobs where id::text like 'de000000-%' or id::text like 'de100000-%' order by id",connection))
+        using(var query=new NpgsqlCommand("select id,title from studio_jobs j where id::text like 'de000000-%' or id::text like 'de100000-%' or exists(select 1 from studio_frontdesk_requests r where r.job_id=j.id and r.created_by='demo-seed') order by id",connection))
         using(var reader=query.ExecuteReader())while(reader.Read())jobs.Add((reader.GetGuid(0),reader.GetString(1)));
         var versions=new PrefixedFileStorage(storage,"VersionStore");
         for(int ordinal=0;ordinal<jobs.Count;ordinal++)
@@ -40,8 +40,8 @@ internal static class DemoJobPhotoPopulation
                 DemoDataExpansion.AddImage(connection,transaction,versions,job,key,Id(job,key+"/version"),1,photo,null,login,searchTerm:title);
                 Guid asset=Id(job,key+"/asset");
                 Execute(connection,transaction,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status) values($1,$2,$2,$3,'Needs Sorting') on conflict(job_id,asset_key) do nothing",asset,job,key);
-                Execute(connection,transaction,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,'Unclassified') on conflict do nothing",job,key);
-                Execute(connection,transaction,"insert into studio_media_asset_subjects(asset_id,subject_id) select $1,id from studio_job_subjects where job_id=$2 and not is_system order by id limit 1 on conflict do nothing",asset,job);
+                Execute(connection,transaction,"insert into studio_media_asset_subjects(asset_id,subject_id) select $1,id from studio_job_subjects where job_id=$2 and not is_system order by id offset ($3 % greatest(1,(select count(*)::int from studio_job_subjects where job_id=$2 and not is_system))) limit 1 on conflict do nothing",asset,job,photo);
+                Execute(connection,transaction,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) select $1,$2,coalesce((select nullif(trim(s.collection_name),'') from studio_media_asset_subjects a join studio_job_subjects s on s.id=a.subject_id where a.asset_id=$3 order by s.id limit 1),'Unclassified') on conflict do nothing",job,key,asset);
             }
             transaction.Commit();
             report?.Invoke(new(96+3*(ordinal+1)/Math.Max(1,jobs.Count),"Photos for every job",ordinal+1,jobs.Count,$"Verified unique library photographs for job {ordinal+1}/{jobs.Count}."));

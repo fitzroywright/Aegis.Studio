@@ -20,7 +20,7 @@ test('Job identity opens an overlay and Tasks retains its own dialog without ret
  const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.equal(button(w,'overview'),null);assert.equal(w.document.getElementById('jobDetail-overview'),null);
  const toggle=w.document.querySelector('.jd-job-name-toggle'),facts=w.document.querySelector('#jobIdentityMenu');assert.equal(facts.hidden,true);toggle.click();assert.equal(facts.hidden,false);
- assert.deepEqual([...facts.querySelectorAll('dt')].map(e=>e.textContent),['Current Status','Days in Stage','Client','Owner','Job Type','Event Date','Location','Attending Job Role','Name of Worker']);assert.match(facts.textContent,/Williams & Clarke.*Photography.*Sun Oct 11 2026.*Kingston Studio/s);
+ assert.deepEqual([...facts.querySelectorAll('dt')].map(e=>e.textContent),['Current Status','Time in Stage','Client','Owner','Job Type','Event Date','Location','Attending Job Role','Name of Worker']);assert.match(facts.textContent,/Williams & Clarke.*Photography.*Sun Oct 11 2026.*Kingston Studio/s);
  facts.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(facts.hidden,true);
  await w.document.querySelector('[data-job-tasks]').onclick();const tasks=w.document.querySelector('.jd-tasks-dialog');assert.equal(tasks.open,true);assert.match(tasks.textContent,/Job tasks are managed in the configured workflow graph/);assert.ok(tasks.querySelector('[data-open-job-workflow]'));tasks.close();
  assert.equal(w.document.querySelector('#studioFooterJobTools'),null);
@@ -81,7 +81,7 @@ test('stale Subjects response cannot overwrite a subsequently opened job',async 
 test('Job Details displays one workflow and keeps its editor out of the page',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.equal(w.document.querySelectorAll('.jd-workflow-display').length,1);assert.ok(w.document.querySelector('[data-next-action]'));assert.equal(w.document.querySelector('.job-detail-workflow-dialog'),null);
- assert.equal(fixture.calls.some(c=>c.url.endsWith('/connected-workflow')),false);
+ assert.equal(fixture.calls.some(c=>c.url.endsWith('/connected-workflow')),true);
 });
 
 test('subject View Photos returns to Media and refreshes the subject filter',async t=>{

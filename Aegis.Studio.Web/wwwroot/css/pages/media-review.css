@@ -8,7 +8,7 @@
 .studio-media-heading h1{font-size:24px;line-height:1.15;margin:0}
 .studio-media-panel{min-width:0;min-height:0;border:1px solid var(--studio-grid-border);border-radius:6px;background:var(--studio-card-surface);overflow:hidden}
 .studio-media-panel h2{font-size:13px;line-height:1.25;margin:0}
-.studio-media-context{display:grid;grid-template-columns:minmax(120px,1fr) minmax(180px,1.4fr) minmax(140px,1fr) auto;align-items:end;gap:15px;padding:10px 14px;flex:none}
+.studio-media-context{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(140px,1fr) auto;align-items:end;gap:15px;padding:10px 14px;flex:none}
 .studio-media-context label,.studio-media-gallery-tools label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;min-width:0}
 .studio-media-context select,.studio-media-gallery-tools select,.studio-media-gallery-tools input,.studio-media-upload select{width:100%;min-width:0;max-width:100%;padding:6px 8px;border:1px solid var(--studio-control-border);border-radius:4px;background:var(--theme-surface);color:var(--theme-text);font-weight:400}
 .studio-media-context .ssp-wrap{min-width:0}
