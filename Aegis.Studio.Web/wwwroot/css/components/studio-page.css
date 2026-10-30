@@ -196,7 +196,7 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 /* Workspace accountability content; the shared shell continues to own the frame. */
 .workspace-management-page{background:#f5f7fa}
 .workspace-accountability-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:stretch}
-.workspace-accountability-card{position:relative;display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) 105px;grid-auto-rows:min-content;column-gap:8px;row-gap:4px;min-width:0;padding:7px;border:1px solid var(--workspace-card-accent,#b99750);border-radius:9px;background:#fff}
+.workspace-accountability-card{position:relative;display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) 105px;grid-template-rows:repeat(4,min-content) minmax(min-content,1fr) auto;column-gap:8px;row-gap:4px;min-width:0;padding:7px;border:1px solid var(--workspace-card-accent,#b99750);border-radius:9px;background:#fff}
 .workspace-card-heading{display:contents}
 .workspace-card-title-row{display:contents}
 .workspace-accountability-card .workspace-card-heading h2{--workspace-value-size:14px;margin:0;font-size:14px;min-height:0;min-width:0;max-width:100%}
