@@ -74,6 +74,7 @@ public class FullDemoRegenerationTests
         new GlobalOperationalRoleStore(ctx.Database).EnsureSchema();
         new StudioEmployeeDirectoryStore(ctx.Database).EnsureSchema();
         var storage=new LocalFileStorage(ctx.Root);
+        Sql(ctx.Connection,"insert into studio_employees(user_name,display_name,is_active,is_assignable) values('demo.jason','Preserved staff account',false,false)");
         using(var old=new MemoryStream([1,2,3]))await storage.StoreAsync(new("old-demo.txt",old,"text/plain","old-demo.txt","Admin"));
         Sql(ctx.Connection,"insert into studio_state(key,value,updated_at_utc) values('demo-job-workflow-graphs-v1','old',now()),('provider-contract','preserved',now())");
         string? previousPhotoRoot=Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS");
@@ -82,7 +83,7 @@ public class FullDemoRegenerationTests
         foreach(string category in new[]{"people","wedding","graduation","family","sports","product"})
         {
             string directory=Path.Combine(photoRoot,category);Directory.CreateDirectory(directory);
-            await File.WriteAllBytesAsync(Path.Combine(directory,"fixture.jpg"),photo);
+            for(int i=0;i<4;i++)await File.WriteAllBytesAsync(Path.Combine(directory,$"fixture-{i}.jpg"),photo);
         }
         Environment.SetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS",photoRoot);
         try
@@ -113,12 +114,25 @@ public class FullDemoRegenerationTests
             Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_jobs j where (select count(*) from studio_media_assets m where m.job_id=j.id)<1"));
             int assetCount=Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_media_assets"));
             Assert.True(assetCount>=126);
-            Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_media_assets where job_id='de000000-0000-4000-0041-000000000106'"));
+            Assert.Equal(4,Scalar(ctx.Connection,"select count(*)::int from studio_media_assets where job_id='de000000-0000-4000-0041-000000000106'"));
             var population=typeof(WorkflowSchema).Assembly.GetType("Aegis.Studio.Web.Operations.DemoJobPhotoPopulation")!;
             population.GetMethod("Seed",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,[ctx.Database,storage,"Admin",null]);
             Assert.Equal(assetCount,Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_media_assets")));
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_photographers"))>=4);
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_frontdesk_requests"))>0);
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_frontdesk_requests r left join studio_jobs j on j.id=r.job_id where r.job_id is null or j.status<>'Pending'"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_frontdesk_requests r where coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0)<>coalesce((select sum(f.amount) from studio_financial_events f where f.job_id=r.job_id and f.kind='Deposit'),0)"));
+            Assert.Equal("Preserved staff account",Scalar(ctx.Connection,"select display_name from studio_employees where user_name='demo.jason' and not is_active and not is_assignable"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_jobs where status='Changes Requested' and (correction_kind is null or correction_kind not in ('Source','Production'))"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_job_subjects s where not s.is_system and nullif(trim(s.collection_name),'') is not null and not exists(select 1 from studio_media_collections c where c.job_id=s.job_id and c.name=s.collection_name)"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_job_subjects where collection_name='Roster'"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_media_assets a join studio_job_asset_collections c on c.job_id=a.job_id and c.asset_key=a.asset_key where (select count(*) from studio_media_asset_subjects s where s.asset_id=a.id)=1 and not exists(select 1 from studio_media_asset_subjects s join studio_job_subjects p on p.id=s.subject_id where s.asset_id=a.id and (coalesce(nullif(trim(p.collection_name),''),'Unclassified')=c.collection_name or a.asset_key not like 'demo-full/%' and a.asset_key not like 'demo-%/%'))"));
+            Assert.Equal("Wedding Photography",Scalar(ctx.Connection,"select definition->>'name' from studio_job_template_instances where job_id='de000000-0000-4000-0041-000000000201'"));
+            Assert.Equal("Corporate Headshots",Scalar(ctx.Connection,"select definition->>'name' from studio_job_template_instances where job_id='de000000-0000-4000-0041-000000000301'"));
+            Assert.Equal("Graduation Photography",Scalar(ctx.Connection,"select definition->>'name' from studio_job_template_instances where job_id='de000000-0000-4000-0041-000000000401'"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_job_activities a join studio_jobs j on j.id=a.job_id where j.status in ('Active Production','Awaiting Approval','Changes Requested','Ready for Delivery','Delivered','Completed') and a.workflow_node_id in ('review','capture/shoot','capture/ingest') and a.status<>'Completed'"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_job_activities a where a.assigned_to like 'demo.%' and not exists(select 1 from studio_employees e where e.user_name=a.assigned_to)"));
+            Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_job_subjects where job_id='de000000-0000-4000-0041-000000000201' and name='Emily Carter'"))>0);
         }
         finally{Environment.SetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS",previousPhotoRoot);if(Directory.Exists(photoRoot))Directory.Delete(photoRoot,true);}
     }

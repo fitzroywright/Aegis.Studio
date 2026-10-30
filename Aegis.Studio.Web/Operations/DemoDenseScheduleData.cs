@@ -271,7 +271,8 @@ internal static class DemoDenseScheduleData
     private static string Collection(int workspace, int index) => workspace switch
     {
         2 => new[] { "Getting Ready", "Ceremony", "Portraits", "Reception" }[index % 4],
-        3 or 4 => new[] { "Roster", "Stage", "Groups", "Unclassified" }[index % 4],
+        3 => new[] { "Executives", "Staff Portraits", "Team Groups", "Group Portraits" }[index % 4],
+        4 => new[] { "Individual Portraits", "Stage", "Class Groups", "Family Groups" }[index % 4],
         5 => new[] { "Products", "Details", "Selects", "Finals" }[index % 4],
         6 => new[] { "Individuals", "Team", "Action", "Groups" }[index % 4],
         _ => new[] { "Selects", "Proofs", "Finals", "Unclassified" }[index % 4]

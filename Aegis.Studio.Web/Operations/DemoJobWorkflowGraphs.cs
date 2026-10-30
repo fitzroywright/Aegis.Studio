@@ -8,6 +8,17 @@ namespace Aegis.Studio.Web.Operations;
 /// <summary>Adds graph scenarios to the existing comprehensive demo; leaves its genuine media intact.</summary>
 internal static class DemoJobWorkflowGraphs
 {
+    internal static string TemplateName(string title)
+    {
+        if (title.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||title.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return "Wedding Photography";
+        if (title.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||title.Contains("School",StringComparison.OrdinalIgnoreCase)||title.Contains("Class",StringComparison.OrdinalIgnoreCase)) return "Graduation Photography";
+        if (title.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||title.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||title.Contains("Executive",StringComparison.OrdinalIgnoreCase)) return "Corporate Headshots";
+        if (title.Contains("Passport",StringComparison.OrdinalIgnoreCase)||title.Contains("Visa",StringComparison.OrdinalIgnoreCase)||title.Contains("Employee ID",StringComparison.OrdinalIgnoreCase)) return "ID Photography";
+        if (title.Contains("Restoration",StringComparison.OrdinalIgnoreCase)) return "Photo Restoration";
+        if (title.Contains("Printing",StringComparison.OrdinalIgnoreCase)) return "Photo Printing";
+        return "Portrait Photography";
+    }
+
     internal static void Seed(NpgsqlConnection c, NpgsqlTransaction tx, string actor)
     {
         Guid Service(string code, string name, string category)
@@ -53,7 +64,8 @@ internal static class DemoJobWorkflowGraphs
             Guid job = DemoDataExpansion.Id(41, jobNumbers[i]);
             using (var check = Command(c, tx, "select exists(select 1 from studio_jobs where id=$1)", job)) if (!(bool)check.ExecuteScalar()!) continue;
             using (var check = Command(c, tx, "select exists(select 1 from studio_job_template_instances where job_id=$1)", job)) if ((bool)check.ExecuteScalar()!) continue;
-            var template = templates[i == 0 ? 5 : i == 1 ? 6 : i % 5];
+            using var title = Command(c,tx,"select title from studio_jobs where id=$1",job);
+            var template = templates.Single(t=>t.Definition.Name==TemplateName((string)title.ExecuteScalar()!));
             ApplyNewJob(c, tx, job, template, Guid.NewGuid(), actor);
             if (i is 2 or 4 or 6 or 7 or 8 or 9) Execute(c, tx, "insert into studio_job_catalog_agreements(id,job_id,catalog_item_id,quantity) values($1,$2,$3,1)", Guid.NewGuid(), job, retouch);
             if (i is 3 or 4 or 6 or 7 or 8 or 9) Execute(c, tx, "insert into studio_job_catalog_agreements(id,job_id,catalog_item_id,quantity) values($1,$2,$3,1)", Guid.NewGuid(), job, print);
