@@ -18,13 +18,12 @@ async function environment(t,config={}){
 test('Messages puts controls above both panes and keeps only context and attention on the rail',async t=>{
  const {w}=await environment(t),d=w.document,content=d.querySelector('.st-content'),banner=content.querySelector(':scope > .studio-inbox-toolbar'),inbox=content.querySelector(':scope > .st-inbox');
  assert.ok(banner);assert.equal(banner.nextElementSibling,inbox);assert.equal(d.querySelector('.st-board > .st-toolbar'),null);
- assert.equal(d.querySelector('.smc-card'),null);assert.equal(d.querySelectorAll('.st-right > section').length,2);
- assert.match(d.querySelector('.st-right').textContent,/Conversation Context/);assert.match(d.querySelector('.st-right').textContent,/Needs Attention/);
+ assert.equal(d.querySelector('.smc-card'),null);assert.equal(d.querySelector('.st-right'),null);assert.ok(d.querySelector('#studioMessageContext').closest('details'));assert.ok(d.querySelector('#studioMessageAttention'));
  for(const id of ['studioInboxJobSelect','studioInboxSearch','studioInboxRefresh','studioAddressBook','newDirectMessage'])assert.ok(banner.querySelector('#'+id),id);
  assert.equal(d.getElementById('newDirectMessage').textContent,'New Message');
  assert.ok(inbox.querySelector(':scope > .studio-inbox-center'));assert.ok(inbox.querySelector(':scope > #messageConversationPane'));
- // Default shared pages retain their existing title and message card.
- const template=d.createElement('template');template.innerHTML=w.StudioPage.html({title:'Another page'});assert.ok(template.content.querySelector('.st-toolbar h1'));assert.ok(template.content.querySelector('.smc-card'));
+ // Default shared pages retain their title without a duplicate message card.
+ const template=d.createElement('template');template.innerHTML=w.StudioPage.html({title:'Another page'});assert.ok(template.content.querySelector('.st-toolbar h1'));assert.equal(template.content.querySelector('.smc-card'),null);
 });
 test('Selecting a message still renders history, reply controls and conversation context',async t=>{
  const {w,calls}=await environment(t),d=w.document;await d.querySelector('[data-inbox-message]').onclick();
@@ -76,3 +75,4 @@ test('Support holds explain the next step and attention clears when delivery rec
  await panel.querySelector('[data-message-attention]').onclick();assert.ok(d.getElementById('studioMessageComposer'));assert.equal(calls.some(c=>c.url.includes('/retry')),false);
  config.attention={items:[],hasMore:false};await panel.querySelector('[data-attention-refresh]').onclick();assert.match(panel.textContent,/No replies you sent need attention/);
 });
+

@@ -77,10 +77,8 @@ function mergeJobMessages(teamMessages, clientMessages) {
     function jobLoadFailed(error,version,retry) {
         if(!currentJobOpening(version))return;
         detailPane.removeAttribute('aria-busy');
-        detailPane.querySelector('.job-detail-title p').textContent='Unable to load job';
-        const panel=detailPane.querySelector('.job-detail-center');
-        panel.innerHTML=`<section class="job-center-panel"><p role="alert">${esc(error.message||String(error))}</p><button type="button" class="action">Retry</button></section>`;
-        panel.querySelector('button').onclick=retry;
+        detailPane.innerHTML=`<header class="job-detail-heading"><div class="job-detail-title"><h1>${esc(selectedJob?.title||'Job Details')}</h1><p role="status">Unable to load job</p></div></header><div class="job-detail-center"><section class="job-center-panel"><p role="alert">${esc(error.message||String(error))}</p><button type="button" class="action">Retry</button></section></div>`;
+        detailPane.querySelector('button').onclick=retry;
     }
     async function showJobMessages(job,version=beginJobLoading(job)) {
         if(!currentJobOpening(version))return;
@@ -225,7 +223,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 messageDialog.addEventListener('close',()=>{messageDialog=null;if(current()&&trigger?.isConnected)trigger.focus();},{once:true});
             };
             window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Status</span><strong>${esc(job.status || 'Not set')}</strong></div><div class="workspace-summary-row"><span>Days in Stage</span><strong data-job-overview-age>Loading…</strong></div><div class="workspace-summary-row"><span>Next Action</span><strong data-job-overview-action>Loading…</strong></div></section>`,'job-detail');
-            window.studioShellMountJobAttention?.(attention);
+            window.studioShellMountAttention?.(attention,'job-detail');
             const brief=document.createElement('section');brief.className='jd-job-brief';center.prepend(brief);
             board.append(center);detailPane.append(board);
             void window.StudioJobBrief?.mount(job,brief,current);
@@ -440,6 +438,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
 
     }
 })();
+
 
 
 

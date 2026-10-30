@@ -134,12 +134,17 @@ async function showCatalogProduction({preserveFilters=false,workspaceId}={}){
     productionBoardController?.abort();clearInterval(productionBoardRefreshTimer);productionBoardController=new AbortController();const signal=productionBoardController.signal;
     const current=StudioPage.begin('production');
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
+    const showLoadError=error=>{
+        if(!current())return;
+        genericView.innerHTML='<p role="alert">Production could not load: '+esc(error.message)+'</p><button class="action" data-production-retry>Retry</button>';
+        genericView.querySelector('button').onclick=()=>showCatalogProduction({preserveFilters:true});
+    };
     const cached=productionBoardSnapshot;
     if(!cached)genericView.innerHTML='<div class="today-loading">Loading Production…</div>';
     let workloadData=cached?.workload,workspaces=cached?.workspaces;
     if(!cached){
         try{[workloadData,workspaces]=await Promise.all([json('/api/production/workload',{signal}),loadWorkspaces()]);}
-        catch(error){if(current()){genericView.innerHTML='<p role="alert">Production could not load: '+esc(error.message)+'</p><button class="action" data-production-retry>Retry</button>';genericView.querySelector('button').onclick=()=>showCatalogProduction({preserveFilters:true});}return;}
+        catch(error){showLoadError(error);return;}
         if(current())productionBoardSnapshot={workload:workloadData,workspaces};
     }
     if(!current())return;
@@ -209,7 +214,14 @@ async function showCatalogProduction({preserveFilters=false,workspaceId}={}){
                 JSON.stringify(nextWorkspaces)!==JSON.stringify(productionBoardSnapshot?.workspaces);
             productionBoardSnapshot={workload:nextWorkload,workspaces:nextWorkspaces};
             if(changed)void showCatalogProduction({preserveFilters:true});
-        }catch(error){if(!signal.aborted)console.warn('Production refresh failed; retaining last workload.',error);}
+        }catch(error){
+            if(!current()||signal.aborted)return;
+            if(error.status===401||error.status===403){
+                productionBoardSnapshot=null;jobPhotos.clear();
+                clearInterval(productionBoardRefreshTimer);productionBoardController.abort();
+                showLoadError(error);
+            }else console.warn('Production refresh failed; retaining last workload.',error);
+        }
         finally{refreshing=false;}
     };
     productionBoardRefreshTimer=setInterval(()=>{void refresh();},productionBoardRefreshMs);
@@ -236,3 +248,4 @@ async function openCommercialWorkOrder(order){
     });
     d.querySelector('[data-resolve]')?.addEventListener('click',async()=>{try{await json(`/api/production/work-orders/${order.id}/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:d.querySelector('[data-note]').value})});d.close();await showCatalogProduction({preserveFilters:true});}catch(err){error(err);}});
 }
+

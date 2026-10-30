@@ -2,74 +2,64 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {environment}=require('./job-detail-fixture.cjs');
 const settle=()=>new Promise(r=>setTimeout(r,20));
+const mountNotes=(w,jobId='job')=>{const card=w.StudioMessageCard.create({id:'notesUnderTest',attributes:'data-message-job-id="'+jobId+'"'});w.document.body.append(card);w.StudioMessageCard.bind(card);return card;};
+const openPhoto=async w=>{w.document.querySelector('.jd-photo').ondblclick();await settle();const dialog=w.document.querySelector('.jd-photo-viewer');dialog.querySelector('[data-photo-details]').click();return dialog;};
 const button=(w,name)=>w.document.querySelector('[data-job-scroll="'+name+'"]');
 const subjectDetails=async w=>{let select=w.document.querySelector('[data-job-subject]');if(!select){await settle();select=w.document.querySelector('[data-job-subject]');}select.value='__details';return select.onchange();};
-test('Today job opens with working reply and Subjects controls in their final containers',async t=>{
+test('Job Details opens the current media and instructions surface and retains Subjects controls',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
- assert.equal(fixture.alerts.length,0);assert.ok(w.document.querySelector('.job-detail-page'));
- assert.equal(typeof w.document.querySelector('#hierarchyCompose').onsubmit,'function');
- assert.match(w.document.querySelector('#studioTodayBrandTitle strong').textContent,/Job Details/);
- assert.equal(w.document.querySelector('#studioFooterRate').textContent,'40 files · 1 subject');
- await subjectDetails(w);
- const subjects=w.document.querySelector('#jobDetail-subjects');assert.equal(subjects.hidden,false);assert.match(subjects.textContent,/Morgan/);
- const add=subjects.querySelector('[data-job-add-subject]');assert.equal(add.hidden,false);add.click();assert.equal(subjects.querySelector('form').hidden,false);
- assert.equal(w.document.querySelector('#jobDetail-media').hidden,true);
- const form=w.document.querySelector('#hierarchyCompose');form.querySelector('textarea').value='Confirmed';
- await form.onsubmit({preventDefault(){},currentTarget:form});
- assert.ok(fixture.calls.some(c=>c.url==='/api/conversations/conversation/messages'&&JSON.parse(c.options.body).body==='Confirmed'));
+ assert.equal(fixture.alerts.length,0);assert.ok(w.document.querySelector('.job-detail-page'));assert.ok(w.document.querySelector('.jd-job-brief'));
+ assert.equal(w.document.querySelector('#hierarchyCompose'),null);assert.equal(w.document.querySelector('.job-detail-right'),null);
+ assert.match(w.document.querySelector('#studioTodayBrandTitle strong').textContent,/Job Details/);assert.equal(w.document.querySelector('#studioFooterRate').textContent,'40 files · 1 subject');
+ await subjectDetails(w);const subjects=w.document.querySelector('#jobDetail-subjects');assert.equal(subjects.hidden,false);assert.match(subjects.textContent,/Morgan/);
+ const add=subjects.querySelector('[data-job-add-subject]');assert.equal(add.hidden,false);add.click();assert.equal(subjects.querySelector('form').hidden,false);assert.equal(w.document.querySelector('#jobDetail-media').hidden,true);
+ assert.ok(fixture.calls.some(c=>c.url.endsWith('/booking-instructions')));
 });
-test('job facts appear below the title while Tasks and Activity render their own panels',async t=>{
+
+test('Job identity opens an overlay and Tasks retains its own dialog without retired footer actions',async t=>{
  const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.equal(button(w,'overview'),null);assert.equal(w.document.getElementById('jobDetail-overview'),null);
- const facts=w.document.querySelector('.job-detail-heading .job-detail-facts');
- assert.equal(w.document.querySelector('.job-detail-title .jd-client-name strong').textContent,'Williams & Clarke');
- assert.deepEqual(Array.from(facts.querySelectorAll('dt'),field=>field.textContent),['Type','Event date','Location','Photographer']);
- assert.deepEqual(Array.from(facts.querySelectorAll('dd'),field=>field.textContent),['Photography','Sun Oct 11 2026','Kingston Studio','Unassigned']);
- assert.equal(button(w,'tasks'),null);assert.equal(button(w,'activity'),null);
- assert.equal(w.document.querySelector('[data-media-search]').nextElementSibling.matches('[data-job-tasks]'),true);
- await w.document.querySelector('[data-job-tasks]').onclick();
- const tasks=w.document.querySelector('.jd-tasks-dialog');assert.equal(tasks.open,true);assert.match(tasks.textContent,/Retouch portraits/);tasks.close();
- const activity=w.document.querySelector('#studioFooterJobTools [data-job-activity]');await activity.onclick();
- const drawer=w.document.getElementById('jobActivityDrawer');assert.equal(drawer.getAttribute('aria-hidden'),'false');assert.match(drawer.textContent,/Front Desk booking/);
- drawer.querySelector('[data-close-drawer]').click();assert.equal(activity.getAttribute('aria-expanded'),'false');
- assert.equal(w.document.querySelectorAll('.job-detail-center > section:not([hidden])').length,1);
- w.document.querySelector('[data-message-more]').click();assert.equal(w.document.activeElement.id,'hierarchyBody');
+ const toggle=w.document.querySelector('.jd-job-name-toggle'),facts=w.document.querySelector('#jobIdentityMenu');assert.equal(facts.hidden,true);toggle.click();assert.equal(facts.hidden,false);
+ assert.deepEqual([...facts.querySelectorAll('dt')].map(e=>e.textContent),['Current Status','Days in Stage','Client','Owner','Job Type','Event Date','Location','Attending Job Role','Name of Worker']);assert.match(facts.textContent,/Williams & Clarke.*Photography.*Sun Oct 11 2026.*Kingston Studio/s);
+ facts.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(facts.hidden,true);
+ await w.document.querySelector('[data-job-tasks]').onclick();const tasks=w.document.querySelector('.jd-tasks-dialog');assert.equal(tasks.open,true);assert.match(tasks.textContent,/Job tasks are managed in the configured workflow graph/);assert.ok(tasks.querySelector('[data-open-job-workflow]'));tasks.close();
+ assert.equal(w.document.querySelector('#studioFooterJobTools'),null);
 });
-test('card Notes saves, views and edits job notes independently of messages',async t=>{
+
+test('Notes controller saves, views and edits job notes independently of messages',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
- const card=w.document.getElementById('jobDetailMessages');await card.querySelector('[data-smc-notes-toggle]').onclick();assert.match(card.querySelector('.smc-notes').textContent,/No notes yet/);
+ const card=mountNotes(w);await card.querySelector('[data-smc-notes-toggle]').onclick();assert.match(card.querySelector('.smc-notes').textContent,/No notes yet/);
  let form=card.querySelector('.smc-note-form');form.elements.body.value='Bring the large backdrop.';await form.onsubmit({preventDefault(){}});
  assert.match(card.querySelector('.smc-note-list').textContent,/Bring the large backdrop/);assert.equal(fixture.jobNotes.job.length,1);
  card.querySelector('[data-edit-note]').click();form=card.querySelector('.smc-note-form');form.elements.body.value='Bring the blue backdrop.';await form.onsubmit({preventDefault(){}});
  assert.equal(fixture.jobNotes.job[0].body,'Bring the blue backdrop.');assert.equal(fixture.jobNotes.job[0].revision,2);assert.equal(fixture.jobNotes.job[0].createdBy,'studio.admin');
  assert.equal(fixture.calls.some(c=>c.url.endsWith('/messages')&&c.options?.method==='POST'),false);
- await w.openWorkspaceJob('job2');await settle();await w.document.querySelector('[data-smc-notes-toggle]').onclick();assert.match(w.document.querySelector('.smc-notes').textContent,/No notes yet/);
+ card.remove();await w.openWorkspaceJob('job2');await settle();mountNotes(w,'job2');await w.document.querySelector('[data-smc-notes-toggle]').onclick();assert.match(w.document.querySelector('.smc-notes').textContent,/No notes yet/);
 });
 test('notes retry reuses the identifier after a lost save response',async t=>{
- const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-smc-notes-toggle]').onclick();
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();mountNotes(w);await w.document.querySelector('[data-smc-notes-toggle]').onclick();
  const original=w.json;let fail=true;w.json=async(url,options)=>{const result=await original(url,options);if(url.endsWith('/notes')&&options?.method==='POST'&&fail){fail=false;throw Error('Connection lost');}return result;};
  const form=w.document.querySelector('.smc-note-form');form.elements.body.value='Keep this note.';await form.onsubmit({preventDefault(){}});assert.match(form.textContent,/Connection lost/);assert.equal(form.elements.body.value,'Keep this note.');
  await form.onsubmit({preventDefault(){}});assert.equal(fixture.jobNotes.job.length,1);const posts=fixture.calls.filter(c=>c.url.endsWith('/notes')&&c.options?.method==='POST');assert.equal(JSON.parse(posts[0].options.body).id,JSON.parse(posts[1].options.body).id);
 });
 test('stale note edits preserve the draft and display the conflict',async t=>{
  const {w,fixture}=environment(t);fixture.jobNotes.job=[{id:'note',body:'Original',revision:1,createdBy:'studio.admin',createdAtUtc:'2026-10-12T03:00:00Z'}];
- await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-smc-notes-toggle]').onclick();w.document.querySelector('[data-edit-note]').click();
+ await w.openWorkspaceJob('job');await settle();mountNotes(w);await w.document.querySelector('[data-smc-notes-toggle]').onclick();w.document.querySelector('[data-edit-note]').click();
  const form=w.document.querySelector('.smc-note-form');form.elements.body.value='My edit';fixture.jobNotes.job[0]={...fixture.jobNotes.job[0],body:'Newer edit',revision:2};
  await form.onsubmit({preventDefault(){}});assert.match(form.textContent,/note has changed/);assert.equal(form.elements.body.value,'My edit');assert.equal(fixture.jobNotes.job[0].body,'Newer edit');
 });
-test('Activity closes with Escape and disappears with Tasks popup on navigation',async t=>{
- const {w}=environment(t);await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-job-activity]').onclick();
- const activity=w.document.getElementById('jobActivityDrawer');activity.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(activity.getAttribute('aria-hidden'),'true');assert.equal(w.document.activeElement.dataset.jobActivity,'');
- assert.equal(w.document.querySelector('#studioFooterJobTools [data-job-notes]'),null);
+test('leaving Job Details removes its open Tasks dialog and retired Activity surfaces',async t=>{
+ const {w}=environment(t);await w.openWorkspaceJob('job');await settle();assert.equal(w.document.querySelector('#studioFooterJobTools [data-job-activity]'),null);
  await w.document.querySelector('[data-job-tasks]').onclick();await w.studioNavigate('today');await settle();assert.equal(w.document.querySelector('.jd-tasks-dialog'),null);assert.equal(w.document.querySelector('.jd-footer-drawer'),null);
 });
+
 test('viewer can read Notes without add or edit controls',async t=>{
- const {w,fixture}=environment(t);fixture.canEdit=false;await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-smc-notes-toggle]').onclick();assert.match(w.document.querySelector('.smc-notes').textContent,/No notes yet/);assert.equal(w.document.querySelector('.smc-note-form'),null);assert.equal(w.document.querySelector('[data-edit-note]'),null);
+ const {w,fixture}=environment(t);fixture.canEdit=false;await w.openWorkspaceJob('job');await settle();mountNotes(w);await w.document.querySelector('[data-smc-notes-toggle]').onclick();assert.match(w.document.querySelector('.smc-notes').textContent,/No notes yet/);assert.equal(w.document.querySelector('.smc-note-form'),null);assert.equal(w.document.querySelector('[data-edit-note]'),null);
 });
 test('a contributor can edit their own Notes but cannot edit another author',async t=>{
  const {w,fixture}=environment(t);fixture.jobNotes.job=[{id:'own',body:'My note',revision:1,createdBy:'studio.admin',createdAtUtc:'2026-10-12T03:00:00Z'},{id:'other',body:'Other note',revision:1,createdBy:'another.user',createdAtUtc:'2026-10-12T03:00:00Z'}];
  const original=w.json;w.json=(url,options)=>url.endsWith('/access')?Promise.resolve({permissions:{editJob:false,manageProduction:true}}):original(url,options);
- await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-smc-notes-toggle]').onclick();
+ await w.openWorkspaceJob('job');await settle();mountNotes(w);await w.document.querySelector('[data-smc-notes-toggle]').onclick();
  assert.ok(w.document.querySelector('[data-edit-note="own"]'));assert.equal(w.document.querySelector('[data-edit-note="other"]'),null);
 });
 test('Subjects load errors stay visible and Retry restores the panel',async t=>{
@@ -85,22 +75,20 @@ test('viewer can inspect Subjects without an Add Subject action',async t=>{
 test('stale Subjects response cannot overwrite a subsequently opened job',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();let release;fixture.delaySubjects=new Promise(r=>release=r);
  const pending=subjectDetails(w);await w.openWorkspaceJob('job2');release();await pending;await settle();
- assert.match(w.document.querySelector('.job-detail-title h1').textContent,/Graduation portraits/);
+ assert.match(w.document.querySelector('.jd-job-name-text').textContent,/Graduation portraits/);
  assert.equal(w.document.querySelector('#jobDetail-subjects').hidden,true);assert.equal(w.document.querySelector('#jobDetail-subjects .person-card'),null);
 });
-test('compact workflow opens full assignment controls without clipping the page',async t=>{
- const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
- const original=w.json;w.json=async(url,options)=>{const result=await original(url,options);if(url.endsWith('/connected-workflow'))result.data={...result.data,stage:'Awaiting Scheduling',ownerAssignment:{assigned_to:'studio.admin',status:'Accepted'}};return result;};
- assert.match(w.document.querySelector('[data-job-owner]').textContent,/Owner: studio/);
- await w.document.querySelector('[data-job-workflow]').onclick();
- const dialog=w.document.querySelector('.job-detail-workflow-dialog');assert.ok(dialog.open);assert.ok(dialog.querySelector('[data-wf-session]'));assert.ok(dialog.querySelector('[data-wf-owner]'));
- dialog.close();await settle();assert.equal(w.document.querySelector('.job-detail-workflow-dialog'),null);
+test('Job Details displays one workflow and keeps its editor out of the page',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
+ assert.equal(w.document.querySelectorAll('.jd-workflow-display').length,1);assert.ok(w.document.querySelector('[data-next-action]'));assert.equal(w.document.querySelector('.job-detail-workflow-dialog'),null);
+ assert.equal(fixture.calls.some(c=>c.url.endsWith('/connected-workflow')),false);
 });
+
 test('subject View Photos returns to Media and refreshes the subject filter',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.equal(button(w,'subjects'),null);
  const select=w.document.querySelector('[data-job-subject]');select.value='person';await select.onchange();
- assert.equal(w.document.querySelector('[data-collection]').nextElementSibling.matches('[data-job-subject]'),true);
+ assert.ok(w.document.querySelector('[data-job-subject]'));assert.equal(w.document.querySelector('[data-job-subject]').value,'person');
  assert.equal(select.value,'person');assert.ok(fixture.calls.some(c=>c.url.includes('/media?')&&c.url.includes('subjectId=person')));
  select.value='';await select.onchange();assert.equal(select.value,'');
  assert.equal(new URL(fixture.calls.filter(c=>c.url.includes('/media?')).at(-1).url,'https://studio.test').searchParams.has('subjectId'),false);
@@ -114,7 +102,7 @@ test('job navigation resolves the application lexical workspace cache',async t=>
  require('vm').runInContext('let workspaceCache = window.workspaceCache; window.workspaceCache = undefined;',dom.getInternalVMContext());
  await w.openWorkspaceJob('job');await settle();
  assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Demo \| Commercial and Products/);
- assert.match(w.document.getElementById('studioContextRail').textContent,/Demo \| Commercial and Products/);
+ assert.equal(w.document.getElementById('studioContextRail'),null);
 });
 test('direct job opening shows Job Details immediately and skips the workspace list',async t=>{
  const {w,fixture}=environment(t);await settle();const original=w.json;let release;
@@ -126,16 +114,16 @@ test('direct job opening shows Job Details immediately and skips the workspace l
  assert.match(w.document.querySelector('#studioTodayBrandTitle strong').textContent,/Job Details/);
  assert.equal(w.detailPane.getAttribute('aria-busy'),'true');
  assert.match(w.detailPane.textContent,/Loading job/);assert.doesNotMatch(w.detailPane.textContent,/Select a job/);
- release();await opening;
+ release();await opening;await settle();
  assert.equal(w.detailPane.hasAttribute('aria-busy'),false);
- assert.ok(w.document.querySelector('#hierarchyCompose'));
+ assert.ok(w.document.querySelector('#jobDetail-media .jd-gallery-toolbar'));
  assert.equal(fixture.calls.some(c=>c.url==='/api/jobs'),false);
 });
 test('a slow earlier job lookup cannot replace the latest selection',async t=>{
  const {w}=environment(t);const original=w.json;let release;const delay=new Promise(r=>release=r);
  w.json=async(url,options)=>{if(url==='/api/jobs/job')await delay;return original(url,options);};
  const first=w.openWorkspaceJob('job');await w.openWorkspaceJob('job2');release();await first;
- assert.match(w.document.querySelector('.job-detail-title h1').textContent,/Graduation portraits/);
+ assert.match(w.document.querySelector('.jd-job-name-text').textContent,/Graduation portraits/);
 });
 test('job loading failure keeps Job Details visible and supports Retry',async t=>{
  const {w}=environment(t);const original=w.json;let fail=true;
@@ -144,14 +132,14 @@ test('job loading failure keeps Job Details visible and supports Retry',async t=
  assert.match(w.document.querySelector('#studioTodayBrandTitle strong').textContent,/Job Details/);
  assert.match(w.detailPane.querySelector('[role=alert]').textContent,/Job unavailable/);
  assert.equal(w.detailPane.hasAttribute('aria-busy'),false);
- fail=false;await w.detailPane.querySelector('button').onclick();
- assert.ok(w.document.querySelector('#hierarchyCompose'));
+ fail=false;await w.detailPane.querySelector('button').onclick();await settle();
+ assert.ok(w.document.querySelector('#jobDetail-media .jd-gallery-toolbar'));
 });
 test('leaving Job Details while loading does not replace the destination page',async t=>{
  const {w}=environment(t);const original=w.json;let release;const delay=new Promise(r=>release=r);
  w.json=async(url,options)=>{if(url==='/api/jobs/job')await delay;return original(url,options);};
  const opening=w.openWorkspaceJob('job');w.document.body.dataset.studioView='today';w.document.getElementById('conversationView').classList.add('hidden');
- release();await opening;
+ release();await opening;await settle();
  assert.equal(w.document.body.dataset.studioView,'today');assert.equal(w.document.querySelector('#hierarchyCompose'),null);
 });
 test('approved layout uses twelve photos, real collection counts and cursor paging',async t=>{
@@ -168,15 +156,15 @@ test('approved layout uses twelve photos, real collection counts and cursor pagi
 });
 test('Selected File saves collection and subjects while preserving production metadata',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
- const selected=w.document.querySelector('.jd-photo');selected.click();
+ await openPhoto(w);
  const form=w.document.querySelector('.jd-file-form');form.elements.collection.value='Unclassified';
  await form.onsubmit({preventDefault(){},currentTarget:form});
  const write=fixture.calls.find(c=>c.url.includes('/media/assets/')&&c.options?.method==='PUT');assert.ok(write);
  const body=JSON.parse(write.options.body);assert.equal(body.collection,'Unclassified');assert.deepEqual(body.subjects,['person']);assert.equal(body.status,'Ready');
 });
 test('Selected Image has a thin metadata title and saves token tags on the photo',async t=>{
- const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();w.document.querySelector('.jd-photo').click();
- const card=w.document.querySelector('.job-detail-selected-file');assert.match(card.querySelector('.jd-card-heading h2').textContent,/Photo/);assert.match(card.querySelector('.jd-selected-file-meta').textContent,/JPEG.*v1/);
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();await openPhoto(w);
+ const card=w.document.querySelector('.job-detail-selected-file');assert.equal(card.querySelector('.jd-card-heading h2'),null);assert.match(card.querySelector('.jd-selected-file-meta').textContent,/JPEG.*v1/);
  assert.equal(card.querySelector('.job-detail-selected-content > strong'),null);assert.equal(card.querySelectorAll('.jd-file-fields > label').length,2);
  let input=card.querySelector('[data-tag-input]');input.value=' Portrait, portrait, Blue backdrop ';let prevented=false;
  input.onkeydown({key:'Enter',preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.equal(card.querySelectorAll('.jd-tag-token').length,2);
@@ -185,17 +173,12 @@ test('Selected Image has a thin metadata title and saves token tags on the photo
  assert.equal(card.querySelectorAll('.jd-tag-token').length,2);card.querySelector('[data-remove-tag]').click();await card.querySelector('form').onsubmit({preventDefault(){}});
  assert.deepEqual(JSON.parse(fixture.calls.filter(c=>c.url.includes('/media/assets/')&&c.options?.method==='PUT').at(-1).options.body).tags,['Blue backdrop']);
 });
-test('Job Details left rail owns actions and respects media edit permissions',async t=>{
- const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
- assert.deepEqual(Array.from(w.document.querySelectorAll('.jd-rail-card h2'),el=>el.textContent),['Navigation','My Workspaces','Actions']);
- assert.equal(w.document.querySelector('.job-detail-right').firstElementChild.classList.contains('jd-attention'),true);
- assert.equal(w.document.querySelector('#studioContextRail .jd-attention'),null);
- assert.equal(w.document.querySelector('[data-job-action=subject]').disabled,false);
- w.document.querySelector('[data-job-action=subject]').click();await settle();
- assert.equal(w.document.querySelector('#jobDetail-subjects').hidden,false);assert.equal(w.document.querySelector('#jobDetail-subjects form').hidden,false);
- fixture.canEdit=false;await w.openWorkspaceJob('job2');await settle();
- assert.equal(w.document.querySelector('[data-job-action=upload]').disabled,true);assert.equal(w.document.querySelector('.jd-file-form button'),null);
+test('Job Details exposes Subjects and upload permission through page controls without rails',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();assert.equal(w.document.querySelector('#studioContextRail,.job-detail-right'),null);assert.ok(w.document.querySelector('[data-files]'));
+ await subjectDetails(w);assert.equal(w.document.querySelector('[data-job-add-subject]').hidden,false);
+ fixture.canEdit=false;await w.openWorkspaceJob('job2');await settle();assert.equal(w.document.querySelector('[data-files],[data-add]'),null);await subjectDetails(w);assert.equal(w.document.querySelector('[data-job-add-subject]').hidden,true);
 });
+
 test('gallery search and list controls operate on the displayed page',async t=>{
  const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
  const search=w.document.querySelector('[data-media-search]');search.value='Photo 10';search.oninput({target:search});
@@ -208,19 +191,19 @@ test('upload selection queues files immediately into the current collection',asy
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
  await w.document.querySelector('[data-filter=Selections]').onclick();
  const input=w.document.querySelector('[data-files]');Object.defineProperty(input,'files',{value:[new w.File(['image'],'photo.jpg',{type:'image/jpeg'})]});
- await input.onchange();const upload=fixture.calls.find(c=>c.url.endsWith('/media/uploads'));assert.ok(upload);assert.equal(upload.options.body.get('collection'),'Selections');
- assert.match(w.document.querySelector('[data-media-result]').textContent,/1 files uploaded/);
+ await input.onchange();const upload=fixture.calls.find(c=>c.url.endsWith('/media/uploads'));assert.ok(upload);const batch=fixture.calls.find(c=>c.url.endsWith('/media/upload-batches'));assert.equal(JSON.parse(batch.options.body).collection,'Selections');assert.ok(upload.options.body.get('uploadId'));
+ assert.match(w.document.querySelector('[data-media-result]').textContent,/1\/1 stored/);
 });
 test('late media responses cannot overwrite a newer job or file inspector',async t=>{
  const {w}=environment(t);const original=w.json;let release;const delay=new Promise(r=>release=r);
  w.json=async(url,options)=>{if(url.startsWith('/api/jobs/job/media?'))await delay;return original(url,options);};
  await w.openWorkspaceJob('job');await w.openWorkspaceJob('job2');await settle();release();await settle();
- assert.match(w.document.querySelector('.job-detail-title h1').textContent,/Graduation portraits/);
- assert.match(w.document.querySelector('.jd-selected-preview img').src,/jobs\/job2\/versions/);
+ assert.match(w.document.querySelector('.jd-job-name-text').textContent,/Graduation portraits/);
+ await openPhoto(w);assert.match(w.document.querySelector('.jd-selected-preview img').src,/jobs\/job2\/versions/);
 });
 test('preview failures show a recovery state and use the preview retry API',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
- const img=w.document.querySelector('.jd-selected-preview img');img.onerror();
+ await openPhoto(w);const img=w.document.querySelector('.jd-selected-preview img');img.onerror();
  assert.equal(img.hidden,true);assert.equal(img.nextElementSibling.hidden,false);
  await w.document.querySelector('[data-retry-preview]').onclick();
  assert.ok(fixture.calls.some(c=>c.url.endsWith('/preview/retry')&&c.options.method==='POST'));
@@ -250,4 +233,11 @@ test('Job Details dropped files declare receipts and retries preserve operation 
 
 
 
-test('Job Notes slides the editor open and preserves a draft when closed',async t=>{const {w}=environment(t);await w.openWorkspaceJob('job');await settle();const card=w.document.getElementById('jobDetailMessages');await card.querySelector('[data-smc-notes-toggle]').onclick();const opener=card.querySelector('[data-note-slide]'),slide=card.querySelector('.smc-note-slide'),form=card.querySelector('.smc-note-form');assert.equal(slide.dataset.open,'false');opener.click();assert.equal(slide.dataset.open,'true');form.elements.body.value='Draft instructions';form.querySelector('[data-close-note]').click();assert.equal(slide.dataset.open,'false');opener.click();assert.equal(form.elements.body.value,'Draft instructions');await form.onsubmit({preventDefault(){}});assert.equal(card.querySelector('.smc-note-slide').dataset.open,'false');card.querySelector('[data-edit-note]').click();assert.equal(card.querySelector('.smc-note-slide').dataset.open,'true');});
+test('Notes controller slides the editor open and preserves a draft when closed',async t=>{const {w}=environment(t);await w.openWorkspaceJob('job');await settle();const card=mountNotes(w);await card.querySelector('[data-smc-notes-toggle]').onclick();const opener=card.querySelector('[data-note-slide]'),slide=card.querySelector('.smc-note-slide'),form=card.querySelector('.smc-note-form');assert.equal(slide.dataset.open,'false');opener.click();assert.equal(slide.dataset.open,'true');form.elements.body.value='Draft instructions';form.querySelector('[data-close-note]').click();assert.equal(slide.dataset.open,'false');opener.click();assert.equal(form.elements.body.value,'Draft instructions');await form.onsubmit({preventDefault(){}});assert.equal(card.querySelector('.smc-note-slide').dataset.open,'false');card.querySelector('[data-edit-note]').click();assert.equal(card.querySelector('.smc-note-slide').dataset.open,'true');});
+
+
+test('a failure after replacing the loading header reports the original error and supports Retry',async t=>{
+ const {w}=environment(t),bind=w.StudioMessageCard.bind;w.StudioMessageCard.bind=()=>{throw Error('Composer initialization failed');};
+ await w.openWorkspaceJob('job');assert.match(w.detailPane.querySelector('[role=alert]').textContent,/Composer initialization failed/);assert.equal(w.detailPane.getAttribute('aria-busy'),null);
+ w.StudioMessageCard.bind=bind;await w.detailPane.querySelector('button').onclick();await settle();assert.ok(w.document.querySelector('.jd-workflow-display'));assert.equal(w.detailPane.querySelector('[role=alert]')?.textContent.includes('Composer initialization failed'),false);
+});

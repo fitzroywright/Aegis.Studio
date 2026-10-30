@@ -54,8 +54,8 @@
         ++inboxRevision;selectedThread=null;selectedRecipients=[];sendRequestId=null;
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML = StudioPage.html({title:'Messages',className:'st-messages-content',showHeader:false,summaryTitle:'Conversation Context',summary:'<div id="studioMessageContext"><p>Select a message to view its job, recipients and delivery context.</p></div>',attention:'<div id="studioMessageAttention" aria-live="polite"><p>Checking your replies…</p></div>',content:`
-            <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><select id="studioInboxReadFilter" aria-label="Filter by read status"><option value="">All messages</option><option value="unread">Unread</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioEmailReview">Email routing review</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New Message</button></div></header>
+        genericView.innerHTML = StudioPage.html({title:'Messages',className:'st-messages-content',showHeader:false,attention:'<div id="studioMessageAttention" aria-live="polite"><p>Checking your replies…</p></div>',content:`
+            <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><select id="studioInboxReadFilter" aria-label="Filter by read status"><option value="">All messages</option><option value="unread">Unread</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioEmailReview">Email routing review</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New Message</button><details class="studio-context-details"><summary>Conversation context</summary><div id="studioMessageContext"><p>Select a message to view its job, recipients and delivery context.</p></div></details></div></header>
             <div class="st-inbox">
                 <section class="studio-inbox-center">
 
@@ -728,6 +728,7 @@
     // Give authentication and the initial shell a moment to settle, then show the digest once.
     setTimeout(() => showAwayDigestOnce(), 450);
 })();
+
 
 
 

@@ -11,47 +11,38 @@ async function full(t){
  for(const script of w.document.querySelectorAll('script[src]'))require('node:vm').runInContext(require('./studio-script-fixture.cjs')(new URL(script.src).pathname),dom.getInternalVMContext());
  await settle();await w.studioTodayReady;return w;
 }
-function checkBottom(w,railSelector){
- const rail=w.document.querySelector(railSelector),card=rail.querySelector('.smc-card');
- assert.equal(rail.children.length,3,railSelector+' on '+w.document.body.dataset.studioView);assert.equal(rail.lastElementChild,card);assert.equal(card.querySelector('.smc-toggle'),null);assert.equal(card.querySelector('.smc-drawer'),null);assert.ok(card.querySelector('[data-smc-notes-toggle]'));return card;
+function mountController(w){
+ const card=w.StudioMessageCard.create({id:'messageControllerTest',attributes:'data-message-job-id="j0"',footer:'<form class="composer"><textarea id="componentMessageDraft"></textarea></form>'});
+ w.document.body.append(card);w.StudioMessageCard.bind(card);return card;
 }
-test('all operational right rails keep Messages open at the bottom with a Notes toggle',async t=>{
+test('operational pages omit retired right rails and duplicate message cards',async t=>{
  const w=await full(t);
- for(const [view,rail] of [['today','.mw-today-right'],['jobs','.sj-right'],['frontdesk','.fd-secondary'],['workspaces','.workspace-right-rail'],['finance','.st-right'],['messages','.st-right'],['admin','.st-right']]){
-  await w.studioNavigate(view);await settle();if(view==='messages'){assert.equal(w.document.querySelector(rail+' .smc-card'),null,'Messages page uses its full inbox instead of a duplicate card');continue;}const card=checkBottom(w,rail);
-  assert.deepEqual(Array.from(w.document.querySelectorAll('#studioContextRail > section'),section=>section.dataset.railCard),['navigation','workspaces','actions'],view);
-  await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.dataset.smcMode,'notes',view);assert.ok(card.querySelector('[data-notes-job]'),view);
-  await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.querySelector('[data-smc-messages]').hidden,false,view);
+ for(const view of ['today','jobs','frontdesk','workspaces','finance','messages','about']){
+  await w.studioNavigate(view);await settle();assert.equal(w.document.querySelector('.mw-today-right,.sj-right,.fd-secondary,.workspace-right-rail,.st-right,#studioContextRail'),null,view);
+  assert.equal(w.document.querySelector('.smc-card'),null,view);
  }
 });
-test('Today and Front Desk filtering preserve the Notes panel without duplicate binding',async t=>{
- const w=await full(t);await w.studioNavigate('today');await w.studioTodayReady;
- let card=w.document.getElementById('todayMessageCard');await card.querySelector('[data-smc-notes-toggle]').onclick();
- let job=card.querySelector('[data-notes-job]');job.value='j0';await job.onchange();card.querySelector('.smc-note-form textarea').value='Today note draft';
- const search=w.document.querySelector('[data-mw-job-search]');search.value='Portrait';search.dispatchEvent(new w.Event('input',{bubbles:true}));await settle();
- assert.equal(w.document.getElementById('todayMessageCard'),card);assert.equal(card.dataset.smcMode,'notes');assert.equal(card.querySelector('.smc-note-form textarea').value,'Today note draft');await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.dataset.smcMode,'messages');
- await w.studioNavigate('frontdesk');card=w.document.getElementById('frontDeskMessageCard');await card.querySelector('[data-smc-notes-toggle]').onclick();
- job=card.querySelector('[data-notes-job]');job.value='j1';await job.onchange();card.querySelector('.smc-note-form textarea').value='Front Desk note draft';
- const filter=w.document.querySelector('[data-fd-filter]');filter.dispatchEvent(new w.Event('change',{bubbles:true}));await settle();
- assert.equal(w.document.getElementById('frontDeskMessageCard'),card);assert.equal(card.dataset.smcMode,'notes');assert.equal(card.querySelector('.smc-note-form textarea').value,'Front Desk note draft');await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.dataset.smcMode,'messages');
+test('Notes controller preserves an editor draft through rebinding and mode changes',async t=>{
+ const w=await full(t),card=mountController(w);await card.querySelector('[data-smc-notes-toggle]').onclick();
+ const form=card.querySelector('.smc-note-form');form.elements.body.value='Keep this draft';
+ w.StudioMessageCard.bind(card);await card.querySelector('[data-smc-notes-toggle]').onclick();await card.querySelector('[data-smc-notes-toggle]').onclick();
+ assert.equal(card.querySelector('.smc-note-form'),form);assert.equal(form.elements.body.value,'Keep this draft');assert.equal(card.querySelectorAll('.smc-note-form').length,1);
 });
-test('Job Details Notes toggle retains the message draft and reply handlers',async t=>{
- const {environment}=require('./job-detail-fixture.cjs'),{w}=environment(t);await w.openWorkspaceJob('job');await settle();
- const card=checkBottom(w,'.job-detail-right'),toggle=card.querySelector('[data-smc-notes-toggle]'),composer=card.querySelector('#hierarchyCompose');
- assert.equal(typeof composer.onsubmit,'function');composer.querySelector('textarea').value='Draft kept while viewing notes';
- await toggle.onclick();assert.equal(card.querySelector('[data-smc-messages]').hidden,true);assert.equal(card.querySelector('[data-notes-job]'),null);
- await toggle.onclick();assert.equal(composer.querySelector('textarea').value,'Draft kept while viewing notes');
- card.querySelector('[data-message-more]').click();assert.equal(card.dataset.smcMode,'messages');assert.equal(w.document.activeElement.id,'hierarchyBody');
- composer.querySelector('textarea').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(card.querySelector('[data-smc-messages]').hidden,false);
+test('message controller retains its composer and handlers while Notes is open',async t=>{
+ const w=await full(t),card=mountController(w),composer=card.querySelector('form'),draft=card.querySelector('textarea');let submissions=0;
+ composer.onsubmit=e=>{e.preventDefault();submissions++;};draft.value='Reply draft';
+ await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.querySelector('[data-smc-messages]').hidden,true);
+ await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(draft.value,'Reply draft');assert.equal(card.querySelector('form'),composer);
+ composer.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));assert.equal(submissions,1);
 });
 test('one controller and one stylesheet own message cards without page-specific skins',()=>{
- const html=fs.readFileSync(path.join(root,'index.html'),'utf8');assert.equal((html.match(/src="\/studio-message-card\.js/g)||[]).length,1);assert.equal((html.match(/href="\/studio-message-card\.css/g)||[]).length,1);assert.ok(html.indexOf('/studio-message-card.js')<html.indexOf('/studio-page.js'));
- assert.doesNotMatch(fs.readFileSync(path.join(root,'studio-message-card.css'),'utf8'),/!important/);
- for(const file of ['studio.css','studio-page.css','jobs-page.css','job-details.css'])assert.doesNotMatch(fs.readFileSync(path.join(root,file),'utf8'),/\.job-detail-message-card|\.st-messages|\.sj-messages|\.fd-communications|\.fd-messages/);
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');assert.equal((html.match(/src="\/studio-message-card\.js/g)||[]).length,1);assert.equal((html.match(/href="\/css\/components\/studio-message-card\.css/g)||[]).length,1);assert.ok(html.indexOf('/studio-message-card.js')<html.indexOf('/studio-page.js'));
+ assert.doesNotMatch(fs.readFileSync(path.join(root,'css/components/studio-message-card.css'),'utf8'),/!important/);
+ for(const file of ['studio.css','css/components/studio-page.css','css/pages/jobs-page.css','css/pages/job-details.css'])assert.doesNotMatch(fs.readFileSync(path.join(root,file),'utf8'),/\.(?:job-detail-message-card|st-messages|sj-messages|fd-communications|fd-messages)(?![\w-])/);
 });
 test('message card and rail styles contain valid declarations and no duplicate property owners',()=>{
  const css=require('css-tree');
- for(const file of ['studio.css','studio-page.css','jobs-page.css','job-details.css','studio-message-card.css']){
+ for(const file of ['studio.css','css/components/studio-page.css','css/pages/jobs-page.css','css/pages/job-details.css','css/components/studio-message-card.css']){
   const ast=css.parse(fs.readFileSync(path.join(root,file),'utf8')),seen=new Set();
   function visit(list,scope=[]){list.forEach(node=>{
    if(node.type==='Atrule'&&node.block&&!/keyframes|font-face|property/.test(node.name))visit(node.block.children,[...scope,node.name+':'+(node.prelude?css.generate(node.prelude):'')]);

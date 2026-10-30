@@ -4,7 +4,7 @@ const {test}=require('node:test');const assert=require('node:assert/strict');
 const now=new Date(),iso=(h,d=0)=>new Date(new Date().setHours(h,0,0,0)+d*86400000).toISOString();
 const permissions={accessWorkspace:true,view:true,editJob:true,changeStatus:true,manageSchedule:true,manageProduction:true,recordFinancialActivity:true,viewFinancials:true,viewConversation:true,viewAttachments:true,addAttachments:true,replyRequester:true,manageMembers:true,createJob:true,notifyMembers:true};
 const names=['Miller Family - Fall Portraits','Carter Wedding','Campion Graduation 2026','Carter Executive Headshots','Peterson Newborn','Wilson Family + Dog'];
-const workspaces=['Portraits and IDs','Weddings and Events','Schools and Corporate','Graduations','Commercial and Products','Sports and Groups'].map((name,i)=>({id:'w'+i,name,permissions,emailAddress:'studio@example.invalid',openCount:4}));
+const workspaces=['Portraits and IDs','Weddings and Events','Schools and Corporate','Graduations','Commercial and Products','Sports and Groups'].map((name,i)=>({id:'w'+i,name,permissions,emailAddress:'studio@example.invalid',openCount:4})).concat([{id:'unassigned',name:'Unassigned',systemKey:'unassigned',permissions}]);
 const jobs=names.map((title,i)=>({id:'j'+i,workspaceId:'w'+i,conversationId:'c'+i,title,clientName:['Miller Family','Emily & Daniel Carter','Campion College','Carter Corp','Peterson Family','Wilson Family'][i],clientId:'cl'+i,status:['Scheduled','Production','Photography','Editing','Scheduled','Scheduled'][i],eventDate:now.toISOString().slice(0,10),createdAt:iso(10,-6),assignedTo:'demo.sam',jobLead:'demo.sam',financialEvents:[{id:'charge'+i,kind:'Charge',amount:45000,createdAt:iso(10,-5)},{id:'pay'+i,kind:'Deposit',amount:22500,createdAt:iso(10,-3)}]}));
 const tasks=jobs.flatMap((j,i)=>[0,1,2].map(n=>({id:'t'+i+'-'+n,jobId:j.id,title:['Cull images','Retouch portraits','Proof selection'][n],activityType:['Cull','Retouch','Proof'][n],status:['NotStarted','InProgress','Blocked'][n],priority:n===2?'High':'Normal',assignedTo:'demo.sam',collectionName:'Selects',scheduledAtUtc:iso(11),dueAtUtc:iso(17,n-1),createdAtUtc:iso(9,-3),blockedReason:n===2?'Awaiting client selection':null})));
 const sessions=jobs.map((j,i)=>({id:'s'+i,jobId:j.id,title:j.title,startsAtUtc:iso(9+i),endsAtUtc:iso(11+i),location:i===4?'Client Home':'Studio A',status:'Scheduled',resourceIds:['r1']}));
@@ -33,30 +33,30 @@ function api(u){const p=u.pathname;
  if(p==='/api/frontdesk/clients')return jobs.map((j,i)=>({id:j.clientId,displayName:j.clientName,email:'client'+i+'@example.invalid',phone:'876-555-000'+i}));
  if(p==='/api/notifications')return jobs.map((j,i)=>({id:'n'+i,subject:j.title,eventType:'WorkspaceMessage',body:'Please confirm our session and delivery timing.',referenceType:'Job',referenceId:j.id,isRead:false,createdAtUtc:iso(10)}));
  if(p.includes('/sending-identities'))return {identities:[{type:'Workspace',isDefault:true},{type:'Self'}]};
+ if(p.startsWith('/api/conversations/')&&p.endsWith('/attachments'))return [];
  if(p.includes('/conversations/c'))return {id:'c0',channel:'Email',subject:'Client session',contactName:'Sarah Miller',messages:[{id:'m1',body:'Please confirm our session and package.',authorDisplayName:'Sarah Miller',visibility:'External',createdAt:iso(10,-1)}]};
  if(p.includes('/messages/threads/Job/'))return {id:'thread'};if(p.includes('/messages/threads/'))return [];
  if(p.includes('settings'))return {};
  return [];
 }
 
-test('the full shell loads every operational screen with a shared data graph',async t=>{const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc}),w=dom.window;t.after(()=>dom.window.close());
+test('the full shell loads every operational screen with a shared data graph',async t=>{const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc,pretendToBeVisual:true}),w=dom.window;t.after(()=>dom.window.close());
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.remove()};w.HTMLElement.prototype.scrollIntoView=function(){};w.alert=e=>errors.push(String(e));w.fetch=async url=>({ok:true,status:200,json:async()=>api(new URL(url,'http://studio.test')),text:async()=>JSON.stringify(api(new URL(url,'http://studio.test')))});
  for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(require('./studio-script-fixture.cjs')(new URL(script.src).pathname),dom.getInternalVMContext());
  await new Promise(r=>setTimeout(r,25));await w.studioTodayReady;
  for(const view of ['today','workspaces','pipeline','production','frontdesk','finance','management','admin']){try{await w.studioNavigate(view);assert.ok(w.document.querySelector('#genericView').textContent.trim().length>0,view);}catch(e){errors.push(view+': '+e.message)}}
- const routeField=w.document.getElementById('workspaceRouteKey');assert.ok(routeField.closest('details'));assert.equal(routeField.closest('details').open,false);
- const read=w.json;let finishDemo;const held=new Promise(r=>finishDemo=r),writes=[];
- w.json=async(url,options)=>{if(url==='/api/admin/connected-workflow/demo-data/generate'){writes.push(options.method);await held;return {message:'Connected Workflow demo generated.'};}return read(url,options);};
- const demoButton=w.document.querySelector('[data-load-demo]'),loadingDemo=demoButton.onclick();
- assert.equal(demoButton.disabled,true);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Generating Connected Workflow/);
- finishDemo();await loadingDemo;assert.equal(demoButton.disabled,false);assert.deepEqual(writes,['POST']);assert.match(w.document.querySelector('[data-demo-status]').textContent,/demo generated/);
- w.json=async(url,options)=>{if(url==='/api/admin/connected-workflow/demo-data/generate')throw Error('Rolled back');return read(url,options);};await demoButton.onclick();assert.equal(demoButton.disabled,false);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Rolled back/);w.json=read;
- try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-detail-board'));assert.equal(w.document.querySelectorAll('.jd-photo').length,12)}catch(e){errors.push('job: '+e.message)}
+ await w.studioNavigate('workspace-management');w.document.querySelector('[data-create-workspace]').click();const routeField=w.document.getElementById('workspaceRouteKey');assert.ok(routeField.closest('details'));assert.equal(routeField.closest('details').open,false);
+ await w.studioNavigate('about');let finishDemo;const held=new Promise(r=>finishDemo=r),writes=[];w.prompt=()=> 'REMOVE STUDIO DEMO DATA';
+ const loader=w.studioLoadDemoData;w.studioLoadDemoData=async(progress,options)=>{writes.push(options);await held;return {message:'Full demo generated.'};};
+ const demoButton=w.document.querySelector('[data-load-demo]'),loadingDemo=demoButton.onclick();assert.equal(demoButton.disabled,true);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Starting full demo reset/);
+ finishDemo();await loadingDemo;assert.equal(demoButton.disabled,false);assert.deepEqual(JSON.parse(JSON.stringify(writes)),[{reset:true}]);assert.match(w.document.querySelector('[data-demo-status]').textContent,/demo generated/);
+ w.studioLoadDemoData=async()=>{throw Error('Rolled back');};await demoButton.onclick();assert.equal(demoButton.disabled,false);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Rolled back/);w.studioLoadDemoData=loader;
+ try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-detail-board'),w.document.getElementById('detailPane').textContent);assert.equal(w.document.querySelectorAll('.jd-photo').length,12)}catch(e){errors.push('job: '+e.message)}
  dom.window.close();assert.deepEqual(errors,[]);});
 
 test('cold workspace opening loads server permissions and keeps actual denial on the landing page',async()=>{
  const errors=[],requests=[],vc=new VirtualConsole();let denied=false;
- const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc}),w=dom.window;
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc,pretendToBeVisual:true}),w=dom.window;
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.remove()};w.HTMLElement.prototype.scrollIntoView=function(){};w.alert=e=>errors.push(String(e));
  w.fetch=async url=>{const u=new URL(url,'http://studio.test');requests.push(u.pathname);const body=u.pathname==='/api/workspace-access'?workspaces.map(workspace=>({workspace,permissions:{...permissions,view:!denied}})):api(u);return {ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body)};};
  try{
@@ -69,7 +69,7 @@ test('cold workspace opening loads server permissions and keeps actual denial on
   assert.equal(w.eval('selectedWorkspace'),'w0');assert.deepEqual(errors,[]);
   assert.equal(w.document.getElementById('conversationView').classList.contains('hidden'),true);
   assert.equal(w.document.body.dataset.studioView,'jobs');
-  assert.equal(w.document.querySelector('[data-sj-workspace]').value,'w0');
+  assert.equal(w.history.state.studioWorkspaceId,'w0');
   denied=true;await w.studioNavigate('workspaces');
   await w.document.querySelector('[data-open-workspace="w1"]').onclick();
   assert.match(errors.at(-1),/do not have permission/);

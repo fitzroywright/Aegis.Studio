@@ -28,7 +28,7 @@ test('zero or failed chart sources never display invalid or misleading proportio
  await w.StudioDashboard.render();await w.studioDashboardReady;
  assert.equal(w.document.querySelectorAll('.cd-donut-segment').length,0);assert.doesNotMatch(w.document.body.innerHTML,/NaN|Infinity/);
  assert.ok([...w.document.querySelectorAll('.cd-bar-track>span')].every(b=>b.style.width==='0%'));
- w.json=async()=>{throw Error('Forbidden')};await w.StudioDashboard.render();await w.studioDashboardReady;
+ w.json=async()=>{throw Object.assign(Error('Forbidden'),{status:403})};await w.StudioDashboard.render();await w.studioDashboardReady;
  assert.equal(w.document.querySelector('.cd-donut'),null);assert.equal(w.document.querySelector('.cd-session-table'),null);
  assert.ok([...w.document.querySelectorAll('.cd-bar-row')].every(b=>b.disabled&&b.textContent.includes('Unavailable')));
 });
@@ -92,4 +92,14 @@ test('optional thumbnail and worker lookup failures keep operational counts avai
  await w.StudioDashboard.render();await w.studioDashboardReady;
  assert.equal(w.document.querySelector('.cd-warning'),null);assert.equal(w.document.querySelector('[data-dashboard-link="deposits"]').disabled,false);
  assert.equal(w.document.querySelector('.cd-thumbnail img'),null);
+});
+
+
+test('a revoked login discards cached dashboard records and a fresh denial cannot revive them',async t=>{
+ const w=setup(t,read(fixture()));await w.StudioDashboard.render();await w.studioDashboardReady;
+ assert.match(w.document.body.textContent,/Wedding/);
+ w.json=async()=>{throw Object.assign(Error('Sign in again'),{status:401});};
+ await w.StudioDashboard.render();await w.studioDashboardReady;
+ assert.doesNotMatch(w.document.body.textContent,/Wedding|Portrait/);assert.ok(w.document.querySelector('.cd-warning'));
+ await w.StudioDashboard.render();await w.studioDashboardReady;assert.doesNotMatch(w.document.body.textContent,/Wedding|Portrait/);
 });

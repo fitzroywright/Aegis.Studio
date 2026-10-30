@@ -10,8 +10,8 @@ function setup(t,admin=true){
 }
 test('Workspaces cards show values with pencils while permissions and old mail use dialogs',async t=>{
  const {w,navigation}=setup(t);await w.StudioWorkspaceManagement.render();await settle();
- const cards=w.document.querySelectorAll('[data-workspace-card]');assert.equal(cards.length,2);const card=cards[0];assert.match(card.textContent,/Portraits.*Lisa Brown.*1 active jobs/s);assert.match(card.querySelector('img').src,/jobs\/j\/versions\/by-id\/v/);
- assert.equal(card.querySelector('input,select,form,[data-workspace-editor]'),null);assert.equal(card.querySelectorAll('[data-workspace-pencil]').length,8);
+ const cards=w.document.querySelectorAll('[data-workspace-card]');assert.equal(cards.length,2);const card=cards[0];assert.equal(card.querySelector('[data-workspace-value="name"]').textContent,'Portraits');assert.match(card.querySelector('[data-workspace-managers]').textContent,/Lisa Brown/);assert.match(card.querySelector('.workspace-active-jobs').textContent,/1 active jobs/);assert.match(card.querySelector('img').src,/jobs\/j\/versions\/by-id\/v/);
+ assert.equal(card.querySelector('input:not([type=file]),select,form,[data-workspace-editor]'),null);assert.equal(card.querySelectorAll('[data-workspace-pencil]').length,7);
  card.querySelector('[data-workspace-members]').click();await settle();assert.ok(w.document.querySelector('dialog #workspaceMemberPanel'));w.document.querySelector('#workspaceMemberPanel').closest('dialog').close();
  card.querySelector('[data-workspace-mail]').click();assert.ok(w.document.querySelector('dialog #workspaceImportPanel'));w.document.querySelector('#workspaceImportPanel').closest('dialog').close();
  card.querySelector('[data-workspace-jobs]').click();assert.deepEqual(JSON.parse(JSON.stringify(navigation.at(-1))),{view:'jobs',options:{workspaceId:'w'}});
@@ -59,7 +59,7 @@ test('Admin entries use shared restrained icons and speed-bump rows while icon c
  const shared=read('css/components/studio-rows.css');assert.match(shared,/studio-admin-item.*transition:/);assert.match(shared,/@media\(prefers-reduced-motion:reduce\).*studio-admin-item/);
 });
 
-function edit(w,card,key,value){const button=card.querySelector('[data-workspace-pencil="'+key+'"]');button.click();const node=card.querySelector('[data-workspace-value="'+key+'"]');if(value!==undefined)node.textContent=value;return {button,node};}
+function edit(w,card,key,value){const button=card.querySelector('[data-workspace-pencil="'+key+'"]');button.click();const node=card.querySelector('[data-workspace-value="'+key+'"]');if(value!==undefined){const control=node.querySelector('.workspace-appearance-picker');if(control)control.value=value;else node.textContent=value;}return {button,node};}
 async function saveField(button){button.click();await settle();await settle();}
 test('pencils edit the existing value node and save only that field without a form or textbox',async t=>{
  const {w,calls,navigation}=setup(t),original=w.json;let release;const pending=new Promise(resolve=>release=resolve);
@@ -100,3 +100,4 @@ test('individual member permissions use a popup with the existing permission val
  w.json=async(url,options)=>{if(options?.method==='PUT'){calls.push({url,options});return {};}if(url==='/api/workspaces/w/members')return [{userName:'lisa',displayName:'Lisa',isActive:true,permissions:{accessWorkspace:true,view:true}}];return original(url,options);};
  await w.StudioWorkspaceManagement.render();await w.editWorkspaceMember('w','lisa','Lisa');const form=w.document.querySelector('dialog:not([id]) form');assert.ok(form);assert.equal(form.elements.namedItem('view').checked,true);assert.equal(form.elements.namedItem('editWorkspace').checked,false);form.elements.namedItem('replyRequester').checked=true;await form.onsubmit({preventDefault(){}});const write=calls.find(call=>call.options?.method==='PUT');assert.equal(write.url,'/api/workspaces/w/members/lisa');const payload=JSON.parse(write.options.body);assert.equal(payload.permissions.replyRequester,true);assert.equal(payload.permissions.view,true);assert.equal(payload.permissions.editWorkspace,false);assert.ok(w.document.querySelector('dialog #workspaceMemberPanel'));
 });
+
