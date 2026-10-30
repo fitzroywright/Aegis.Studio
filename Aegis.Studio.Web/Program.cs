@@ -38,19 +38,31 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Npgsql;
 
+if (args.FirstOrDefault() == "maintenance")
+{
+    Environment.ExitCode = await StudioMaintenanceCommand.RunAsync(args.Skip(1).ToArray());
+    return;
+}
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+bool isolatedDemo = DemoIntegrationIsolation.Configure(builder.Configuration, builder.Environment);
+if (isolatedDemo)
+{
+    builder.Services.AddTransient<DemoIntegrationIsolationHandler>();
+    builder.Services.ConfigureHttpClientDefaults(client => client.AddHttpMessageHandler<DemoIntegrationIsolationHandler>());
+}
 string operationsLogInstanceId = builder.Configuration["Service:Identity"]?.Trim() ?? Environment.MachineName;
 string operationsLogIdentityFile = builder.Configuration["Aegis:Registration:IdentityFile"]
     ?? (OperatingSystem.IsWindows()
         ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Aegis", "Studio", "registration-identity.json")
         : "/var/lib/aegis/studio/registration-identity.json");
-builder.Services.AddAegisOperationsLogging(builder.Configuration, "Aegis.Studio", operationsLogInstanceId, operationsLogIdentityFile, builder.Environment.EnvironmentName);
+if (!isolatedDemo) builder.Services.AddAegisOperationsLogging(builder.Configuration, "Aegis.Studio", operationsLogInstanceId, operationsLogIdentityFile, builder.Environment.EnvironmentName);
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSignalR();
 builder.Services.AddStudioEngineeringDiagnostics();
-builder.Services.AddHostedService<Aegis.Studio.Web.OperationsTelemetryPublisher>();
+if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.OperationsTelemetryPublisher>();
 builder.Services.AddSingleton<StudioOperationsFlowPublisher>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<StudioOperationsFlowPublisher>());
+if (!isolatedDemo) builder.Services.AddHostedService(sp => sp.GetRequiredService<StudioOperationsFlowPublisher>());
 
 ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
 builder.Services.AddSingleton(secretProvider);
@@ -139,7 +151,7 @@ builder.Services.AddSingleton<StudioMessagingDatabase>();
 
 if (builder.Configuration.GetValue("AuthenticationPlugin:Enabled", true))
     AuthenticationPluginLoader.Register(builder.Services, builder.Configuration, builder.Environment.ContentRootPath);
-var studioAuthentication = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => { options.Cookie.Name = "Aegis.Studio.Auth"; options.Cookie.HttpOnly = true; options.Cookie.SameSite = SameSiteMode.Strict; options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; options.LoginPath = "/login"; options.AccessDeniedPath = "/login"; options.ExpireTimeSpan = TimeSpan.FromHours(8); options.SlidingExpiration = true; options.Events.OnValidatePrincipal = StudioSignIn.ValidateCookieAsync; options.Events.OnRedirectToLogin = context => { if (context.Request.Path.StartsWithSegments("/api")) { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; } context.Response.Redirect(context.RedirectUri); return Task.CompletedTask; }; });
+var studioAuthentication = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => { options.Cookie.Name = "Aegis.Studio.Auth"; options.Cookie.HttpOnly = true; options.Cookie.SameSite = SameSiteMode.Strict; options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; options.LoginPath = "/login"; options.AccessDeniedPath = "/login"; options.ExpireTimeSpan = TimeSpan.FromHours(8); options.SlidingExpiration = true; options.Events.OnValidatePrincipal = StudioSignIn.ValidateCookieAsync; options.Events.OnRedirectToAccessDenied = StudioSignIn.RedirectAccessDeniedAsync; options.Events.OnRedirectToLogin = context => { if (context.Request.Path.StartsWithSegments("/api")) { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; } context.Response.Redirect(context.RedirectUri); return Task.CompletedTask; }; });
 if (builder.Configuration.GetValue("Authentication:Entra:Enabled", false))
 {
     string tenant = Guid.Parse(builder.Configuration["Authentication:Entra:TenantId"] ?? "").ToString("D");
@@ -237,7 +249,7 @@ builder.Services.AddSingleton<Aegis.Studio.Web.Workers.WorkerDirectory>();
 builder.Services.AddSingleton<ProductionStore>();
 builder.Services.AddSingleton<PerformanceMetricsStore>();
 builder.Services.AddSingleton<WorkDayStore>();
-builder.Services.AddHostedService<WorkDayApiExchangeWorker>();
+if (!isolatedDemo) builder.Services.AddHostedService<WorkDayApiExchangeWorker>();
 builder.Services.AddSingleton<StudioPosStore>();
 builder.Services.AddStudioPosHardening();
 builder.Services.AddSingleton<AttachmentStore>();
@@ -245,22 +257,23 @@ builder.Services.AddSingleton<OutboundEmailStore>();
 builder.Services.AddSingleton<UnroutedEmailStore>();
 builder.Services.AddSingleton<GraphEmailDeltaStateStore>();
 builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
-builder.Services.AddHostedService<InboundEmailWorker>();
-builder.Services.AddHostedService<OutboundEmailWorker>();
-builder.Services.AddHostedService<Aegis.Studio.Web.Intake.WebsiteIntakeWorker>();
-builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GalleryPushWorker>();
-builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GallerySelectionWorker>();
+if (!isolatedDemo) builder.Services.AddHostedService<InboundEmailWorker>();
+if (!isolatedDemo) builder.Services.AddHostedService<OutboundEmailWorker>();
+if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.WebsiteIntakeWorker>();
+if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GalleryPushWorker>();
+if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GallerySelectionWorker>();
 builder.Services.AddSingleton<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogStore>();
-builder.Services.AddHostedService<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogPublisher>();
-builder.Services.AddHostedService<NotificationDeliveryWorker>();
+if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogPublisher>();
+if (!isolatedDemo) builder.Services.AddHostedService<NotificationDeliveryWorker>();
 builder.Services.AddSingleton<WorkflowStore>();
-builder.Services.AddHostedService<Aegis.Studio.Web.PublicApi.PublicWebhookWorker>();
+if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.PublicApi.PublicWebhookWorker>();
 builder.Services.AddHostedService<WorkflowMonitorWorker>();
-builder.Services.AddHostedService<ConfigurationContractPublisher>();
+if (!isolatedDemo) builder.Services.AddHostedService<ConfigurationContractPublisher>();
 builder.Services.AddSingleton<IClientGalleryPublisher,ManifestClientGalleryPublisher>();
 builder.Services.AddHostedService<Aegis.Studio.Web.Media.MediaDerivativeWorker>();
 builder.Services.AddSingleton<Aegis.Studio.Web.WorkDay.IWorkDaySchedulingService>(sp=>new Aegis.Studio.Web.WorkDay.WorkDaySchedulingService(sp.GetRequiredService<StudioDatabase>(),new PhotographerStore(sp.GetRequiredService<StudioDatabase>())));
 
+if (isolatedDemo) DemoIntegrationIsolation.PauseSharedDeliveryProcessor(builder.Services);
 WebApplication app = builder.Build();
 var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
@@ -284,7 +297,7 @@ StudioOperationsEnhancements.EnsureSchema(
 WorkDayStore workDayStore=app.Services.GetRequiredService<WorkDayStore>();
 workDayStore.EnsureSchema();
 int workDayLocationRetentionDays=Math.Clamp(app.Configuration.GetValue<int?>("WorkDay:LocationRetentionDays")??30,1,3650);
-workDayStore.ApplyLocationRetention(TimeSpan.FromDays(workDayLocationRetentionDays));
+if (!isolatedDemo) workDayStore.ApplyLocationRetention(TimeSpan.FromDays(workDayLocationRetentionDays));
 
 app.Use(async(context,next)=>
 {

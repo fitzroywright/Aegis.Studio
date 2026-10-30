@@ -97,6 +97,13 @@ public static class AuthenticationEndpoints
 
 public static class StudioSignIn
 {
+    public static Task RedirectAccessDeniedAsync(RedirectContext<CookieAuthenticationOptions> context)
+    {
+        if (context.Request.Path.StartsWithSegments("/api")) context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        else context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    }
+
     public static async Task ValidateCookieAsync(CookieValidatePrincipalContext context)
     {
         await AccountSecurityHosting.ValidateCookieAsync(context);
