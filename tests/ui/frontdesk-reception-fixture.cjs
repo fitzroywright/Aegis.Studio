@@ -16,7 +16,8 @@ module.exports=function setup(t){
  if(url.endsWith('/connected-workflow'))return{canManage:true,data:{owner:'Lisa Brown',sessions:[{crew:[{user_name:'Daniel'}]}]}};if(url.endsWith('/session-plan'))return[{name:'Alicia Campbell',isSystem:false}];if(url.endsWith('/operations/audit'))return[{action:'FrontDeskCheckIn',detail:'Client checked in',createdAtUtc:'2026-10-29T13:04:00Z'}];if(url.endsWith('/check-in'))return{};throw Error('Unexpected '+url);};
  w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML='<h2>'+w.esc(title)+'</h2>'+html;d.close=()=>{d.dispatchEvent(new w.Event('close'));d.remove();};w.document.body.append(d);return d;};
  w.studioNavigate=async(view,options)=>fixture.actions.push(['navigate',view,options]);w.studioLaunchNewBooking=async()=>fixture.actions.push(['booking']);w.launchFrontDeskPos=async(action,context)=>fixture.actions.push(['pos',action,context]);w.pickFrontDeskFinancialAction=async action=>fixture.actions.push(['financial',action]);w.StudioWorkflow={open:async(job,selector)=>{fixture.actions.push(['workflow',job,selector]);return w.studioDialog('Report','');}};
- w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"\nfrontDeskDate='2026-10-29';window.fdTest={render:()=>renderFrontDesk(),clearDetails:()=>frontDeskDetails.clear()};");
+ w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"\nfrontDeskDate='2026-10-29';frontDeskTab='today';window.fdTest={render:()=>renderFrontDesk(),clearDetails:()=>frontDeskDetails.clear()};");
  w.studioLaunchNewBooking=async()=>fixture.actions.push(['booking']);
  return{w,fixture,render:()=>w.showFrontDesk(),settle:()=>new Promise(resolve=>setImmediate(resolve))};
 };
+

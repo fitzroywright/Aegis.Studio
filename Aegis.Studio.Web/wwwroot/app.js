@@ -219,6 +219,7 @@ newRequestForm.onsubmit = async event => {
 
     newRequestForm.reset();
     newRequestDialog.close();
+    window.StudioNextActions?.changed();
     selectedWorkspace = created.workspaceId;
     await loadWorkspaces();
     const workspace = workspaceCache.find(item => item.id === selectedWorkspace);
@@ -226,6 +227,7 @@ newRequestForm.onsubmit = async event => {
     await loadConversations();
     await openConversation(created.id);
 };
+
 
 
 

@@ -74,8 +74,8 @@ isolation keeps the deployment gate closed.
 
 ## Local preparation evidence
 
-On the operator's Mac, the candidate passes 456 Web tests (including 10 new
-PostgreSQL bootstrap cases and 3 API-denial cases), 3 Domain tests and 473 UI
+On the operator's Mac, the candidate passes 476 Web tests (including 10 new
+PostgreSQL bootstrap cases and 3 API-denial cases), 3 Domain tests and 513 UI
 tests, without failures or skips. A representative backup restored successfully;
 planning, apply and retry were exercised on that isolated restore. Comparing all
 185 existing business tables immediately after bootstrap found only the intended

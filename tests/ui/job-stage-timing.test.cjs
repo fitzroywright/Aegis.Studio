@@ -31,7 +31,7 @@ test('a failed workflow graph cannot hide independently available stage timing',
 });
 test('timing read failures are explicit and the next workflow event retries successfully',async t=>{
  const {w}=setup(t),read=w.json;let fail=true;w.json=async(url,options)=>{if(url.endsWith('/connected-workflow')){if(fail)throw Error('Offline');return {data:{enteredAt:'2026-10-30T17:15:00Z'}};}return read(url,options);};
- await w.openWorkspaceJob('job');await settle();assert.equal(w.document.querySelector('[data-stage-age]').textContent,'Timing unavailable');assert.ok(w.document.querySelector('[data-next-action]'));
+ await w.openWorkspaceJob('job');await settle();assert.equal(w.document.querySelector('[data-stage-age]').textContent,'Timing unavailable');assert.ok(w.document.querySelector('[data-next-activate]'));
  fail=false;w.dispatchEvent(new w.CustomEvent('studio-workflow-changed',{detail:{jobId:'job'}}));await settle();assert.equal(w.document.querySelector('[data-stage-age]').textContent,'45m');
 });
 test('late timing responses cannot replace a newer stage snapshot',async t=>{

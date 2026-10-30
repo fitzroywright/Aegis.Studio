@@ -80,7 +80,7 @@ test('stale Subjects response cannot overwrite a subsequently opened job',async 
 });
 test('Job Details displays one workflow and keeps its editor out of the page',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
- assert.equal(w.document.querySelectorAll('.jd-workflow-display').length,1);assert.ok(w.document.querySelector('[data-next-action]'));assert.equal(w.document.querySelector('.job-detail-workflow-dialog'),null);
+ assert.equal(w.document.querySelectorAll('.jd-workflow-display').length,1);assert.ok(w.document.querySelector('[data-next-activate]'));assert.equal(w.document.querySelector('.job-detail-workflow-dialog'),null);
  assert.equal(fixture.calls.some(c=>c.url.endsWith('/connected-workflow')),true);
 });
 
@@ -241,3 +241,4 @@ test('a failure after replacing the loading header reports the original error an
  await w.openWorkspaceJob('job');assert.match(w.detailPane.querySelector('[role=alert]').textContent,/Composer initialization failed/);assert.equal(w.detailPane.getAttribute('aria-busy'),null);
  w.StudioMessageCard.bind=bind;await w.detailPane.querySelector('button').onclick();await settle();assert.ok(w.document.querySelector('.jd-workflow-display'));assert.equal(w.detailPane.querySelector('[role=alert]')?.textContent.includes('Composer initialization failed'),false);
 });
+

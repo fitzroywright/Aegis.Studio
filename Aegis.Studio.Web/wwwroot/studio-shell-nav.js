@@ -21,7 +21,8 @@
     let mediaWorkspaceFilter = null;
     const pageAttention = new Map();
     let sharedAttention={items:[],loaded:false,error:''};
-    async function loadSharedAttention(){if(!window.StudioAttention)return;try{sharedAttention=await window.StudioAttention.load();}catch{sharedAttention={items:[],loaded:false,error:'Needs Attention could not be loaded. Reopen to retry.'};}refreshPageDrawers();}
+    let attentionOwnerFilter='',attentionActor='';
+    async function loadSharedAttention(){if(!window.StudioAttention)return;try{sharedAttention=await window.StudioAttention.load();if(window.StudioNextActions){const me=await json('/api/auth/me');attentionActor=(me.user||me).userName||(me.user||me).loginName||'';}}catch{sharedAttention={items:[],loaded:false,error:'Needs Attention could not be loaded. Reopen to retry.'};}refreshPageDrawers();}
     let sharedSessions = [];
     let sessionsState = 'loading';
     let sessionsRequest = null;
@@ -357,7 +358,7 @@
         drawer.setAttribute('aria-modal', 'true');
         drawer.setAttribute('aria-label', 'Needs Attention');
         drawer.hidden = true;
-        drawer.innerHTML = '<header><h2>Needs Attention</h2><button type="button" data-attention-close aria-label="Close Needs Attention">×</button></header><div id="studioAttentionDetails" class="studio-attention-details"><div id="studioAttentionItems"></div><div id="studioPageAttention"></div></div>';
+        drawer.innerHTML = '<header><h2>Needs Attention</h2><button type="button" data-attention-close aria-label="Close Needs Attention">×</button></header><label class="studio-attention-owner">Show <select data-attention-owner aria-label="Attention responsibility"><option value="">All staff</option><option value="mine">Assigned to me</option><option value="unassigned">Unassigned</option></select></label><div id="studioAttentionDetails" class="studio-attention-details"><div id="studioAttentionItems"></div><div id="studioPageAttention"></div></div>';
         const sessionsDrawer = document.createElement('aside');
         sessionsDrawer.id = 'studioSessionsDrawer';
         sessionsDrawer.className = 'studio-attention-drawer';
@@ -420,14 +421,17 @@
         });
         backdrop.onclick = close;
         drawer.querySelector('[data-attention-close]').onclick = close;
+        drawer.querySelector('[data-attention-owner]').onchange=event=>{attentionOwnerFilter=event.target.value;refreshPageDrawers();};
         document.addEventListener('keydown', event => {
             if (event.key === 'Escape' && (!drawer.hidden || !sessionsDrawer.hidden)) close();
         });
         drawer.addEventListener('click', event => {
-            const link = event.target.closest('[data-attention-job],[data-attention-route]');
+            const link = event.target.closest('[data-attention-job],[data-attention-route],[data-attention-next],[data-attention-enquiry]');
             if (!link) return;
             close();
-            if(link.dataset.attentionJob)window.studioNavigate?.('workspaces',{jobId:link.dataset.attentionJob});
+            if(link.dataset.attentionNext){const item=sharedAttention.items.find(item=>item.id===link.dataset.attentionNext);if(item?.nextAction)StudioNextActions.activate(item.nextAction).catch(error=>alert(error.message));}
+            else if(link.dataset.attentionEnquiry)window.StudioNextActions?.openEnquiry(link.dataset.attentionEnquiry);
+            else if(link.dataset.attentionJob)window.studioNavigate?.('workspaces',{jobId:link.dataset.attentionJob});
             else window.studioNavigate?.(link.dataset.attentionRoute);
         });
         window.addEventListener('studio-attention-updated', event => {
@@ -449,7 +453,7 @@
         if(pageSlot&&pageSlot.firstElementChild!==(content||null))pageSlot.replaceChildren(...(content?[content]:[]));
         const jobSlot=document.getElementById('studioShellJobAttention');
         const jobContent=key==='job-detail'?jobSlot?.firstElementChild:null;
-        if(jobSlot&&jobSlot.hidden!==(key!=='job-detail'))jobSlot.hidden=key!=='job-detail';
+        if(jobSlot&&jobSlot.hidden!==(key!=='job-detail'||!!attentionOwnerFilter))jobSlot.hidden=key!=='job-detail'||!!attentionOwnerFilter;
         const countContent=node=>{
             if(node.dataset.attentionCount!==undefined)return Number(node.dataset.attentionCount)||0;
             return node.querySelectorAll('[data-attention-item],button,[role=alert]').length;
@@ -459,7 +463,9 @@
             const id=row.dataset.attentionItem;mountedIds.add(id);if(row.dataset.sjJob&&id===row.dataset.sjJob)mountedIds.add('job:'+id);
         }
         items=items.filter(item=>!mountedIds.has(item.id));
-        const total = (content?countContent(content):jobContent?countContent(jobContent):0)+items.length;
+        if(attentionOwnerFilter)items=items.filter(item=>attentionOwnerFilter==='unassigned'?!item.assignedTo:!!attentionActor&&String(item.assignedTo||'').toLowerCase()===attentionActor.toLowerCase());
+        if(pageSlot&&pageSlot.hidden!==!!attentionOwnerFilter)pageSlot.hidden=!!attentionOwnerFilter;
+        const total = (!attentionOwnerFilter&&content?countContent(content):!attentionOwnerFilter&&jobContent?countContent(jobContent):0)+items.length;
         const count = document.getElementById('studioAttentionCount');
         if (count) count.textContent = String(total);
         document.getElementById('studioAttentionTrigger')?.classList.toggle('has-attention', total > 0);
@@ -477,7 +483,9 @@
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.dataset.attentionItem = item.id;
-                if(item.route)button.dataset.attentionRoute=item.route;
+                if(item.nextAction)button.dataset.attentionNext=item.id;
+                else if(item.enquiryId)button.dataset.attentionEnquiry=item.enquiryId;
+                else if(item.route)button.dataset.attentionRoute=item.route;
                 else if(item.jobId)button.dataset.attentionJob = item.jobId;
                 else button.dataset.attentionRoute = 'tasks';
                 const name = document.createElement('strong');name.textContent = item.title;
@@ -566,7 +574,8 @@
         void loadSharedAttention();
         syncGridFooterCount();
         window.addEventListener('studio-jobs-view-changed',()=>{refreshWorkspaceMenu();syncPageFrame();});
-        document.addEventListener('studio-workflow-changed',()=>{void loadSharedAttention();});
+        window.addEventListener('studio-next-actions-changed',()=>{void loadSharedAttention();});
+        document.addEventListener('studio-workflow-changed',()=>{if(!window.StudioNextActions)void loadSharedAttention();});
         window.addEventListener('studio-workspaces-loaded',refreshWorkspaceMenu);
         document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');
@@ -601,3 +610,4 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })()
+
