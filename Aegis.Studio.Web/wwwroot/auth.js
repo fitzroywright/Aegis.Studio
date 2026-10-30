@@ -25,6 +25,7 @@ async function loadSignedInUser() {
     }
 
     const payload = await response.json();
+    if(payload.accountState && payload.accountState !== 'Active'){window.location.replace('/login?pending=1');return;}
     const user = payload.user || payload;
     try{
         const capabilities=await fetch('/api/workflow/capabilities');

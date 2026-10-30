@@ -31,17 +31,11 @@ test('bell requests only unread messages and never loads announcements',async t=
  w.eval(read('notifications.js'));await w.document.getElementById('notificationButton').onclick();
  const panel=w.document.getElementById('studioMessageBellPanel');assert.match(panel.textContent,/Unread/);assert.doesNotMatch(panel.textContent,/Already read|Announcements/);assert.deepEqual(urls,['/api/messages/inbox?offset=0&limit=8&unreadOnly=true']);
 });
-test('Job conversation and notes open from Actions outside the unread slide-down',async t=>{
- const {w}=require('./job-detail-fixture.cjs').environment(t);
- w.eval(read('studio-page.js'));w.eval(read('notifications.js'));w.eval(read('job-workflow-display.js'));w.eval(read('job-workflow-graph.js'));
+test('the unread message feed stays independent of retired Job Details cards and actions',async t=>{
+ const {w}=require('./job-detail-fixture.cjs').environment(t);w.eval(read('notifications.js'));
  await w.openWorkspaceJob('job');await new Promise(resolve=>setImmediate(resolve));
- assert.equal(w.document.querySelector('#studioMessageBellPanel #jobDetailMessages'),null);
- const action=w.document.querySelector('[data-job-action="messages"]');assert.ok(action);action.click();
- await new Promise(resolve=>setImmediate(resolve));
- const dialog=w.document.querySelector('.jd-messages-dialog');assert.ok(dialog?.open);assert.ok(dialog.querySelector('#jobDetailMessages [data-smc-notes-toggle]'));
- dialog.querySelector('[data-close]').click();assert.equal(w.document.querySelector('.jd-messages-dialog'),null);
- action.click();await new Promise(resolve=>setImmediate(resolve));assert.ok(w.document.querySelector('.jd-messages-dialog #jobDetailMessages'));
- w.StudioWorkspace.invalidate();assert.equal(w.document.querySelector('.jd-messages-dialog'),null);
+ assert.equal(w.document.querySelector('#studioMessageBellPanel #jobDetailMessages'),null);assert.equal(w.document.querySelector('[data-job-action="messages"],.jd-messages-dialog'),null);
+ assert.ok(w.document.querySelector('.jd-job-brief'));w.StudioWorkspace.invalidate();assert.equal(w.document.querySelector('.jd-messages-dialog'),null);
 });
 test('Messages composer creates only staff workspace announcements using its dedicated endpoint',async t=>{
  const {w,calls}=fixture(t);
@@ -51,10 +45,10 @@ test('Messages composer creates only staff workspace announcements using its ded
  let payload;w.json=async(url,options)=>{calls.push(url);payload=JSON.parse(options.body);};
  const toolbar=w.document.querySelector('.studio-inbox-tools');await w.StudioAnnouncements.attachComposer(toolbar,()=>true);
  toolbar.querySelector('[data-post-announcement]').click();const form=w.document.querySelector('dialog form');
- assert.equal(form.elements.workspace.options.length,1);assert.equal(form.elements.workspace.value,'staff');assert.match(w.document.querySelector('dialog').textContent,/not sent to clients/);
+ assert.equal(form.elements.workspace.options.length,1);assert.equal(form.elements.workspace.value,'staff');assert.equal(form.elements.workspace.options[0].textContent,'Bryan’s staff');assert.equal(w.document.querySelector('dialog input[name=client]'),null);
  form.elements.title.value='Tomorrow';form.elements.body.value='Team briefing';await form.onsubmit({preventDefault(){}});
  assert.deepEqual(calls,['/api/workspaces/staff/announcements']);assert.deepEqual(payload,{title:'Tomorrow',body:'Team briefing'});
- assert.equal(form.querySelector('button').disabled,false);assert.match(form.textContent,/posted/);
+ assert.equal(form.querySelector('button').disabled,false);assert.match(form.textContent,/Announcement sent/);
  assert.doesNotMatch(read('job-workspace.js'),/renderWorkspaceAnnouncements|renderAnnouncementAdministration|announcement-form/);
  assert.doesNotMatch(read('studio-navigation.js'),/renderAnnouncementAdministration/);
  assert.match(read('messages.js'),/StudioAnnouncements\?\.attachComposer/);
@@ -82,3 +76,4 @@ test('clicking announcements scrolls their strip, wraps around and keeps dismiss
  host.querySelector('h2').click();assert.equal(moves.length,before);
  const css=read('studio.css');assert.match(css,/\.workspace-announcement-banners \{[^}]*overflow-x: auto;[^}]*scrollbar-width: none;/s);assert.match(css,/\.workspace-announcement-banners::-webkit-scrollbar \{ display:none; \}/);
 });
+

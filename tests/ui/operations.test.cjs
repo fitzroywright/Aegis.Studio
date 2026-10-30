@@ -29,19 +29,14 @@ test('folder ingest drains repeated directory batches and ignores non-photo file
  const directory={isDirectory:true,createReader:()=>({readEntries:done=>done(batches.shift())})};const files=await w.studioDroppedPhotos({items:[{webkitGetAsEntry:()=>directory}],files:[]});assert.deepEqual(Array.from(files,f=>f.name),['one.jpg','two.png']);assert.equal(batches.length,0);
 });
 
-test('workspace integration settings are collapsed and save a routing override',async()=>{
- const w=setup(['workspaces.js']);const calls=[];
- w.json=async(u,o)=>{if(o){calls.push(JSON.parse(o.body));return {};}if(u==='/api/studio-employees?assignable=true')return [{userName:'staff',displayName:'Staff',roles:['Photographer']}];return {id:'workspace',name:'Weddings',emailAddress:'weddings@example.invalid',routeKey:'existing-route',isEnabled:true,sortOrder:7,defaultJobLead:'staff'};};
- w.studioDialog=(title,body)=>{const dialog=w.document.createElement('dialog');dialog.innerHTML=body;dialog.close=()=>dialog.remove();w.document.body.append(dialog);return dialog;};w.loadWorkspaces=async()=>{};w.studioNavigate=async()=>{};
- await w.editWorkspace('workspace');const dialog=w.document.querySelector('dialog'),form=dialog.querySelector('form'),route=form.elements.routeKey;
- assert.equal(route.value,'existing-route');assert.equal(route.closest('details').open,false);route.value='wedding-bookings';
- await form.onsubmit({preventDefault(){}});assert.equal(calls[0].routeKey,'wedding-bookings');assert.equal(calls[0].name,'Weddings');assert.equal(calls[0].sortOrder,7);assert.equal(calls[0].defaultJobLead,'staff');assert.equal(w.document.querySelector('dialog'),null);
+test('workspace editing navigates to its authoritative inline administration page',async()=>{
+ const w=setup(['workspaces.js']),destinations=[];w.studioNavigate=async view=>destinations.push(view);
+ await w.editWorkspace('workspace');assert.deepEqual(destinations,['workspace-management']);assert.equal(w.document.querySelector('dialog'),null);w.close();
 });
-
 
 test('Production QC displays the pinned source and records a rejection reason',async()=>{
  const w=setup(['media-production.js','production.js']);w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.dispatchEvent(new w.Event('close'));};w.showProduction=async()=>{};const writes=[];w.prompt=()=>"Colour needs reprint";
- w.json=async(u,o)=>{if(o){writes.push(JSON.parse(o.body));return {};}if(u.endsWith('/order-lines'))return [];return {quantity:3,completed:3,passed:0,total:1,rejected:writes.length,items:[{id:'item',sourceVersionId:'approved-v3',fileName:'Portrait.jpg',versionNumber:3,productCode:'PRINT-5X7',quantity:3,completedQuantity:3,qcState:writes.length?'Rejected':'Pending',qcReason:writes.length?'Colour needs reprint':null}]};};
+ w.json=async(u,o)=>{if(o){writes.push(JSON.parse(o.body));return {};}if(u.endsWith('/order-lines'))return [];if(u.endsWith('/access'))return {permissions:{manageProduction:true}};return {quantity:3,completed:3,passed:0,total:1,rejected:writes.length,items:[{id:'item',sourceVersionId:'approved-v3',fileName:'Portrait.jpg',versionNumber:3,productCode:'PRINT-5X7',quantity:3,completedQuantity:3,qcState:writes.length?'Rejected':'Pending',qcReason:writes.length?'Colour needs reprint':null}]};};
  await w.openProductionItems({jobId:'job',id:'order',title:'Print order'});const link=w.document.querySelector('dialog a');assert.ok(link.href.endsWith('/approved-v3/content'));assert.match(link.textContent,/Approved v3/);await w.document.querySelector('[data-qc-reject]').onclick();assert.equal(writes[0].state,'Rejected');assert.equal(writes[0].reason,'Colour needs reprint');assert.match(w.document.querySelector('dialog').textContent,/Colour needs reprint/);w.close();
 });
 
@@ -57,4 +52,5 @@ test('Finance retains completed-job receivables and directs approval to Job Deta
  await w.showAccounts();assert.match(w.genericView.textContent,/Delivered wedding/);assert.match(w.genericView.textContent,/Completed · Finance release authorized/);assert.match(w.genericView.textContent,/Overdue/);
  let opened;w.openWorkspaceJob=async id=>opened=id;w.document.querySelector('[data-open-job="completed"]').click();assert.equal(opened,'completed');w.close();
 });
+
 

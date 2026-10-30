@@ -75,6 +75,14 @@ STUDIO_TEST_POSTGRES='<disposable test connection string>' dotnet test \
   --filter FullyQualifiedName~NextAction
 ```
 
-Deployment, the user's Mac build, live role checks and production database
-acceptance have not been performed. This change does not merge or deploy the
-separate coordinated Common.Security migration.
+The coordinated Common.Security migration landed on main during merge
+preparation. This change was reconciled onto it, preserving the migrated
+authorization, API error handling and protected cache behavior. Its updated
+interaction fixtures retain all current page dependencies and exercise the
+shared server-projected action rather than the removed page-only renderer.
+The pre-modernization comparison above remains historical evidence; consult
+PR #400's latest security-regression check for the complete integrated .NET,
+PostgreSQL 16 and UI results. No tests are skipped by that evidence gate.
+
+Deployment, the user's Mac build, live provider/role checks and production
+database acceptance have not been performed.

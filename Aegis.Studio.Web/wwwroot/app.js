@@ -9,7 +9,9 @@ async function json(url, options) {
     if (!response.ok) {
         let error=null;try{error=await response.json();}catch{}
         const fallback=response.status===403?'You do not have permission for this action.':response.status===401?'Your session has expired. Sign in again.':response.status===404?'This item is no longer available.':'This action could not be completed. Please retry.';
-        throw new Error(response.status>=500?fallback:(error?.error||error?.detail||fallback));
+        const failure=new Error(response.status>=500?fallback:(error?.error||error?.detail||fallback));
+        failure.status=response.status;
+        throw failure;
     }
 
     if (response.status === 204 || response.status === 205) return null;
@@ -225,6 +227,7 @@ newRequestForm.onsubmit = async event => {
     await loadConversations();
     await openConversation(created.id);
 };
+
 
 
 

@@ -14,17 +14,13 @@ async function environment(t,saved={view:'all'}){
  const host=w.document.getElementById('genericView');await w.StudioJobsPage.render(host,fixture.options);
  return {w,host,fixture,rows:()=>[...host.querySelectorAll('tr[data-sj-job]')].map(r=>r.dataset.sjJob)};
 }
-test('Jobs starts with an active day filter and All dates explicitly clears its selection',async t=>{
+test('Jobs starts with an active day filter and date navigation persists the chosen period',async t=>{
  const {w,host,rows,fixture}=await environment(t);
  assert.deepEqual(rows(),['job-15']);assert.equal(w.document.getElementById('studioFooterRate').textContent,'1 jobs');
  assert.equal(host.querySelector('[data-sj-calendar-view="day"]').getAttribute('aria-pressed'),'true');
- assert.equal(host.querySelector('#jobsMessageCard .smc-title strong').textContent,'Messages');
- host.querySelector('[data-sj-calendar-clear]').click();
- assert.equal(w.document.getElementById('studioFooterRate').textContent,'28 jobs');
- assert.equal(host.querySelectorAll('[data-sj-calendar-view][aria-pressed="true"]').length,0);
- assert.equal(host.querySelector('[data-sj-calendar-clear]').getAttribute('aria-pressed'),'true');
- await w.StudioJobsPage.render(host,fixture.options);
- assert.equal(host.querySelector('[data-sj-calendar-clear]').getAttribute('aria-pressed'),'true');
+ assert.equal(host.querySelector('#jobsMessageCard'),null);assert.equal(host.querySelector('[data-sj-calendar-clear]'),null);
+ host.querySelector('[data-sj-calendar-step="1"]').click();assert.deepEqual(rows(),['job-16']);
+ await w.StudioJobsPage.render(host,fixture.options);assert.deepEqual(rows(),['job-16']);
  host.querySelector('[data-sj-calendar-today]').click();assert.deepEqual(rows(),['job-15']);
 });
 test('Jobs week and month ranges compose with status and search and reset pagination',async t=>{
@@ -56,3 +52,4 @@ test('Jobs layout options preserve filters, totals, navigation and saved layout'
  assert.equal(host.querySelector('.sj-pagination').hidden,true);
  host.querySelector('.studio-calendar-bar[data-sj-job]').click();assert.equal(fixture.opened.length,1);
 });
+

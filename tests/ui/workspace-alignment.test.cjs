@@ -11,7 +11,7 @@ test('names prefer given or display first name and fall back to login',async()=>
  const w=dom.window;w.eval(fs.readFileSync(path.join(root,'studio-message-card.js'),'utf8'));w.fetch=async()=>({ok:true,json:async()=>({user:{userName:'fwright',displayName:'Fitzroy Wright'}})});
  w.eval(fs.readFileSync(path.join(root,'auth.js'),'utf8'));
  await new Promise(resolve=>setTimeout(resolve,0));
- assert.equal(w.document.getElementById('signedInUser').textContent,'Fitzroy');
+ assert.equal(w.document.getElementById('signedInUser').textContent,'Fitzroy Wright');
  assert.equal(w.studioFirstName('fwright'),'Fitzroy');
  w.studioRememberPeople([{userName:'taberfa',firstName:'Taberfa',displayName:'T. Brown'}]);
  assert.equal(w.studioFirstName('taberfa'),'Taberfa');
@@ -33,53 +33,21 @@ test('single subject is a card; multiple subjects form a roster; viewers cannot 
  await w.renderJobSubjects({id:'job'},panel,()=>true,()=>{});
  assert.equal(panel.querySelectorAll('.person-card').length,2);assert.equal(panel.querySelector('form'),null);
 });
-test('task list and calendar retain the same scheduled and unscheduled records',async()=>{
- const {w,panel}=environment();let calls=0;const tasks=[{id:'a',title:'Retouch portraits',scheduledAtUtc:new Date().toISOString(),status:'NotStarted'},{id:'b',title:'Await prints',status:'Blocked'}];
- w.json=async url=>{if(url.endsWith('/access'))return {permissions:{manageProduction:false}};calls++;return tasks;};
- await w.renderJobTasks({id:'job'},panel,()=>true,()=>{});
- assert.equal(panel.querySelectorAll('.task-card').length,2);
- panel.querySelector('[data-task-view="calendar"]').click();
- assert.equal(panel.querySelectorAll('.task-card').length,2);assert.match(panel.textContent,/Retouch portraits/);assert.match(panel.textContent,/Await prints/);assert.equal(calls,1);
- panel.querySelector('[data-task-view="list"]').click();assert.equal(panel.querySelectorAll('.task-card').length,2);
+test('Job task access uses the configured workflow rather than a parallel task list',async()=>{
+ const {w,panel}=environment();const opened=[];let reads=0;w.json=async()=>{reads++;return [];};w.StudioJobGraph={launchTask:async id=>opened.push(id)};
+ await w.renderJobTasks({id:'job'},panel,()=>true,()=>{});assert.match(panel.textContent,/configured workflow graph/);panel.querySelector('[data-open-job-workflow]').click();assert.deepEqual(opened,['job']);assert.equal(reads,0);w.close();
 });
+
 test('stale asynchronous subjects response does not overwrite the next tab',async()=>{
  const {w,panel}=environment();panel.textContent='Next tab';w.json=async url=>url.endsWith('/access')?{permissions:{}}:[];
  await w.renderJobSubjects({id:'job'},panel,()=>false,()=>{});assert.equal(panel.textContent,'Next tab');
 });
-test('workspace job keeps Media dominant with working replies and dedicated panels',async t=>{
- const html=fs.readFileSync(path.join(root,'index.html'),'utf8');const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;w.eval(fs.readFileSync(path.join(root,'studio-message-card.js'),'utf8'));
- t.after(()=>w.close());
- const job={id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Portraits',clientName:'Client',status:'Scheduled'};
- Object.assign(w,{showWorkspaces:async()=>{},workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
- for(const id of ['conversationList','detailPane','workspaceTitle'])w[id]=w.document.getElementById(id);
- w.fetch=async url=>({ok:true,json:async()=>url.endsWith('/sending-identities')?{identities:[{type:'Workspace'},{type:'Self',isDefault:true}]}:{channel:'Email',messages:[]}});
- w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.split('?')[0].endsWith('/media')?{assets:[],subjects:[],collections:[],unmatched:[],totalAssets:0,gallery:{default_lens:'Auto'}}:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
- w.eval(fs.readFileSync(path.join(root,'auth.js'),'utf8'));
- w.money=n=>'JMD '+n;w.eval(fs.readFileSync(path.join(root,'management.js'),'utf8'));
- w.eval(fs.readFileSync(path.join(root,'job-handoff.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'job-details.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
- await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,10));
- assert.equal(w.document.querySelector('#jobInternalNote'),null);
- assert.equal(w.document.querySelector('#jobSendingIdentity').value,'Workspace');
- assert.equal(w.document.querySelector('#hierarchyCompose button').textContent,'Send Message');
- const requests=[];const originalJson=w.json;w.json=async(url,options)=>{if(options?.body)requests.push({url,body:JSON.parse(options.body)});return originalJson(url,options);};
- for(const mode of ['Workspace','Internal','Self']) {
-   const form=w.document.querySelector('#hierarchyCompose');const sender=w.document.querySelector('#jobSendingIdentity');sender.value=mode;sender.onchange();form.querySelector('textarea').value='Test reply';
-   await form.onsubmit({preventDefault(){},currentTarget:form});
- }
- assert.equal(requests[0].url,'/api/conversations/conversation/messages');assert.equal(requests[0].body.sendingIdentity,'Workspace');
- assert.equal(requests[1].url,'/api/messages/threads/thread');assert.deepEqual(requests[1].body,{body:'Test reply'});
- assert.equal(requests[2].body.sendingIdentity,'Self');
- assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
- assert.equal(w.messageFirstName('fwright',[],'Team member',true),'fwright');
- assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'fwright');
- assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-scroll]'),b=>b.dataset.jobScroll),['media','overview','subjects','tasks','activity']);
- assert.equal(w.document.querySelector('.detail-header .activity-button'),null);
- assert.equal(w.document.querySelector('[data-job-scroll=activity]')?.dataset.jobScroll,'activity');
- assert.ok(w.document.querySelector('.job-detail-board'));
- await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-detail-right #jobDetailMessages.smc-card'));assert.ok(w.document.querySelector('[aria-label="Filter media by collection"]'));assert.ok(w.document.querySelector('.jd-attention'));assert.equal(w.document.querySelector('.job-context-sidebar'),null);assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
- assert.equal(w.document.querySelector('.workspace-settings-action'),null);assert.equal(w.document.querySelector('[data-tab=members]'),null);
- assert.equal(w.document.querySelector('details.job-details-card'),null);assert.equal(w.document.querySelector('[data-job="job"]'),null);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
+test('workspace Job Details keeps media dominant without retired reply cards or duplicate panels',async t=>{
+ const {w}=require('./job-detail-fixture.cjs').environment(t);await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,20));
+ assert.ok(w.document.querySelector('.job-detail-board .jd-contact-sheet'));assert.ok(w.document.querySelector('.jd-job-brief'));assert.ok(w.document.querySelector('[aria-label="Filter media by collection"]'));
+ assert.equal(w.document.querySelector('.job-detail-right,#jobDetailMessages,#hierarchyCompose,.job-context-sidebar,.gallery-upload-card,.workspace-settings-action'),null);assert.equal(w.document.querySelectorAll('.jd-workflow-display').length,1);
 });
+
 test('current shell keeps obsolete left navigation removed',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const shell=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});
@@ -101,9 +69,9 @@ test('job handoff uses shoot completion, never first upload, and shows blocked w
 test('FrontDesk search preserves focus and separates enquiry and booking queues',()=>{
  const {w,panel}=environment();panel.id='genericView';
  Object.assign(w,{activateView(){},activateNavigation(){},conversationView:{classList:{add(){}}},genericView:panel,money:n=>'JMD '+n,openWorkspaceJob(){},openPos(){},json:async()=>({frontDesk:true,user:{isAdministrator:true}})});
- w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"\nfrontDeskJobs=[{id:'job',clientName:'Campbell',title:'Wedding',status:'Needs Scheduling'}];frontDeskRequests=[{id:'request',request:{clientName:'Campbell',title:'Wedding',eventDate:'2026-10-10',requiredDeposit:100,workspaceId:'workspace'},recordedDeposit:40,status:'AwaitingDeposit'}];frontDeskTab='requests';frontDeskWorkspaces=[{id:'workspace',name:'Weddings'}];renderFrontDesk();");
+ w.eval(fs.readFileSync(path.join(root,'management.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"\nfrontDeskJobs=[{id:'job',clientName:'Campbell',title:'Wedding',status:'Needs Scheduling'}];frontDeskRequests=[{id:'request',request:{clientName:'Campbell',title:'Wedding',eventDate:'2026-10-10',requiredDeposit:100,workspaceId:'workspace'},recordedDeposit:40,status:'AwaitingDeposit'}];frontDeskTab='today';frontDeskDate='2026-10-10';frontDeskWorkspaces=[{id:'workspace',name:'Weddings'}];renderFrontDesk();");
  const input=panel.querySelector('#frontDeskSearch');input.focus();input.value='Campbell';input.oninput({target:input});assert.equal(panel.querySelector('#frontDeskSearch'),input);assert.equal(w.document.activeElement,input);
- assert.ok(panel.querySelector('[data-fd-row-open="request"]'));assert.match(panel.textContent,/Ready for confirmation/);assert.equal(panel.querySelector('[data-frontdesk-job]'),null);
+ assert.ok(panel.querySelector('[data-fd-row-open="request"]'));assert.match(panel.textContent,/Awaiting deposit/);assert.equal(panel.querySelector('[data-frontdesk-job]'),null);
 });
 
 test('shared request helper accepts empty successful responses',async()=>{
@@ -138,27 +106,27 @@ test('Media collection controls persist names and dropped files target the selec
  const {w,panel}=environment();w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  w.FormData=class {entries=[];append(key,value){this.entries.push([key,value]);}get(key){return this.entries.find(x=>x[0]===key)?.[1];}};
  const data={gallery:{default_collection:'General'},collections:['General'],subjects:[],assets:[],unmatched:[]},calls=[];
- w.json=async(url,options)=>{if(url.endsWith('/media'))return data;if(url.endsWith('/access'))return {permissions:{manageProduction:true}};if(url.includes('/activities?'))return [];if(options){calls.push({url,options});if(url.endsWith('/collections'))data.collections.push(JSON.parse(options.body).name);if(url.includes('/collections/General'))data.collections=data.collections.map(x=>x==='General'?JSON.parse(options.body).name:x);return {assetId:'image'};}return [];};
- w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));
+ w.json=async(url,options)=>{if(url.endsWith('/connected-workflow'))return {data:{sessions:[]}};if(url.endsWith('/media'))return data;if(url.endsWith('/access'))return {permissions:{manageProduction:true}};if(url.includes('/activities?'))return [];if(options){calls.push({url,options});if(url.endsWith('/collections'))data.collections.push(JSON.parse(options.body).name);if(url.includes('/collections/General'))data.collections=data.collections.map(x=>x==='General'?JSON.parse(options.body).name:x);return {assetId:'image'};}return [];};
+ w.eval(fs.readFileSync(path.join(root,'subject-picker.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));
  await w.renderProductionMedia({id:'job'},panel,()=>true);
  panel.querySelector('[data-new-collection]').click();let form=w.document.querySelector('dialog form');form.elements.name.value='Portraits';await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.equal(panel.querySelector('[data-collection]').value,'Portraits');
  await panel.querySelector('.media-drop-surface').ondrop({preventDefault(){},dataTransfer:{files:[{name:'portrait.jpg'}]}});
- let uploadForm=[...w.document.querySelectorAll('dialog form')].find(x=>x.closest('dialog')?.textContent.includes('Add / Upload'));
+ await new Promise(resolve=>setImmediate(resolve));let uploadForm=[...w.document.querySelectorAll('dialog form')].find(x=>x.closest('dialog')?.textContent.includes('Add / Upload'));
  assert.ok(uploadForm);await uploadForm.onsubmit({preventDefault(){},currentTarget:uploadForm});
  await new Promise(resolve=>setTimeout(resolve,10));
- assert.equal(calls.find(x=>x.url.endsWith('/uploads')).options.body.get('collection'),'Portraits');
+ assert.equal(JSON.parse(calls.find(x=>x.url.endsWith('/media/upload-batches')).options.body).collection,'Portraits');assert.ok(calls.find(x=>x.url.endsWith('/uploads')).options.body.get('uploadId'));
  panel.querySelector('[data-rename-collection]').click();form=[...w.document.querySelectorAll('dialog form')].find(x=>x.closest('dialog')?.textContent.includes('Rename collection'));assert.ok(form);form.elements.name.value='Portraits edited';await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.ok(calls.some(x=>x.url.includes('/collections/Portraits')));
 });
 test('upcoming tasks keep the Add task action outside the scrolling task list',async()=>{
- const {w,panel}=environment();w.studioFirstName=value=>value;
+ const {w,panel}=environment();w.studioFirstName=value=>value;w.StudioWorkflow={current:async()=>({canManage:true,canReview:true,userName:'staff',data:{}}),canReportTask:()=>true,open:async()=>{}};
  w.json=async url=>url.endsWith('/access')?{permissions:{manageProduction:true}}:Array.from({length:8},(_,i)=>({id:'task'+i,title:'Task '+i,status:'NotStarted',assignedTo:'staff'}));
  w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));
  await w.renderCompactTasks({id:'job'},panel,()=>true);
  assert.equal(panel.querySelector('.thread-task-list .compact-task')?.textContent.includes('Task 0'),true);
  assert.equal(panel.querySelector('.thread-task-list [data-all]'),null);
- assert.equal(panel.querySelector('.thread-task-footer [data-all]')?.textContent,'Add task / View all');
+ assert.equal(panel.querySelector('.thread-task-footer [data-all]')?.textContent,'View all');
 });
 test('large Media jobs show a searchable subject list beside overflowing images',async()=>{
  const {w,panel}=environment();
@@ -181,15 +149,14 @@ test('Pipeline shows stage groups with schedule and task on timeline and calenda
  const today=new Date();const time=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,10).toISOString();const end=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,12).toISOString();
  const requests=[];
  w.json=async(url,options)=>{requests.push(url);if(options)return {id:'new'};if(url==='/api/jobs')return [{id:'job',title:'Wedding',status:'Needs Scheduling',clientName:'Brown'}];if(url.startsWith('/api/schedule/entries?'))return [{id:'shoot',jobId:'job',title:'Wedding shoot',startsAtUtc:time,endsAtUtc:end,resourceIds:['photographer'],status:'Scheduled'},{id:'general',jobId:null,title:'Studio booking',startsAtUtc:time,endsAtUtc:end,resourceIds:[],status:'Tentative'}];if(url==='/api/operations/activities')return [{id:'task',jobId:'job',title:'Confirm location',scheduledAtUtc:time,dueAtUtc:time,status:'NotStarted'}];if(url==='/api/schedule/resources')return [{id:'photographer',name:'Taberfa',resourceType:'Staff',isActive:true}];if(url==='/api/auth/me')return {user:{isAdministrator:true}};if(url==='/api/workspaces')return [{id:'workspace',name:'Weddings'}];throw Error(url);};
- w.eval(fs.readFileSync(path.join(root,'studio-page.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'scheduling.js'),'utf8'));
- await w.showPipeline();
+ for(const file of ['calendar-layouts.js','studio-status-order.js','subject-picker.js','studio-page.js','scheduling.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));
+ await w.showPipeline();w.genericView.querySelector('[data-pipeline-view="timeline"]').click();await new Promise(r=>setTimeout(r,10));
  assert.match(w.genericView.textContent,/Needs scheduling/);assert.match(w.genericView.textContent,/Wedding shoot/);assert.match(w.genericView.textContent,/Confirm location/);assert.match(w.genericView.textContent,/Unlinked schedule/);
  assert.equal(w.genericView.querySelectorAll('.pipeline-stage-lane').length,2);
  w.genericView.querySelector('[data-pipeline-view="calendar"]').click();await new Promise(resolve=>setTimeout(resolve,10));
  assert.ok(w.genericView.querySelector('.pipeline-calendar'));assert.match(w.genericView.textContent,/Wedding shoot/);
- w.genericView.querySelector('[data-stage="Needs scheduling"]').click();await new Promise(resolve=>setTimeout(resolve,10));
- assert.equal(w.genericView.querySelector('[data-stage="Needs scheduling"]').getAttribute('aria-pressed'),'true');
- w.genericView.querySelector('#pipelineNewSchedule').click();const form=w.genericView.querySelector('#scheduleEntryForm');
+ w.genericView.querySelector('[data-pipeline-view="jobs"]').click();await new Promise(resolve=>setTimeout(resolve,10));const stage=w.genericView.querySelector('#pipelineStatusFilter');stage.value='Needs Scheduling';stage.dispatchEvent(new w.Event('change'));await new Promise(resolve=>setTimeout(resolve,10));assert.equal(stage.value,'Needs Scheduling');
+ w.openScheduleEntryForm('job');const form=w.genericView.querySelector('#scheduleEntryForm');
  form.querySelector('#scheduleJob').value='job';form.querySelector('#scheduleTitle').value='Extra shoot';
  await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.ok(requests.some(url=>url==='/api/schedule/entries'));
@@ -206,31 +173,32 @@ test('large galleries render one bounded page of previews and advance using a se
 });
 
 
-test('Workspaces keeps Today breadcrumb and three-column rails',()=>{
+test('Workspaces keeps Today breadcrumbs and a single center panel without retired rails',()=>{
  const source=fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8');
  const workspaceSource=fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8');
  const css=fs.readFileSync(path.join(root,'studio.css'),'utf8');
  assert.match(source,/workspace-list-layout/);
  assert.doesNotMatch(source,/class="workspace-left-rail"/);
  assert.match(source,/workspace-center-panel/);
- assert.match(source,/workspace-right-rail/);
- assert.match(fs.readFileSync(path.join(root,'studio-shell-nav.js'),'utf8'),/label: 'Today', view: 'today'/);
+ assert.doesNotMatch(source,/workspace-right-rail/);
+ assert.match(fs.readFileSync(path.join(root,'studio-shell-nav.js'),'utf8'),/Navigation History/);
 
  assert.match(workspaceSource,/\{label:'Today',view:'today'\}/);
  assert.match(workspaceSource,/\{label:'Workspaces',view:'workspaces'\}/);
- assert.match(css,/body \.shell>\.studio-context-rail/);
+ assert.doesNotMatch(css,/body \.shell>\.studio-context-rail/);
 });
 
 
-test('Jobs uses its dedicated renderer and shared shell rail',()=>{
+test('Jobs uses its dedicated renderer and permanent shared navigation',()=>{
  const navigation=fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8');
  const jobs=fs.readFileSync(path.join(root,'jobs-page.js'),'utf8');
  const shell=fs.readFileSync(path.join(root,'studio-shell-nav.js'),'utf8');
  assert.match(navigation,/jobs:renderJobs/);
  assert.match(navigation,/StudioJobsPage.render/);
  assert.match(jobs,/\/api\/workflow\/jobs/);
- assert.match(shell,/sj-rail-card/);
- assert.match(shell,/studioOpenJobs/);
+ assert.doesNotMatch(shell,/sj-rail-card/);assert.match(shell,/studioNavigationTools/);
+ assert.match(navigation,/studioOpenJobs/);
 });
+
 
 

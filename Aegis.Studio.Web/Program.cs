@@ -27,9 +27,11 @@ using Aegis.Studio.Web.Storage;
 using Aegis.Studio.Web.WorkDay;
 using Common.Diagnostics;
 using Common.Secrets;
+using Common.Security.Hosting;
+using Common.Security.Abstractions;
+using Common.Security.Models;
 using Common.Storage;
 using Common.Registration;
-using Common.Security.Abstractions;
 using Common.Security.Integration;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -131,14 +133,33 @@ builder.Services.AddSingleton<NpgsqlDataSource>(services =>
 });
 builder.Services.AddSingleton(services =>
     new StudioDatabase(services.GetRequiredService<NpgsqlDataSource>(), studioConnectionString));
+builder.Services.AddCommonAccountSecurity(services => services.GetRequiredService<StudioDatabase>().OpenConnection(), "Aegis.Studio");
 builder.Services.AddSingleton<StudioFeatureDatabase>();
 builder.Services.AddSingleton<StudioMessagingDatabase>();
 
-AuthenticationPluginLoader.Register(
-    builder.Services,
-    builder.Configuration,
-    builder.Environment.ContentRootPath);
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => { options.Cookie.Name = "Aegis.Studio.Auth"; options.Cookie.HttpOnly = true; options.Cookie.SameSite = SameSiteMode.Strict; options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; options.LoginPath = "/login"; options.AccessDeniedPath = "/login"; options.ExpireTimeSpan = TimeSpan.FromHours(8); options.SlidingExpiration = true; options.Events.OnRedirectToLogin = context => { if (context.Request.Path.StartsWithSegments("/api")) { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; } context.Response.Redirect(context.RedirectUri); return Task.CompletedTask; }; });
+if (builder.Configuration.GetValue("AuthenticationPlugin:Enabled", true))
+    AuthenticationPluginLoader.Register(builder.Services, builder.Configuration, builder.Environment.ContentRootPath);
+var studioAuthentication = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => { options.Cookie.Name = "Aegis.Studio.Auth"; options.Cookie.HttpOnly = true; options.Cookie.SameSite = SameSiteMode.Strict; options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; options.LoginPath = "/login"; options.AccessDeniedPath = "/login"; options.ExpireTimeSpan = TimeSpan.FromHours(8); options.SlidingExpiration = true; options.Events.OnValidatePrincipal = StudioSignIn.ValidateCookieAsync; options.Events.OnRedirectToLogin = context => { if (context.Request.Path.StartsWithSegments("/api")) { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; } context.Response.Redirect(context.RedirectUri); return Task.CompletedTask; }; });
+if (builder.Configuration.GetValue("Authentication:Entra:Enabled", false))
+{
+    string tenant = Guid.Parse(builder.Configuration["Authentication:Entra:TenantId"] ?? "").ToString("D");
+    string issuer = $"https://login.microsoftonline.com/{tenant}/v2.0";
+    studioAuthentication.AddCommonOpenIdConnect(new CommonOpenIdConnectOptions(
+        "StudioEntra", issuer, builder.Configuration["Authentication:Entra:ClientId"] ?? "",
+        await secretProvider.GetRequiredAsync("Authentication:Entra:ClientSecret"), "/signin-entra",
+        CookieAuthenticationDefaults.AuthenticationScheme,
+        new Common.Security.Integration.ExternalIdentityRegistration("studio-entra", issuer, AuthenticationProviderKind.EntraId, [tenant])),
+        async (context, identity) =>
+        {
+            try
+            {
+                var principal = await StudioSignIn.CreatePrincipalAsync(identity, context.HttpContext.RequestServices, context.HttpContext.RequestAborted);
+                if (principal is null) context.Fail("This account has no approved Studio access.");
+                else context.Principal = principal;
+            }
+            catch (IdentityEnrollmentRequiredException) { context.Fail("An administrator must approve the provider identity binding."); }
+        });
+}
 builder.Services.AddAuthorization(options => { options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build(); });
 builder.Services.AddHealthChecks();
 
@@ -252,6 +273,7 @@ forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
 app.MapDiagnosticLevelRuntime();
 await app.Services.GetRequiredService<StudioDatabase>().InitializeAsync();
+app.InitializeCommonAccounts();
 await app.Services.GetRequiredService<StudioFeatureDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioMessagingDatabase>().InitializeAsync();
 Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogStore publicBookingCatalog=app.Services.GetRequiredService<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogStore>();
@@ -302,6 +324,8 @@ app.Use(async (context, next) =>
 app.UseMiddleware<StorageFailureMiddleware>();
 app.UseMiddleware<TodayStartupTimingMiddleware>();
 app.UseAuthentication();
+app.UseCommonAccountEnforcement("/login", "/login.html", "/login.js", "/api/auth/me", "/api/auth/logout", "/assets/bryan-studios-logo.png", "/assets/aegis-studio-login-background.png");
+app.UseRateLimiter();
 app.UseMiddleware<WorkDayDeviceTokenMiddleware>();
 app.Use(async (context, next) => { bool document = context.Request.Path == "/" || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase); if (document && context.User.Identity?.IsAuthenticated != true) { context.Response.Redirect("/login"); return; } await next(); });
 app.UseAuthorization();
@@ -315,6 +339,7 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 app.MapGet("/login", (IWebHostEnvironment e) => Results.File(Path.Combine(e.WebRootPath, "login.html"), "text/html; charset=utf-8")).AllowAnonymous();
+app.MapGet("/login.js", (IWebHostEnvironment e) => Results.File(Path.Combine(e.WebRootPath, "login.js"), "application/javascript; charset=utf-8")).AllowAnonymous();
  // Explicitly allow only the login artwork needed before sign-in.
  // Keep the authorization fallback in place for every other static asset and API.
 app.MapGet("/assets/studio-login-logo.png", (IWebHostEnvironment e) =>

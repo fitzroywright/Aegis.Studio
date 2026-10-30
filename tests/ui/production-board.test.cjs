@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),{JSDOM}=require('jsdom'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot'),settle=()=>new Promise(r=>setImmediate(r));
 function setup(t,data){
- const dom=new JSDOM('<body data-studio-view="production"><div id="genericView"></div><div id="conversationView"></div><span id="studioFooterRate"></span></body>',{url:'https://studio.test',runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());let revision=0;
+ const dom=new JSDOM('<body data-studio-view="production"><div id="genericView"></div><div id="conversationView"></div><span id="studioFooterRate"></span></body>',{url:'https://studio.test',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;t.after(()=>w.close());let revision=0;
  Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),studioFirstName:v=>v,loadWorkspaces:async()=>[{id:'w',name:'Work'}],alert:e=>{w.errors.push(e);},errors:[],money:String,studioNavigate:async(view,options)=>w.navigation.push({view,options}),navigation:[]});
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));w.esc=esc;
  w.StudioPage={begin:()=>{const at=++revision;return ()=>at===revision&&w.document.body.dataset.studioView==='production';},escape:esc,html:o=>'<aside data-overview>'+o.summary+'</aside><section class="st-board"><div class="st-content">'+o.content+'</div></section>',bind(){},query:(host,s)=>host.querySelector(s),queryAll:(host,s)=>host.querySelectorAll(s)};
@@ -52,10 +52,19 @@ test('current job stage wins over overdue or blocked future work',async t=>{
 });
 test('load failures show Retry and stale responses cannot replace a newer list',async t=>{
  const data=fixture(),{w}=setup(t,data),base=w.json;let release;w.json=url=>url==='/api/production/workload'?new Promise(r=>release=r):base(url);const old=w.showCatalogProduction();await settle();w.json=base;await w.showCatalogProduction();release({...fixture(),jobs:[]});await old;assert.ok(w.genericView.querySelector('[data-production-job="j"]'));
- w.json=async()=>{throw Error('Database unavailable');};await w.showCatalogProduction();assert.match(w.genericView.textContent,/Database unavailable/);assert.ok(w.genericView.querySelector('[data-production-retry]'));
+ w.json=async()=>{throw Error('Database unavailable');};w.genericView.querySelector('[data-production-refresh]').click();await settle();await settle();assert.match(w.genericView.textContent,/Database unavailable/);assert.ok(w.genericView.querySelector('[data-production-retry]'));
 });
 test('production photo updates preserve the job card and fall back to a labelled placeholder on failure',async t=>{
  const data=fixture(),{w}=setup(t,data);const json=w.json;w.json=async url=>url==='/api/production/media-summary'?[{jobId:'j',thumbnailVersionIds:['photo']}]:json(url);
  await w.showCatalogProduction();await settle();const card=w.genericView.querySelector('[data-production-job="j"]');const image=card.querySelector('.production-job-image img');assert.ok(image);assert.match(image.src,/jobs\/j\/versions\/by-id\/photo\/preview/);
  image.dispatchEvent(new w.Event('error'));assert.equal(w.genericView.querySelector('[data-production-job="j"]'),card);assert.match(card.querySelector('.production-job-image').textContent,/No image ready yet/);card.click();assert.equal(w.navigation.at(-1).options.jobId,'j');
+});
+
+
+for(const status of [401,403])test('Production removes cached jobs after HTTP '+status+' and Retry cannot revive denied records',async t=>{
+ const {w}=setup(t,fixture());await w.showCatalogProduction();assert.ok(w.genericView.querySelector('[data-production-job="j"]'));
+ w.json=async()=>{throw Object.assign(Error('Access unavailable'),{status});};
+ await w.showCatalogProduction();await settle();
+ assert.equal(w.genericView.querySelector('[data-production-job]'),null);assert.match(w.genericView.textContent,/Access unavailable/);
+ w.genericView.querySelector('[data-production-retry]').click();await settle();assert.equal(w.genericView.querySelector('[data-production-job]'),null);
 });

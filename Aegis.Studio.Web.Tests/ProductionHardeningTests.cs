@@ -7,7 +7,6 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class ProductionHardeningTests
 {
     [Theory]
-    [InlineData("POST", "/api/auth/login", "auth-login")]
     [InlineData("POST", "/api/bookings", "public-booking")]
     [InlineData("POST", "/api/bookings/11111111-1111-1111-1111-111111111111/payment-confirmations", "payment-confirmation")]
     [InlineData("GET", "/public/galleries/token/items/11111111-1111-1111-1111-111111111111/preview", "public-gallery")]

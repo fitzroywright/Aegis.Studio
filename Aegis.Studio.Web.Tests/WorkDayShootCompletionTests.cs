@@ -21,7 +21,8 @@ public sealed class WorkDayShootCompletionTests
         var entry=new ScheduleStore(db,new ConfigurationBuilder().Build()).Create(new(context.Job,null,"Photography",start,start.AddHours(1),"Studio","Scheduled",null,[a.ScheduleResourceId,b.ScheduleResourceId]));
         var shoot=new OperationalWorkStore(db).CreateShoot(context.Job,new(entry.Id,"a","b",start,start.AddHours(1),"Studio",null,null),"Manager");
         Execute("create table studio_workflow_sessions(id uuid primary key,job_id uuid,shoot_id uuid,required boolean);create function studio_workflow_notify(uuid,text,text,text,text) returns void language plpgsql as 'begin return; end';");
-        Execute("insert into studio_workflow_sessions values($1,$2,$3,true);update studio_jobs set status='Scheduled' where id=$2",Guid.NewGuid(),context.Job,shoot.Id);
+        Execute("insert into studio_workflow_sessions values($1,$2,$3,true)",Guid.NewGuid(),context.Job,shoot.Id);
+        Execute("update studio_jobs set status='Scheduled' where id=$1",context.Job);
         Execute(MediaUploadReceipts.Schema);
         Execute("alter table studio_media_assets add column if not exists deleted_at_utc timestamptz");
         Guid Receipt(string person)
@@ -67,3 +68,4 @@ public sealed class WorkDayShootCompletionTests
         Assert.DoesNotContain("UploadIds",System.Text.Json.JsonSerializer.Serialize(request));
     }
 }
+

@@ -111,7 +111,7 @@ test('toolstrip ends with the existing bell and avatar while their menus remain 
  const account=host.lastElementChild;
  assert.ok(account.classList.contains('studio-navigation-account'));
  assert.equal(account.firstElementChild,bell);
- assert.equal(account.lastElementChild,avatar);
+ assert.equal(account.lastElementChild,w.document.querySelector('.studio-user-identity'));assert.equal(account.contains(avatar),true);
  assert.equal(w.document.querySelectorAll('#notificationButton').length,1);
  assert.equal(w.document.querySelectorAll('.user-menu').length,1);
  await bell.onclick();
@@ -123,7 +123,7 @@ test('toolstrip ends with the existing bell and avatar while their menus remain 
  avatar.querySelector('[data-studio-avatar-notifications]').click();
  assert.deepEqual(calls,['notifications']);assert.equal(avatar.open,false);
  w.StudioShell.sync('jobs');
- assert.equal(account.firstElementChild,bell);assert.equal(account.lastElementChild,avatar);
+ assert.equal(account.firstElementChild,bell);assert.equal(account.lastElementChild,w.document.querySelector('.studio-user-identity'));assert.equal(account.contains(avatar),true);
 });
 
 test('shared footer restores count and keeps history and workspace selection across pages',async t=>{
@@ -203,3 +203,4 @@ test('footer workspace selection and attention mounting work without Page action
  assert.equal(w.document.querySelector('#studioPageAttention button').textContent,'Check job');
  assert.equal(w.document.querySelector('#studioPageMenu,#studioPageContext'),null);
 });
+

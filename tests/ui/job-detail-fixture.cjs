@@ -2,7 +2,7 @@
 const fs=require('fs');
 const path=require('path');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-const scripts=['studio-status-order.js','dagre.min.js','workflow-graph.js','subject-picker.js','studio-message-card.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','studio-next-actions.js','job-details.js','workspace-outlook.js','studio-shell-nav.js'];
+const scripts=['studio-status-order.js','calendar-layouts.js','studio-page.js','dagre.min.js','workflow-graph.js','subject-picker.js','studio-message-card.js','job-handoff.js','job-workspace.js','job-brief.js','media-production.js','connected-workflow.js','studio-next-actions.js','job-details.js','job-workflow-display.js','job-workflow-graph.js','workspace-outlook.js','studio-shell-nav.js'];
 function setup(w){
  const jobs=[{id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Wedding selects review',clientName:'Williams & Clarke',status:'Awaiting Production Review',eventDate:'2026-10-11'},{id:'job2',workspaceId:'workspace',conversationId:'conversation2',title:'Graduation portraits',clientName:'School',status:'Awaiting Scheduling'}];
  const calls=[],alerts=[];
@@ -66,5 +66,6 @@ function environment(t){
  return {w,fixture,dom};
 }
 module.exports={environment,setup,scripts,root};
+
 
 

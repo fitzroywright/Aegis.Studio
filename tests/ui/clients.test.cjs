@@ -130,15 +130,15 @@ test('printing clones the card statement and preserves signed ledger values',asy
  assert.ok(w.document.querySelector('[data-c-statement]'));
 });
 
-test('the actual Clients left rail contains no Messages or Notes card',async t=>{
+test('Client Management omits retired rails and message cards while finance remains usable',async t=>{
  const {dom,w}=setup();t.after(()=>dom.window.close());
  const shell=w.document.createElement('div');shell.className='shell';w.document.body.append(shell);
  w.fetch=async()=>({ok:true,json:async()=>[]});
  w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/studio-shell-nav.js'),'utf8'));
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
  await w.StudioClients.render({clientId:'a'});await settle();
- const rail=w.document.getElementById('studioContextRail');assert.ok(rail);
- assert.equal(rail.querySelector('.smc-card,#clientMessageCard,[data-page-messages]'),null);
+ assert.equal(w.document.getElementById('studioContextRail'),null);
+ assert.equal(w.document.querySelector('#clientMessageCard,[data-page-messages]'),null);
  tab(w,'finance');await settle();
  assert.equal(w.document.querySelector('.client-statement-heading h3').textContent,'Financial Statement');
  assert.equal(w.document.querySelector('.client-statement-eyebrow'),null);
@@ -211,3 +211,4 @@ test('link errors remain visible and retryable; client navigation closes the dia
  fixture.failLink=false;let release;fixture.linkDelay=new Promise(resolve=>release=resolve);dialog.querySelector('[data-link-create]').click();dialog.querySelector('[data-link-create]').click();assert.equal(fixture.calls.filter(call=>call.options?.method==='POST').length,2);
  await w.StudioClients.render({clientId:'b',tab:'jobs'});release();await settle();assert.equal(w.document.querySelector('dialog'),null);assert.equal(dialog.querySelector('[data-link-code]').value,'');assert.match(w.document.querySelector('[data-c-content]').textContent,/Other client job/);
 });
+
