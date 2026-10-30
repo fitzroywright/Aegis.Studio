@@ -251,7 +251,57 @@ async function runMailboxImport(workspaceId) {
 }
 
 function renderEmployeeDirectorySection() {
-    return `<section class="staff-administration"><div class="staff-editors"><section class="staff-editor"><h2>Add staff member</h2><div class="staff-entry"><label>User name<input id="employeeUserName" autocomplete="off"></label><label>Display name<input id="employeeDisplayName"></label><label>Email<input id="employeeEmail" type="email"></label><label>Assignable<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><button type="button" class="primary" onclick="saveStudioEmployee()">Save employee</button></div></section>${renderStudioRoleEditor()}<div class="staff-global-roles" data-staff-global-roles></div></div><section class="staff-grid-section"><header><h2>Staff directory</h2><span>Edit a row, then Save. User names identify existing accounts.</span></header><div id="studioEmployeeList" class="staff-grid-scroll"><p role="status">Loading…</p></div></section>${renderStudioRoleGrid()}</section>`;
+    return `<section class="staff-administration">
+        <nav class="staff-role-tabs" aria-label="Staff and roles sections">
+            <button type="button" class="primary" data-staff-tab="staff" aria-selected="true" onclick="selectStaffRoleTab('staff')">Staff</button>
+            <button type="button" class="action" data-staff-tab="roles" aria-selected="false" onclick="selectStaffRoleTab('roles')">Roles &amp; Permissions</button>
+            <button type="button" class="action" data-staff-tab="assignments" aria-selected="false" onclick="selectStaffRoleTab('assignments')">Assignments</button>
+        </nav>
+        <div data-staff-panel="staff">
+            <header class="staff-directory-toolbar"><div><h2>Staff directory</h2><p class="muted">Studio-wide staff identities. Workspace access is granted separately.</p></div><button type="button" class="primary" onclick="openStudioStaffDialog()">Add staff</button></header>
+            <section class="staff-grid-section"><div id="studioEmployeeList" class="staff-grid-scroll"><p role="status">Loading…</p></div></section>
+        </div>
+        <div data-staff-panel="roles" hidden>
+            <header class="staff-directory-toolbar"><div><h2>Roles &amp; Permissions</h2><p class="muted">Reusable job and workspace security roles.</p></div><button type="button" class="primary" onclick="openStudioRoleDialog()">Create role</button></header>
+            ${renderStudioRoleGrid()}
+        </div>
+        <div data-staff-panel="assignments" hidden>
+            <header class="staff-directory-toolbar"><div><h2>Global operational assignments</h2><p class="muted">Cross-workspace responsibilities; separate from job and workspace permissions.</p></div></header>
+            <div class="staff-global-roles" data-staff-global-roles></div>
+        </div>
+    </section>`;
+}
+function selectStaffRoleTab(tab) {
+    const root=document.querySelector('.staff-administration');
+    if(!root)return;
+    root.querySelectorAll('[data-staff-panel]').forEach(panel=>{panel.hidden=panel.dataset.staffPanel!==tab;});
+    root.querySelectorAll('[data-staff-tab]').forEach(button=>{
+        const active=button.dataset.staffTab===tab;
+        button.setAttribute('aria-selected',String(active));
+        button.classList.toggle('primary',active);
+        button.classList.toggle('action',!active);
+    });
+}
+function openStudioStaffDialog() {
+    const dialog=studioDialog('Add staff member',`<form class="request-form" id="staffCreateForm"><label>User name<input id="employeeUserName" required autocomplete="off"></label><label>Display name<input id="employeeDisplayName" required></label><label>Email<input id="employeeEmail" type="email"></label><label>Assignable<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Add staff</button></div></form>`);
+    dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
+    dialog.querySelector('form').onsubmit=async event=>{
+        event.preventDefault();
+        const button=dialog.querySelector('[type=submit]');button.disabled=true;
+        try{await saveStudioEmployee();dialog.close();}catch(error){dialog.querySelector('[role=alert]').textContent=error.message||String(error);}
+        finally{button.disabled=false;}
+    };
+}
+function openStudioRoleDialog() {
+    const dialog=studioDialog('Create reusable role',`<form class="request-form" id="roleCreateForm">${renderStudioRoleEditor()}<p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Create role</button></div></form>`);
+    const embedded=dialog.querySelector('.staff-editor > .staff-entry > button');
+    if(embedded)embedded.remove();
+    dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
+    dialog.querySelector('form').onsubmit=async event=>{
+        event.preventDefault();const button=dialog.querySelector('[type=submit]');button.disabled=true;
+        try{await createStudioRole();dialog.close();}catch(error){dialog.querySelector('[role=alert]').textContent=error.message||String(error);}
+        finally{button.disabled=false;}
+    };
 }
 async function refreshStudioEmployees(){
     const holder=document.getElementById('studioEmployeeList');if(!holder)return;
