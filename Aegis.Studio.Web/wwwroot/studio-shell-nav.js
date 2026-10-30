@@ -18,6 +18,7 @@
     let workspaceLoadPromise = null;
     let workspaceLoadAttempted = false;
     let productionWorkspaceFilter = null;
+    let mediaWorkspaceFilter = null;
     const pageAttention = new Map();
     let sharedAttention={items:[],loaded:false,error:''};
     async function loadSharedAttention(){if(!window.StudioAttention)return;try{sharedAttention=await window.StudioAttention.load();}catch{sharedAttention={items:[],loaded:false,error:'Needs Attention could not be loaded. Reopen to retry.'};}refreshPageDrawers();}
@@ -143,6 +144,8 @@
         const cache = typeof workspaceCache !== 'undefined' ? workspaceCache : window.workspaceCache;
         const workspaces = document.body.dataset.studioView === 'production' && productionWorkspaceFilter
             ? productionWorkspaceFilter.workspaces
+            : document.body.dataset.studioView === 'media' && mediaWorkspaceFilter
+            ? mediaWorkspaceFilter.workspaces
             : (Array.isArray(cache) ? cache : []).filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false);
         renderFooterWorkspaceMenu(workspaces);
     }
@@ -160,8 +163,10 @@
             footer.append(control);
         }
         const isProduction = document.body.dataset.studioView === 'production' && productionWorkspaceFilter;
+        const isMedia = document.body.dataset.studioView === 'media' && mediaWorkspaceFilter;
+        control.disabled = Boolean(isMedia && mediaWorkspaceFilter.locked);
         const savedSelection = window.sessionStorage.getItem('studio.footer.workspace.selection') || '';
-        const selectedId = isProduction ? String(productionWorkspaceFilter.selected || '') : savedSelection;
+        const selectedId = isProduction ? String(productionWorkspaceFilter.selected || '') : isMedia ? String(mediaWorkspaceFilter.selected || '') : savedSelection;
         control.replaceChildren();
         const all = new Option('Workspaces: All', '');
         control.add(all);
@@ -169,6 +174,9 @@
         control.value = workspaces.some(workspace => String(workspace.id) === selectedId) ? selectedId : '';
         control.onchange = () => {
             const id = control.value;
+            if (isMedia) {
+                return mediaWorkspaceFilter.onSelect?.(id);
+            }
             if(document.body.dataset.studioView === 'dashboard'){
                 window.sessionStorage.setItem('studio.footer.workspace.selection',id);
                 window.StudioDashboard?.render();
@@ -224,6 +232,10 @@
     };
 
     window.StudioShell={
+        setMediaWorkspaceFilter(workspaces, selected, onSelect, locked = false) {
+            mediaWorkspaceFilter = { workspaces: Array.isArray(workspaces) ? workspaces : [], selected: selected || '', onSelect, locked };
+            if (document.body.dataset.studioView === 'media') refreshWorkspaceMenu();
+        },
         setProductionWorkspaceFilter(workspaces, selected, onSelect) {
             productionWorkspaceFilter = { workspaces: Array.isArray(workspaces) ? workspaces : [], selected: selected || '', onSelect };
             if (document.body.dataset.studioView === 'production') refreshWorkspaceMenu();
@@ -589,7 +601,3 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })()
-
-
-
-
