@@ -326,13 +326,12 @@ function mergeJobMessages(teamMessages, clientMessages) {
             messageHeader.querySelector('[data-message-search]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');const term=prompt('Search this conversation');if(term===null)return;messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));};
             messageHeader.querySelector('[data-message-more]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();};
 
-            let workflow=null,workflowRequest=0,stageTiming=null,timingRequest=0;
+            let workflow=null,workflowRequest=0,stageTiming=null,timingRequest=0,currentNextAction;
             const updateAge=()=>{
-                const action=window.StudioJobDetails.workflowAction(workflow);
                 header.querySelector('[data-stage-age]').textContent=stageTiming===null?'Loading…':StudioJobDetails.stageAge(stageTiming);
                 document.querySelectorAll('[data-job-overview-age]').forEach(age=>age.textContent=header.querySelector('[data-stage-age]').textContent);
                 const next=document.querySelector('#studioPageContext [data-job-overview-action]');
-                if(next)next.textContent=action?.task?.title || 'No outstanding action';
+                if(next)next.textContent=currentNextAction===undefined?'Loading…':currentNextAction?.action.title||'No outstanding action';
             };
             const refreshTiming=async()=>{
                 const request=++timingRequest,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
@@ -355,7 +354,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     workflow=graphView;
                     const action=window.StudioJobDetails.workflowAction(graphView),task=action?.task;
                     StudioJobWorkflowDisplay.render(header.querySelector('.jd-workflow-track'),graphView);
-                    StudioJobDetails.nextActionLink(header.querySelector('.jd-next-action'),graphView,nodeId=>openGraphAction(nodeId));
+                    let nextRow=null;if(window.StudioNextActions){nextRow=await StudioNextActions.get('job',job.id);if(!current()||request!==workflowRequest)return;currentNextAction=nextRow;StudioNextActions.mount(header.querySelector('.jd-next-action'),nextRow,{compact:true});}
                     header.querySelector('.jd-status-pill').textContent=task?.title||(graphView.tasks?.length?'Workflow complete':'Workflow unavailable');
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(task?.assignedTo?studioFirstName(task.assignedTo):job.jobLead?studioFirstName(job.jobLead):'Unassigned');
                     const responsible=graphView.tasks?.find(item=>item.role&&item.assignedTo);
@@ -367,7 +366,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     header.querySelector('.jd-workflow-caption').hidden=!blocked;
                     const attentionItems=attention.querySelector('.jd-attention-items');
                     attentionItems.replaceChildren();
-                    const pendingTasks=(graphView.tasks||[]).filter(item=>!['Completed','Cancelled','Archived','Skipped'].includes(item.status)&&!['Inactive','Skipped'].includes(item.eligibility));
+                    const pendingTasks=(graphView.tasks||[]).filter(item=>item.id!==nextRow?.action.taskId).filter(item=>!['Completed','Cancelled','Archived','Skipped'].includes(item.status)&&!['Inactive','Skipped'].includes(item.eligibility));
                     attention.dataset.attentionCount=String(pendingTasks.length);
                     for(const pendingTask of pendingTasks){const item=document.createElement('button');item.type='button';item.dataset.attentionItem='task:'+pendingTask.id;item.textContent=pendingTask.title+(pendingTask.reason?' · '+pendingTask.reason:'');item.onclick=()=>openGraphAction(pendingTask.nodeId);attentionItems.append(item);}
                     const button=attention.querySelector('[data-view-workflow]');
@@ -378,7 +377,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(current()&&request===workflowRequest){
                         const message=error?.name==='AbortError'?'Workflow request timed out after 20 seconds.':error?.message||String(error);
                         console.error('[Studio Job Details] Failed to load workflow graph for job '+job.id,error);
-                        header.querySelector('.jd-next-action').replaceChildren();
+                        header.querySelector('.jd-next-action').innerHTML='<p role="alert">Next action unavailable. <button type="button" data-next-retry>Retry</button></p>';header.querySelector('[data-next-retry]').onclick=refreshWorkflow;
                         updateAge();
                         const overview=document.getElementById('studioPageContext');
                         const next=overview?.querySelector('[data-job-overview-action]');
@@ -401,7 +400,8 @@ function mergeJobMessages(teamMessages, clientMessages) {
             const navigationObserver=new MutationObserver(()=>{if(document.body.dataset.studioView!=='workspaces'){disposeJobView();disposeJobView=()=>{};}});
             navigationObserver.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});
             disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);taskDialog?.close();messageDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);drawerViews.forEach(view=>{view.drawer.remove();view.toggle?.removeAttribute('aria-expanded');view.toggle?.removeAttribute('aria-controls');});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
-            const graphChanged=event=>{if(event.detail?.jobId===job.id&&current())refreshWorkflow();};window.addEventListener('studio-workflow-changed',graphChanged,true);const previousDispose=disposeJobView;disposeJobView=()=>{window.removeEventListener('studio-workflow-changed',graphChanged,true);previousDispose();};
+            const nextChanged=event=>{if((!event.detail||event.detail.jobId===job.id)&&current())refreshWorkflow();};window.addEventListener('studio-next-actions-changed',nextChanged);
+            const graphChanged=event=>{if(!window.StudioNextActions&&event.detail?.jobId===job.id&&current())refreshWorkflow();};window.addEventListener('studio-workflow-changed',graphChanged,true);const previousDispose=disposeJobView;disposeJobView=()=>{window.removeEventListener('studio-next-actions-changed',nextChanged);window.removeEventListener('studio-workflow-changed',graphChanged,true);previousDispose();};
             detailPane.dataset.readyEnabled='true';refreshWorkflow();refreshLocation();selectPanel('media');
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
         } else {

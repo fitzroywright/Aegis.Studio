@@ -2,7 +2,7 @@
 const fs=require('fs');
 const path=require('path');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-const scripts=['studio-status-order.js','dagre.min.js','workflow-graph.js','subject-picker.js','studio-message-card.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js','studio-shell-nav.js'];
+const scripts=['studio-status-order.js','dagre.min.js','workflow-graph.js','subject-picker.js','studio-message-card.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','studio-next-actions.js','job-details.js','workspace-outlook.js','studio-shell-nav.js'];
 function setup(w){
  const jobs=[{id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Wedding selects review',clientName:'Williams & Clarke',status:'Awaiting Production Review',eventDate:'2026-10-11'},{id:'job2',workspaceId:'workspace',conversationId:'conversation2',title:'Graduation portraits',clientName:'School',status:'Awaiting Scheduling'}];
  const calls=[],alerts=[];
@@ -15,6 +15,7 @@ function setup(w){
  w.fetch=async()=>({ok:true,json:async()=>({user:{userName:'studio.admin',displayName:'Studio Admin'},channel:'Email',messages:[{id:'external',author:'Williams',body:'Please confirm availability.',createdAt:'2026-10-10T12:00:00Z',visibility:'External'}],identities:[{type:'Workspace'},{type:'Self'}]})});
  w.json=async(url,options)=>{
   calls.push({url,options});const base=url.split('?')[0];
+  if(base==='/api/work/next-actions'){const id=new URL(url,'https://studio.test').searchParams.get('id');return jobs.filter(job=>!id||job.id===id).map(job=>({kind:'job',entityId:job.id,jobId:job.id,conversationId:job.conversationId,workspaceId:job.workspaceId,entityTitle:job.title,action:{key:'review',title:'Review job requirements',reason:'Review the recorded workflow requirements.',route:'workflow'},assignedTo:'studio.admin',dueAtUtc:null,version:0,canManage:fixture.canEdit}));}
   if(base==='/api/jobs')return jobs;
   if(base==='/api/jobs/job'||base==='/api/jobs/job2')return jobs.find(j=>base.endsWith('/'+j.id));
   if(base.endsWith('/workflow-graph')){
@@ -65,4 +66,5 @@ function environment(t){
  return {w,fixture,dom};
 }
 module.exports={environment,setup,scripts,root};
+
 

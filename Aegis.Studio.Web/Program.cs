@@ -367,6 +367,7 @@ Aegis.Studio.Web.Intake.IntakeSchema.Ensure(app.Services.GetRequiredService<Stud
 Aegis.Studio.Web.Intake.IntakeRosterStore.Map(app);
 Aegis.Studio.Web.Intake.SubjectMessages.Map(app);
 app.MapStudioQuotes();
+app.MapStudioNextActions();
 app.MapJobAccess();
 app.MapStudioServiceStatus();
 app.MapJobWorkspaceParticipation();
@@ -755,6 +756,7 @@ app.MapPut("/api/admin/job-roles/{code}/active", (string code, bool active, Clai
 }).RequireAuthorization();
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
+
 
 
 

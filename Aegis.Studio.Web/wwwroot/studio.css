@@ -9285,6 +9285,8 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 }
 .studio-sessions-range { flex:0 0 auto; margin:0; padding:5px 10px 0; font-size:11px; color:#40576a; }
 .studio-attention-drawer > [data-sessions-calendar] { flex:0 0 auto; margin:0; min-height:28px; padding:3px 10px; border:0; border-top:1px solid #c8d1dc; border-radius:0; background:#234969; color:#fff; font:inherit; font-size:11px; line-height:20px; cursor:pointer; }
+.studio-attention-owner { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:11px; }
+.studio-attention-owner select { flex:1; min-width:0; padding:5px 8px; border:1px solid var(--studio-drawer-row-border,#e0e6ec); border-radius:4px; background:var(--theme-surface,#fff); color:inherit; font:inherit; }
 .studio-attention-details,.studio-message-bell-content { flex:1 1 auto; min-height:0; min-width:0; padding:8px 10px; display:grid; grid-template-columns:minmax(0,1fr); align-content:start; gap:8px; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; }
 .studio-attention-details button,.studio-message-bell-list button { display:flex; flex-direction:column; align-items:flex-start; gap:4px; width:100%; min-width:0; white-space:normal; padding:9px 5px; border:0; border-bottom:1px solid var(--studio-drawer-row-border,#e0e6ec); border-radius:0; background:transparent; color:inherit; text-align:left; font:inherit; font-size:12px; cursor:pointer; overflow-wrap:anywhere; }
 .studio-attention-details button:hover,.studio-message-bell-list button:hover { background:var(--studio-drawer-hover,#eaf0f7); }
@@ -9413,3 +9415,4 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 }
 @media(max-width:800px) { .company-dashboard { height:auto; grid-template-rows:auto; } .cd-main,.cd-bottom { grid-template-columns:minmax(0,1fr); } .cd-donut { max-height:none; width:140px; } .cd-week-chart { min-height:180px; } .cd-bottom .cd-card { overflow-x:auto; } .cd-card table { min-width:460px; } }
 @media(max-width:650px) { .cd-heading { align-items:stretch; } .cd-heading>div:first-child { flex-basis:100%; } .cd-card { padding:8px; } }
+
