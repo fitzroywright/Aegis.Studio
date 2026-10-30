@@ -45,7 +45,7 @@ window.StudioWorkspaceManagement={async render(){
       const data=new FormData();data.append('image',file);
       const response=await fetch('/api/workspaces/'+encodeURIComponent(id)+'/cover',{method:'PUT',body:data,credentials:'same-origin'});
       if(!response.ok){const detail=await response.json().catch(()=>({}));throw Error(detail.error||'Image could not be saved.');}
-      const image=document.createElement('img');image.alt='';image.src='/api/workspaces/'+encodeURIComponent(id)+'/cover?v='+Date.now();slot.replaceChildren(image);dialog.close();
+      const image=document.createElement('img');image.alt='';image.src='/api/workspaces/'+encodeURIComponent(id)+'/cover?v='+Date.now();slot.replaceChildren(image);slot.dataset.savedCover='true';dialog.close();
      }catch(cause){error.textContent=cause.message;save.disabled=false;}
     };
    };
@@ -53,6 +53,12 @@ window.StudioWorkspaceManagement={async render(){
    slot.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();open();}});
   });
   void hydrateWorkspaceManagers(visible);
-  void json('/api/production/media-summary').then(rows=>{if(!current())return;for(const item of visible){const jobIds=new Set(jobs.filter(job=>job.workspaceId===item.workspace.id).map(job=>job.id));const media=rows.find(row=>jobIds.has(row.jobId)&&row.thumbnailVersionIds?.length);if(!media||String(item.workspace.systemKey||item.workspace.name||'').trim().toLowerCase()==='unassigned')continue;const slot=genericView.querySelector('[data-workspace-photo="'+item.workspace.id+'"]');if(!slot)continue;const image=document.createElement('img');image.alt='';image.loading='lazy';image.src='/api/jobs/'+encodeURIComponent(media.jobId)+'/versions/by-id/'+encodeURIComponent(media.thumbnailVersionIds[0])+'/preview?size=thumbnail';image.onerror=()=>{slot.textContent='▧';};slot.replaceChildren(image);}}).catch(()=>{});
+  // Saved covers take precedence over automatically selected job thumbnails.
+  await Promise.all(visible.filter(item=>String(item.workspace.systemKey||item.workspace.name||'').trim().toLowerCase()!=='unassigned').map(async item=>{
+   const slot=genericView.querySelector('[data-workspace-photo="'+item.workspace.id+'"]');if(!slot)return;
+   const path='/api/workspaces/'+encodeURIComponent(item.workspace.id)+'/cover';
+   try{const response=await fetch(path,{credentials:'same-origin'});if(!response.ok)return;const blob=await response.blob();if(!current())return;const url=URL.createObjectURL(blob);const image=document.createElement('img');image.alt='';image.onload=()=>URL.revokeObjectURL(url);image.onerror=()=>URL.revokeObjectURL(url);image.src=url;slot.replaceChildren(image);slot.dataset.savedCover='true';}catch{}
+  }));
+  void json('/api/production/media-summary').then(rows=>{if(!current())return;for(const item of visible){const jobIds=new Set(jobs.filter(job=>job.workspaceId===item.workspace.id).map(job=>job.id));const media=rows.find(row=>jobIds.has(row.jobId)&&row.thumbnailVersionIds?.length);if(!media||String(item.workspace.systemKey||item.workspace.name||'').trim().toLowerCase()==='unassigned')continue;const slot=genericView.querySelector('[data-workspace-photo="'+item.workspace.id+'"]');if(!slot||slot.dataset.savedCover==='true')continue;const image=document.createElement('img');image.alt='';image.loading='lazy';image.src='/api/jobs/'+encodeURIComponent(media.jobId)+'/versions/by-id/'+encodeURIComponent(media.thumbnailVersionIds[0])+'/preview?size=thumbnail';image.onerror=()=>{slot.textContent='▧';};slot.replaceChildren(image);}}).catch(()=>{});
  }catch(error){if(current())genericView.innerHTML='<p role="alert">Workspaces could not load: '+StudioPage.escape(error.message)+'</p>';}
 }};
