@@ -1,11 +1,3 @@
-const baseWorkspaceRowRenderer = renderWorkspaceAdminRow;
-renderWorkspaceAdminRow = function(workspace, permissions, isAdministrator) {
-    const row = baseWorkspaceRowRenderer(workspace, permissions, isAdministrator);
-    const canViewGallery = isAdministrator || permissions.viewAttachments || permissions.adminWorkspace;
-    if (!canViewGallery) return row;
-    return row.replace('</div></div>', `<button class="action" onclick="openWorkspaceGallery('${workspace.id}','${esc(workspace.name)}')">Gallery</button></div></div>`);
-};
-
 async function openWorkspaceGallery(workspaceId, workspaceName) {
     let gallery;
     try {
@@ -96,3 +88,4 @@ async function unpublishWorkspaceGallery(workspaceId, workspaceName) {
 function previewGalleryItem(workspaceId, itemId) {
     window.open(`/api/workspaces/${workspaceId}/gallery/items/${itemId}/preview`, '_blank', 'noopener');
 }
+

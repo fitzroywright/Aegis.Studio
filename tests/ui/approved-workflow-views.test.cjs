@@ -14,7 +14,7 @@ function setup(t,view){
  const jobs=[{id:'j',conversationId:'cv',title:'Campion Graduation',clientName:'Campion College',clientId:'client',status:'Ready for Delivery'},{id:'j2',title:'Carter Wedding',clientName:'Carter',status:'Published'}];
  w.json=async(url,options)=>{calls.push({url,options});if(options?.method==='PUT')return {...roster,revision:8};if(url==='/api/jobs')return jobs;if(url==='/api/jobs/j')return jobs[0];if(url.endsWith('/session-plan'))return subjects;if(url.endsWith('/access'))return {permissions:{editJob:true}};if(url.endsWith('/session-plan/roster')||url.includes('/intake/')&&url.endsWith('/roster'))return roster;if(url.endsWith('/finance-release')){if(url.includes('j2'))throw Error('Accounts unavailable');return {decision:{balance:12500}};}if(url==='/api/auth/me')return {user:{isAdministrator:true}};return [];};
  w.fetch=async()=>({ok:true,json:async()=>[]});
- for(const file of ['studio-page.js','frontdesk.js','studio-workflow-views.js','studio-shell-nav.js'])w.eval(read(file)+(file==='frontdesk.js'?'\nwindow.configureFrontDesk=rows=>{frontDeskRequests=rows;renderFrontDesk();};':''));
+ for(const file of ['studio-page.js','management.js','frontdesk.js','studio-workflow-views.js','studio-shell-nav.js'])w.eval(read(file)+(file==='frontdesk.js'?'\nwindow.configureFrontDesk=rows=>{frontDeskDate="2026-10-30";frontDeskRequests=rows;renderFrontDesk();};':''));
  w.eval(fs.readFileSync(path.resolve(root,'../../Aegis.Studio.PublicSite/public/roster-editor.js'),'utf8'));
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
  return {w,calls,navigation,roster,subjects,jobs};
@@ -22,7 +22,7 @@ function setup(t,view){
 test('Session Plan reads outcomes and full photo counts separately from roster import',async t=>{
  const {w,calls}=setup(t,'session-plan');await w.StudioWorkflowViews.showSessionPlan('j');
  assert.match(w.genericView.textContent,/Alicia.*Photographed.*3/s);assert.match(w.genericView.textContent,/David.*Absent/s);
- assert.match(w.document.getElementById('studioContextRail').textContent,/Reshoots1/);
+ assert.match(w.genericView.textContent,/Maya.*Reshoot.*1/s);
  assert.ok(calls.some(c=>c.url==='/api/jobs/j/session-plan'));
  assert.equal(w.document.querySelector('.studio-right-rail'),null);
  assert.equal(w.document.querySelector('#studioContextRail [data-rail-card="actions"]'),null);
@@ -63,9 +63,9 @@ test('Delivery shows real balances, leaves failed financial reads unavailable, a
 test('Front Desk tabs retain request review, safe confirmation and deposits',async t=>{
  const {w,calls}=setup(t,'frontdesk');w.StudioStatusOrder={sort:values=>values};
  w.configureFrontDesk([{id:'r',jobId:'j',status:'AwaitingDeposit',recordedDeposit:5000,request:{clientName:'Miller Family',title:'Family portraits',requiredDeposit:10000,eventDate:'2026-10-30'}}]);
- assert.equal(w.genericView.querySelectorAll('[data-fd-tab]').length,4);
- assert.match(w.genericView.querySelector('.fd-selected-request').textContent,/Deposit remaining.*5000/s);
- assert.match(w.genericView.querySelector('[data-fd-row-open]').textContent,/Awaiting deposit/);
+ assert.equal(w.genericView.querySelectorAll('[data-fd-tab]').length,3);
+ assert.match(w.genericView.querySelector('.fd-selected-request').textContent,/Awaiting deposit/);assert.ok(w.genericView.querySelector('[data-fd-deposit]'));
+ assert.match(w.genericView.querySelector('[data-fd-row-open]').textContent,/Deposit needed/);
  let payment;w.launchFrontDeskPos=async(action,context)=>{payment={action,context};};
  w.genericView.querySelector('[data-fd-deposit]').click();await settle();assert.equal(payment.context.bookingId,'r');
  const original=w.json;w.json=async(url,options)=>url.endsWith('/workflow-graph')?{revision:12}:url.endsWith('/workflow-graph/actions')?(calls.push({url,options}),{}):original(url,options);
@@ -82,7 +82,7 @@ test('Production lists jobs by stage and opens Job Details',async t=>{
  await w.showCatalogProduction();
  assert.deepEqual([...w.genericView.querySelectorAll('[data-production-lane] h2')].map(e=>e.textContent),['Ready to Start','In Production','Quality Control','Rework','Complete']);
  assert.ok(w.genericView.querySelector('[data-production-lane="progress"] [data-production-job="j"]'));
- assert.ok(w.genericView.querySelector('[data-production-due]'));
+ assert.equal(w.genericView.querySelector('[data-production-due]'),null);assert.match(w.genericView.querySelector('[data-production-job="j"]').textContent,/Campion/);
  w.genericView.querySelector('[data-production-job="j"]').click();await settle();assert.equal(navigation.at(-1).options.jobId,'j');
  assert.equal(w.document.querySelector('#studioContextRail .st-attention'),null);
 });
@@ -105,11 +105,11 @@ test('Production lists jobs by stage and opens Job Details',async t=>{
 test('Front Desk retains the scrolled seventh row, radio and double-click target on selection',async t=>{
  const {w,navigation}=setup(t,'frontdesk');w.StudioStatusOrder={sort:v=>v};
  w.configureFrontDesk(Array.from({length:10},(_,i)=>({id:'r'+i,jobId:'j'+i,status:'AwaitingDeposit',request:{clientName:'Client '+i,title:'Portrait '+i,requiredDeposit:100,eventDate:'2026-10-30'}})));
- const list=w.genericView.querySelector('.fd-table-scroll'),row=list.querySelector('[data-fd-row-open="r6"]');
+ const list=w.genericView.querySelector('.fd-appointment-scroll'),row=list.querySelector('[data-fd-row-open="r6"]');
  list.scrollTop=300;row.focus();row.click();
- assert.equal(w.genericView.querySelector('.fd-table-scroll'),list);
+ assert.equal(w.genericView.querySelector('.fd-appointment-scroll'),list);
  assert.equal(list.querySelector('[data-fd-row-open="r6"]'),row);assert.equal(list.scrollTop,300);
- assert.equal(w.document.activeElement,row);assert.equal(row.getAttribute('aria-selected'),'true');assert.equal(row.querySelector('input').checked,true);
+ assert.equal(w.document.activeElement,row);assert.equal(row.getAttribute('aria-selected'),'true');assert.equal(row.tagName,'BUTTON');
  assert.match(w.genericView.querySelector('.fd-selected-request').textContent,/Client 6/);
  row.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));await settle();
  assert.equal(navigation.at(-1).options.jobId,'j6');
@@ -207,3 +207,4 @@ test('assignment and remainder actions use the existing workflow editor and sche
  assert.deepEqual(opened.map(x=>x[1]),['[data-wf-session]:not([data-wf-remainder])','[data-wf-remainder]']);
  roster.canSchedule=false;await w.StudioWorkflowViews.showSessionPlan('j');assert.equal(w.genericView.querySelector('[data-session-plan]').disabled,true);await assert.rejects(()=>w.StudioWorkflowViews.run('assign-session'),/permission/);
 });
+

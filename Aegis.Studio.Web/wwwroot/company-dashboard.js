@@ -79,6 +79,10 @@
                         failures.delete(key);
                     } catch (error) {
                         if (request.signal.aborted) return;
+                        // A revoked session or permission must discard previously readable summaries.
+                        if (error.status === 401 || error.status === 403) {
+                            snapshot.delete(key);delete data[key];ready.delete(key);
+                        }
                         // Retain the last good snapshot during temporary outages.
                         if (!ready.has(key) && !['media','resources'].includes(key)) failures.add(key);
                     }
@@ -166,4 +170,5 @@
     }
     window.StudioDashboard = {render,project,dispose(){controller?.abort();resizeObserver?.disconnect();clearInterval(refreshTimer);}};
 })();
+
 

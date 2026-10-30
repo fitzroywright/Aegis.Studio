@@ -40,7 +40,7 @@ test('saved Operations bookmark and browser history return to Today',async t=>{
  w.studioNavigate=async view=>destinations.push(view);
  await start();
  w.dispatchEvent(new w.PopStateEvent('popstate',{state:{studioView:'operations-management'}}));
- assert.deepEqual(destinations,['today','today']);
+ assert.deepEqual(destinations,['dashboard','dashboard']);
 });
 
 test('shared navigation retains functional destinations without Operations',async t=>{
@@ -58,3 +58,4 @@ test('shared navigation retains functional destinations without Operations',asyn
    assert.ok(rail.querySelector(`[data-studio-side="${destination}"]`),destination);
  }
 });
+

@@ -155,15 +155,25 @@ public sealed class IntegratedWorkflowTests
     {
         using var context=new WorkflowContext();
         var db=context.Database;var c=context.Connection;var versions=context.Versions;var job=context.Job;var root=context.Root;
-        var v3=versions.Add(job,"unsupported-original","portrait.raw","application/octet-stream",new MemoryStream([3]),"Editor");
+        var v3=versions.Add(job,"unsupported-original","portrait.bin","application/octet-stream",new MemoryStream([3]),"Editor");
         using var originalPhoto=File.OpenRead(Path.Combine(AppContext.BaseDirectory,"Fixtures","portrait.jpg"));var realPhoto=versions.Add(job,"real-preview","portrait.jpg","image/jpeg",originalPhoto,"Editor");
         var worker=new MediaDerivativeWorker(db,new LocalFileStorage(root),new TestEnvironment(root),NullLogger<MediaDerivativeWorker>.Instance);
         var generate=typeof(MediaDerivativeWorker).GetMethod("Generate",BindingFlags.Instance|BindingFlags.NonPublic)!;
-        await (Task)generate.Invoke(worker,[realPhoto.Id,CancellationToken.None])!;
+        await GenerateLeased(realPhoto.Id);
         using(var state=new NpgsqlCommand("select status,thumbnail_key from studio_media_derivatives where version_id=$1",c)){state.Parameters.AddWithValue(realPhoto.Id);using var row=state.ExecuteReader();Assert.True(row.Read());Assert.Equal("Ready",row.GetString(0));using var thumbnail=new LocalFileStorage(root).OpenReadAsync(row.GetString(1)).GetAwaiter().GetResult();using var image=SKBitmap.Decode(thumbnail);Assert.NotNull(image);Assert.True(Math.Max(image.Width,image.Height)<=384);}
-        await (Task)generate.Invoke(worker,[v3.Id,CancellationToken.None])!;
+        await GenerateLeased(v3.Id);
         using(var state=new NpgsqlCommand("select status from studio_media_derivatives where version_id=$1",c)){state.Parameters.AddWithValue(v3.Id);Assert.Equal("Unsupported",state.ExecuteScalar());}
         using(var intact=versions.Open(job,v3.Id,out _))Assert.Equal(3,intact.ReadByte());
+        async Task GenerateLeased(Guid id)
+        {
+            Guid lease=Guid.NewGuid();
+            using(var claim=new NpgsqlCommand("update studio_media_derivatives set status='Processing',lease_id=$2 where version_id=$1 and status='Pending'",c))
+            {
+                claim.Parameters.AddWithValue(id);claim.Parameters.AddWithValue(lease);
+                Assert.Equal(1,claim.ExecuteNonQuery());
+            }
+            await (Task)generate.Invoke(worker,[id,lease,CancellationToken.None])!;
+        }
     }
     [StudioPostgresFact]
     public void DemoUpgradePreservesProductionLinksAcrossRetries()
@@ -185,6 +195,7 @@ public sealed class IntegratedWorkflowTests
     {
         using var context=new WorkflowContext();
         var db=context.Database;var job=context.Job;
+        Sql(context.Connection,"create table studio_workflow_sessions(id uuid primary key,shoot_id uuid); create table studio_workflow_crew(session_id uuid not null references studio_workflow_sessions(id),user_name text not null)");
         var photographers=new PhotographerStore(db);photographers.Save(new("a","Photographer A","Employee",true,[],null));photographers.Save(new("b","Photographer B","Employee",true,[],null));
         Sql(context.Connection,"create table studio_job_owner_assignments(id uuid primary key,status text);alter table studio_jobs add column owner_assignment_id uuid;insert into studio_job_owner_assignments values($1,'Accepted');update studio_jobs set owner_assignment_id=$1,status='Scheduled' where id=$2",Guid.NewGuid(),job);
         var scheduler=new WorkDaySchedulingService(db,photographers);var starts=DateTimeOffset.UtcNow.AddDays(5);
@@ -252,6 +263,10 @@ public sealed class IntegratedWorkflowTests
             {
                 Database.InitializeAsync().GetAwaiter().GetResult();new StudioFeatureDatabase(source).InitializeAsync().GetAwaiter().GetResult();
                 new WorkspaceJobStore(Database).EnsureSchema();new StudioClientStore(Database).Migrate();new ScheduleStore(Database,new ConfigurationBuilder().Build()).EnsureOperationalSchema();
+                ExternalBookingResourceHolds.EnsureSchema(Database);
+                // This isolated store fixture does not enable connected-workflow triggers.
+                // Include columns read by current scheduling and booking stores.
+                Sql(Connection,"alter table studio_schedule_entry_resources add column if not exists attendance_start_utc timestamptz; alter table studio_schedule_entry_resources add column if not exists attendance_end_utc timestamptz; alter table studio_conversations add column if not exists intake_reference text");
                 Versions=new StudioVersionStore(Database,new LocalFileStorage(Root));MediaProductionStore.Migrate(Database);
                 Sql(Connection,ProductionItems.Schema);Sql(Connection,ProductionOrderLinker.Schema);Sql(Connection,CommercialSchema.Sql);
                 Guid conversation=Guid.NewGuid();
@@ -275,6 +290,7 @@ public sealed class IntegratedWorkflowTests
     }
     private static void Sql(NpgsqlConnection c,string sql,params object[] values){using var cmd=new NpgsqlCommand(sql,c){CommandTimeout=120};if(values.Length>0&&sql.Contains(';')){foreach(string statement in sql.Split(';',StringSplitOptions.RemoveEmptyEntries))Sql(c,statement,values);return;}foreach(var value in values)cmd.Parameters.AddWithValue(value);cmd.ExecuteNonQuery();}
 }
+
 
 
 

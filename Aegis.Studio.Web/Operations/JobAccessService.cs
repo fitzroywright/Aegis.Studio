@@ -73,10 +73,12 @@ public sealed class JobAccessService
     }
     private static JobPermissionSet FromArray(bool[] values)=>new(values[0],values[1],values[2],values[3],values[4],values[5],values[6],values[7],values[8],values[9],values[10],values[11],values[12],values[13],values[14],values[15],values[16],values[17],values[18]);
 
-    public IReadOnlyList<JobMember> GetMembers(Guid jobId)
+    public IReadOnlyList<JobMember> GetMembers(Guid jobId, NpgsqlConnection? transactionConnection = null, NpgsqlTransaction? transaction = null)
     {
-        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlConnection? ownedConnection = transactionConnection is null ? database.OpenConnection() : null;
+        NpgsqlConnection connection = transactionConnection ?? ownedConnection!;
         using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction=transaction;
         command.CommandText = """
             select job_id,user_name,display_name,is_active,inherit_workspace_permissions,
                    access_job,view_job,view_conversation,reply_requester,view_attachments,add_attachments,
@@ -92,7 +94,7 @@ public sealed class JobAccessService
         return values;
     }
 
-    public JobMember SaveMember(Guid jobId, JobMemberRequest request)
+    public JobMember SaveMember(Guid jobId, JobMemberRequest request, NpgsqlConnection? transactionConnection = null, NpgsqlTransaction? transaction = null)
     {
         if (GetWorkspaceId(jobId) is null) throw new KeyNotFoundException("Job was not found.");
         if (string.IsNullOrWhiteSpace(request.UserName)) throw new InvalidOperationException("User name is required.");
@@ -102,8 +104,10 @@ public sealed class JobAccessService
         JobPermissionSet permissions = request.Permissions ?? JobPermissionSet.Viewer;
         if (permissions.AdminJob) permissions = JobPermissionSet.Full;
 
-        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlConnection? ownedConnection = transactionConnection is null ? database.OpenConnection() : null;
+        NpgsqlConnection connection = transactionConnection ?? ownedConnection!;
         using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction=transaction;
         command.CommandText = """
             insert into studio_job_members
             (job_id,user_name,display_name,is_active,inherit_workspace_permissions,access_job,view_job,view_conversation,
@@ -130,13 +134,15 @@ public sealed class JobAccessService
             permissions.NotifyJobMembers,permissions.ManageJobMembers,permissions.AdminJob];
         foreach (object value in values) command.Parameters.AddWithValue(value);
         command.ExecuteNonQuery();
-        return GetMembers(jobId).First(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
+        return GetMembers(jobId,connection,transaction).First(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
     }
 
-    public void RemoveMember(Guid jobId, string userName)
+    public void RemoveMember(Guid jobId, string userName, NpgsqlConnection? transactionConnection = null, NpgsqlTransaction? transaction = null)
     {
-        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlConnection? ownedConnection = transactionConnection is null ? database.OpenConnection() : null;
+        NpgsqlConnection connection = transactionConnection ?? ownedConnection!;
         using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction=transaction;
         command.CommandText = "delete from studio_job_members where job_id=$1 and lower(user_name)=lower($2)";
         command.Parameters.AddWithValue(jobId);
         command.Parameters.AddWithValue(userName.Trim());

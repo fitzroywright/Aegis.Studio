@@ -28,7 +28,9 @@ public sealed class WorkDayRosterJourneyTests
         var workflow=new WorkflowStore(db,new JobAccessService(db),new WorkspaceAccessService(db),new UnusedPublisher(),new ConfigurationBuilder().Build());
         ClaimsPrincipal Actor(string name)=>new(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier,name),new Claim(ClaimTypes.Role,"Administrator")],"Test"));
         var manager=Actor("manager");var owner=Actor("owner");
-        Execute("select set_config('studio.connected_command','true',false);update studio_jobs set status='Needs Assignment' where id=$1;select set_config('studio.connected_command','false',false)",context.Job);
+        Execute("select set_config('studio.connected_command','true',false)");
+        try { Execute("update studio_jobs set status='Needs Assignment' where id=$1",context.Job); }
+        finally { Execute("select set_config('studio.connected_command','false',false)"); }
         JsonElement Snapshot()=>WorkflowStore.Snapshot(c,null,context.Job);
         long Revision()=>Snapshot().GetProperty("revision").GetInt64();
         workflow.Execute(context.Job,new("owner",Revision(),Guid.NewGuid(),UserName:"owner"),manager);
@@ -40,11 +42,17 @@ public sealed class WorkDayRosterJourneyTests
         var photographed=Guid.NewGuid();var deferred=Guid.NewGuid();
         Execute("insert into studio_job_subjects(id,job_id,name,reference,updated_by,collection_name) values($1,$3,'One','P1','manager','Portraits'),($2,$3,'Two','P2','manager','Portraits')",photographed,deferred,context.Job);
         WorkDayOperationRequest Step(WorkDayOperationKind kind,long version)=>new(Guid.NewGuid(),kind,original,DateTimeOffset.UtcNow,"device",null,null,null,version);
-        Assert.Equal(WorkDayOperationState.Acknowledged,workday.Apply("photo",Step(WorkDayOperationKind.AcceptAssignment,0)).State);
+        // Connected-workflow assignment triggers seed a nonzero generation.
+        long assignedVersion=workday.GetAssignmentState(original,"photo")!.Value.Version;
+        Assert.True(assignedVersion>0);
+        var accepted=workday.Apply("photo",Step(WorkDayOperationKind.AcceptAssignment,assignedVersion));
+        Assert.Equal(WorkDayOperationState.Acknowledged,accepted.State);
+        long acceptedVersion=workday.GetAssignmentState(original,"photo")!.Value.Version;
+        Assert.Equal(assignedVersion+1,acceptedVersion);
         WorkDayOperationRequest Report(Guid id,string state)
         {
             var target=WorkDayFieldReports.Targets(c,null,original).Single(x=>x.TargetId=="subject:"+id);
-            return new(Guid.NewGuid(),WorkDayOperationKind.RecordFieldStatus,original,DateTimeOffset.UtcNow,"device",state,JsonSerializer.Serialize(new WorkDayFieldStatus(target.TargetId,state,target.SourceFingerprint,target.Version,"Field observation")),null,1);
+            return new(Guid.NewGuid(),WorkDayOperationKind.RecordFieldStatus,original,DateTimeOffset.UtcNow,"device",state,JsonSerializer.Serialize(new WorkDayFieldStatus(target.TargetId,state,target.SourceFingerprint,target.Version,"Field observation")),null,acceptedVersion);
         }
         // Prepared reports retain their original IDs and revisions through delayed transmission.
         var first=Report(photographed,"Photographed");var second=Report(deferred,"Deferred");
@@ -54,7 +62,7 @@ public sealed class WorkDayRosterJourneyTests
         Assert.Equal(WorkDayOperationState.Conflict,workday.Apply("unassigned-user",first with{OperationId=Guid.NewGuid()}).State);
         var counts=new MediaProductionStore(db,context.Versions).Snapshot(context.Job).GetProperty("rosterCounts");
         Assert.Equal(1,counts.GetProperty("Photographed").GetInt32());Assert.Equal(1,counts.GetProperty("Deferred").GetInt32());
-        foreach(var (kind,version) in new[]{(WorkDayOperationKind.Arrive,1L),(WorkDayOperationKind.StartSession,2L),(WorkDayOperationKind.CompleteSession,3L)})
+        foreach(var (kind,version) in new[]{(WorkDayOperationKind.Arrive,acceptedVersion),(WorkDayOperationKind.StartSession,acceptedVersion+1),(WorkDayOperationKind.CompleteSession,acceptedVersion+2)})
             Assert.Equal(WorkDayOperationState.Acknowledged,workday.Apply("photo",Step(kind,version)).State);
         Assert.Equal("Awaiting Upload",Snapshot().GetProperty("stage").GetString());
         var followup=new WorkflowCommand("reschedule-remainder",Revision(),Guid.NewGuid(),Title:"Remainder",Crew:[new("photo","Lead")],Start:start.AddDays(1),End:start.AddDays(1).AddHours(1),Location:"Studio",Reason:"Return for deferred subject",SubjectIds:[deferred]);
@@ -71,3 +79,4 @@ public sealed class WorkDayRosterJourneyTests
     private sealed class UnusedPublisher:IClientGalleryPublisher
     {public Task<ClientGalleryPublication> PublishAsync(ClientGalleryPublishRequest request,CancellationToken token)=>throw new InvalidOperationException("This journey does not publish galleries.");}
 }
+

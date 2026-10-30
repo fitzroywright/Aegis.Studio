@@ -1,3 +1,4 @@
+using Common.Security.Integration;
 using Aegis.Studio.Web.Workflow;
 using System.Security.Claims;
 using Aegis.Studio.Web.Notifications;
@@ -47,23 +48,23 @@ public static class JobAccessEndpoints
             return Results.Ok(members.Values.OrderBy(x => x.DisplayName).ThenBy(x => x.UserName));
         }).RequireAuthorization();
 
-        app.MapPut("/api/jobs/{jobId:guid}/members/{userName}", (Guid jobId, string userName, JobMemberRequest request, ClaimsPrincipal user, JobAccessService access) =>
+        app.MapPut("/api/jobs/{jobId:guid}/members/{userName}", (Guid jobId, string userName, JobMemberRequest request, ClaimsPrincipal user, JobAccessService access, RelationalAccountStore security) =>
         {
             JobPermissionSet caller = access.GetPermissions(user, jobId);
             if (!user.IsInRole("Administrator") && !caller.ManageJobMembers && !caller.AdminJob) return Results.Forbid();
             JobPermissionSet requested = request.Permissions ?? JobPermissionSet.Viewer;
             if (!user.IsInRole("Administrator") && !PermissionsWithin(requested, caller)) return Results.Forbid();
             JobMemberRequest normalized = request with { UserName = userName };
-            return Results.Ok(access.SaveMember(jobId, normalized));
+            return Results.Ok(StudioStaffAuthorization.Change(security,user,userName,(connection,transaction,alias)=>access.SaveMember(jobId,normalized with {UserName=alias},connection,transaction)));
         }).RequireAuthorization();
 
-        app.MapDelete("/api/jobs/{jobId:guid}/members/{userName}", (Guid jobId, string userName, ClaimsPrincipal user, JobAccessService access) =>
+        app.MapDelete("/api/jobs/{jobId:guid}/members/{userName}", (Guid jobId, string userName, ClaimsPrincipal user, JobAccessService access, RelationalAccountStore security) =>
         {
             JobPermissionSet caller = access.GetPermissions(user, jobId);
             if (!user.IsInRole("Administrator") && !caller.ManageJobMembers && !caller.AdminJob) return Results.Forbid();
             JobMember? target = access.GetMembers(jobId).FirstOrDefault(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
             if (target is not null && !user.IsInRole("Administrator") && !PermissionsWithin(target.Permissions, caller)) return Results.Forbid();
-            access.RemoveMember(jobId, userName);
+            StudioStaffAuthorization.Change(security,user,userName,(connection,transaction,alias)=>{access.RemoveMember(jobId,alias,connection,transaction);return true;});
             return Results.NoContent();
         }).RequireAuthorization();
 

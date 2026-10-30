@@ -72,10 +72,12 @@ public sealed class WorkspaceAccessService
         return values;
     }
 
-    public IReadOnlyList<WorkspaceMember> GetMembers(Guid workspaceId)
+    public IReadOnlyList<WorkspaceMember> GetMembers(Guid workspaceId, NpgsqlConnection? transactionConnection = null, NpgsqlTransaction? transaction = null)
     {
-        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlConnection? ownedConnection = transactionConnection is null ? database.OpenConnection() : null;
+        NpgsqlConnection connection = transactionConnection ?? ownedConnection!;
         using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction=transaction;
         command.CommandText = """
             select workspace_id,user_name,display_name,is_active,access_workspace,can_view,reply_requester,view_attachments,add_attachments,create_job,edit_job,manage_schedule,manage_production,notify_members,edit_workspace,manage_members,admin_workspace,send_as_self,created_at_utc,updated_at_utc
             from studio_workspace_members where workspace_id=$1 order by display_name,user_name
@@ -87,7 +89,7 @@ public sealed class WorkspaceAccessService
         return values;
     }
 
-    public WorkspaceMember SaveMember(Guid workspaceId, WorkspaceMemberRequest request)
+    public WorkspaceMember SaveMember(Guid workspaceId, WorkspaceMemberRequest request, NpgsqlConnection? transactionConnection = null, NpgsqlTransaction? transaction = null)
     {
         if (string.IsNullOrWhiteSpace(request.UserName)) throw new InvalidOperationException("User name is required.");
         string userName = request.UserName.Trim();
@@ -98,8 +100,10 @@ public sealed class WorkspaceAccessService
             p = WorkspacePermissionSet.Full;
         }
 
-        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlConnection? ownedConnection = transactionConnection is null ? database.OpenConnection() : null;
+        NpgsqlConnection connection = transactionConnection ?? ownedConnection!;
         using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction=transaction;
         command.CommandText = """
             insert into studio_workspace_members
             (workspace_id,user_name,display_name,is_active,access_workspace,can_view,reply_requester,view_attachments,add_attachments,create_job,edit_job,manage_schedule,manage_production,notify_members,edit_workspace,manage_members,admin_workspace,send_as_self,created_at_utc,updated_at_utc)
@@ -113,13 +117,15 @@ public sealed class WorkspaceAccessService
         object[] values = [workspaceId,userName,displayName,request.IsActive,p.AccessWorkspace,p.View,p.ReplyRequester,p.ViewAttachments,p.AddAttachments,p.CreateJob,p.EditJob,p.ManageSchedule,p.ManageProduction,p.NotifyMembers,p.EditWorkspace,p.ManageMembers,p.AdminWorkspace,p.SendAsSelf];
         foreach (object value in values) command.Parameters.AddWithValue(value);
         command.ExecuteNonQuery();
-        return GetMembers(workspaceId).First(x => string.Equals(x.UserName,userName,StringComparison.OrdinalIgnoreCase));
+        return GetMembers(workspaceId,connection,transaction).First(x => string.Equals(x.UserName,userName,StringComparison.OrdinalIgnoreCase));
     }
 
-    public void RemoveMember(Guid workspaceId, string userName)
+    public void RemoveMember(Guid workspaceId, string userName, NpgsqlConnection? transactionConnection = null, NpgsqlTransaction? transaction = null)
     {
-        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlConnection? ownedConnection = transactionConnection is null ? database.OpenConnection() : null;
+        NpgsqlConnection connection = transactionConnection ?? ownedConnection!;
         using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction=transaction;
         command.CommandText = "delete from studio_workspace_members where workspace_id=$1 and lower(user_name)=lower($2)";
         command.Parameters.AddWithValue(workspaceId);
         command.Parameters.AddWithValue(userName.Trim());
