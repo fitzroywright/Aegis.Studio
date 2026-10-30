@@ -202,6 +202,7 @@ public sealed class UnifiedMessagingPersistenceTests
                 create table if not exists studio_global_operational_roles(id uuid,name text,is_active boolean);
                 create table if not exists studio_global_operational_role_members(role_id uuid,user_name text,display_name text,is_active boolean);
                 """,c))q.ExecuteNonQuery();
+            PermissionTestSchema.Ensure(db);
             var employees=new StudioEmployeeDirectoryStore(db);employees.EnsureSchema();
             var profiles=new UserProfileStore(db);profiles.GetOrCreate(f.Paul);profiles.GetOrCreate(f.Tamara);
             var workspaces=new WorkspaceStore(db);var access=new WorkspaceAccessService(db);var jobs=new JobAccessService(db);

@@ -92,7 +92,7 @@ public sealed class FrontDeskBookingRequestTests
             using var c=fixture.Database.OpenConnection();
             string[] sql=[
                 "create table studio_workspaces(id uuid primary key,is_enabled boolean not null)",
-                "create table studio_conversations(id uuid primary key,workspace_id uuid not null,subject text,contact_name text,contact_address text,channel text,is_closed boolean,created_at_utc timestamptz,job_id uuid)",
+                "create table studio_conversations(id uuid primary key,workspace_id uuid not null,subject text,contact_name text,contact_address text,channel text,is_closed boolean,created_at_utc timestamptz,job_id uuid,intake_reference text)",
                 "create table studio_jobs(id uuid primary key,workspace_id uuid,conversation_id uuid references studio_conversations(id),title text,client_name text,status text,event_date date,created_at_utc timestamptz,client_id uuid)",
                 "create table studio_clients(id uuid primary key,display_name text,email text,phone text,updated_at_utc timestamptz default now())",
                 "create table studio_messages(id uuid primary key,conversation_id uuid,author_display_name text,visibility text,body text,created_at_utc timestamptz)",
@@ -112,4 +112,5 @@ public sealed class StudioPostgresFactAttribute : FactAttribute
 {
     public StudioPostgresFactAttribute(){if(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES")))Skip="Set STUDIO_TEST_POSTGRES to a disposable PostgreSQL test database to run transactional booking tests.";}
 }
+
 

@@ -8,6 +8,8 @@ The continuation UI suite is green: both `npm test` from `tests/ui` and `node --
 
 The latest previously published candidate's coordinated PostgreSQL run recorded **429 passed, 14 failed, zero skipped** for Web and **3 passed** for Domain. Remaining failures report missing fixture schema for intake references, attendance, scheduling and workflow permissions, plus a WorkDay roster journey failure requiring investigation. The .NET SDK is unavailable in this editing workspace; those failures remain blocking. Earlier database test corrections split positional-parameter setup commands, use the incoming Internet Message ID column, and supply the preview worker processing lease. No failing assertions are skipped to waive a release gate.
 
+The next draft follow-up supplies the missing isolated-fixture scheduling/intake/permission schema and makes the WorkDay journey use the current assignment generation. Assertions remain enabled. These test-only changes await the coordinated PostgreSQL run; they are not recorded as passing.
+
 This is a coordinated source candidate, not an approved production rollout. `security-baseline.json` pins every shared library; no application may substitute a floating Common.Security checkout or overwrite shared running binaries. Build in an isolated output directory and deploy a complete application bundle independently.
 
 ## Build and evidence

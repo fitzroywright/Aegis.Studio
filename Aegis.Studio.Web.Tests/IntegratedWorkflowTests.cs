@@ -262,6 +262,9 @@ public sealed class IntegratedWorkflowTests
             {
                 Database.InitializeAsync().GetAwaiter().GetResult();new StudioFeatureDatabase(source).InitializeAsync().GetAwaiter().GetResult();
                 new WorkspaceJobStore(Database).EnsureSchema();new StudioClientStore(Database).Migrate();new ScheduleStore(Database,new ConfigurationBuilder().Build()).EnsureOperationalSchema();
+                // This isolated store fixture does not enable connected-workflow triggers.
+                // Include columns read by current scheduling and booking stores.
+                Sql(Connection,"alter table studio_schedule_entry_resources add column if not exists attendance_start_utc timestamptz; alter table studio_schedule_entry_resources add column if not exists attendance_end_utc timestamptz; alter table studio_conversations add column if not exists intake_reference text");
                 Versions=new StudioVersionStore(Database,new LocalFileStorage(Root));MediaProductionStore.Migrate(Database);
                 Sql(Connection,ProductionItems.Schema);Sql(Connection,ProductionOrderLinker.Schema);Sql(Connection,CommercialSchema.Sql);
                 Guid conversation=Guid.NewGuid();

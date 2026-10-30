@@ -31,6 +31,8 @@ public sealed class MediaProductionPersistenceTests
             using(var c=db.OpenConnection())
             {
                 Sql(c,"create table studio_workspaces(id uuid primary key)");Sql(c,"create table studio_jobs(id uuid primary key,workspace_id uuid,title text,assigned_to text,event_date date,status text not null default 'New')");
+                // Field-report tables reference schedule entries even in a media-only fixture.
+                Sql(c,"create table studio_schedule_entries(id uuid primary key)");
                 Sql(c,"create table studio_operational_audit(id uuid primary key,job_id uuid,action text,user_name text,detail text,created_at_utc timestamptz)");
             }
             new WorkspaceJobStore(db).EnsureSchema();var versions=new StudioVersionStore(db,new LocalFileStorage(Path.Combine(root,"storage")));
@@ -73,7 +75,7 @@ public sealed class MediaProductionPersistenceTests
             using(var c=db.OpenConnection()){
                 Sql(c,"alter table studio_workspaces add column is_enabled boolean default true");Sql(c,"insert into studio_workspaces(id) select workspace_id from studio_jobs");
                 Sql(c,"alter table studio_jobs add column client_name text default 'Client'");Sql(c,"alter table studio_jobs add column conversation_id uuid");
-                Sql(c,"create table studio_conversations(id uuid primary key,contact_address text)");Sql(c,"insert into studio_conversations select id,'client@example.invalid' from studio_jobs");Sql(c,"update studio_jobs set conversation_id=id");
+                Sql(c,"create table studio_conversations(id uuid primary key,contact_address text,intake_reference text)");Sql(c,"insert into studio_conversations(id,contact_address) select id,'client@example.invalid' from studio_jobs");Sql(c,"update studio_jobs set conversation_id=id");
                 Sql(c,"create table studio_notifications(id uuid primary key,user_name text,channel text,event_type text,subject text,body text,reference_type text,reference_id text,status text,destination text,attempts int,is_read boolean,created_at_utc timestamptz,last_error text)");
             }
             clients.Link(job,client.Id,"frontdesk");var accounts=new StudioAccountsStore(db);accounts.EnsureSchema();
@@ -97,4 +99,5 @@ public sealed class MediaProductionPersistenceTests
         public IFileProvider ContentRootFileProvider {get;set;}=new NullFileProvider();public IFileProvider WebRootFileProvider {get;set;}=new NullFileProvider();
     }
 }
+
 
