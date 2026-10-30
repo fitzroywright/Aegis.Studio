@@ -16,7 +16,8 @@ public sealed class ManualPhotographerPersistenceTests
         var start=DateTimeOffset.UtcNow.AddHours(1);var entry=new ScheduleStore(db,new ConfigurationBuilder().Build()).Create(new(context.Job,null,"Photography",start,start.AddHours(1),"Studio","Scheduled",null,[a.ScheduleResourceId,b.ScheduleResourceId]));
         var shoot=new OperationalWorkStore(db).CreateShoot(context.Job,new(entry.Id,"a","b",start,start.AddHours(1),"Studio",null,null),"Manager");
         Execute("create table studio_workflow_sessions(id uuid primary key,job_id uuid,shoot_id uuid,required boolean);create function studio_workflow_notify(uuid,text,text,text,text) returns void language plpgsql as 'begin return; end';");
-        Execute("insert into studio_workflow_sessions values($1,$2,$3,true);update studio_jobs set status='Scheduled' where id=$2",Guid.NewGuid(),context.Job,shoot.Id);
+        Execute("insert into studio_workflow_sessions values($1,$2,$3,true)",Guid.NewGuid(),context.Job,shoot.Id);
+        Execute("update studio_jobs set status='Scheduled' where id=$1",context.Job);
         WorkDayOperationRequest Report(WorkDayOperationKind kind,long version)=>new(Guid.NewGuid(),kind,entry.Id,DateTimeOffset.UtcNow,"StudioManual",null,null,null,version);
         foreach(var person in new[]{"a","b"})
         {
@@ -32,3 +33,4 @@ public sealed class ManualPhotographerPersistenceTests
         void Execute(string sql,params object[] values){using var cmd=new NpgsqlCommand(sql,c);foreach(var value in values)cmd.Parameters.AddWithValue(value);cmd.ExecuteNonQuery();}
     }
 }
+
