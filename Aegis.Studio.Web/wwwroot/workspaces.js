@@ -325,9 +325,64 @@ async function refreshStudioEmployees(){
         const register=row.querySelector('[data-register-photographer]');if(register)register.onclick=()=>registerStudioPhotographer(employee);
     });
 }
+async function loadStaffWorkspaceGrants(employee,holder){
+    try{
+        const [access,me]=await Promise.all([json('/api/workspace-access'),json('/api/auth/me')]);
+        const admin=(me.user||me).isAdministrator===true;
+        const candidates=access.filter(x=>admin||x.permissions?.manageMembers||x.permissions?.adminWorkspace);
+        if(!candidates.length){holder.textContent='No workspaces available to manage.';return;}
+        const rows=await Promise.all(candidates.map(async item=>{
+            const id=item.workspace.id;
+            try{
+                const members=await json('/api/workspaces/'+encodeURIComponent(id)+'/members');
+                return {item,member:members.find(m=>String(m.userName).toLowerCase()===String(employee.userName).toLowerCase())||null};
+            }catch{return {item,error:'Access unavailable'};}
+        }));
+        holder.innerHTML='<h3>Workspace access</h3><p class="muted">Grants are enforced by the existing workspace authorization service.</p>'+rows.map((r,i)=>`<div class="staff-workspace-grant" data-grant-index="${i}"><strong>${esc(r.item.workspace.name)}</strong> ${r.error?'<span>Access unavailable</span>':`<select aria-label="Access for ${esc(r.item.workspace.name)}" data-grant-select><option value="none" ${!r.member?.isActive?'selected':''}>No access</option><option value="view" ${r.member?.isActive&&r.member.permissions?.accessWorkspace&&!r.member.permissions?.manageMembers?'selected':''}>Member</option><option value="manager" ${r.member?.isActive&&r.member.permissions?.manageMembers?'selected':''}>Workspace manager</option></select><button type="button" class="action" data-grant-save>Apply</button>`}</div>`).join('');
+        holder.querySelectorAll('[data-grant-save]').forEach(button=>{
+            button.onclick=async()=>{
+                const row=button.closest('[data-grant-index]'),record=rows[Number(row.dataset.grantIndex)],id=record.item.workspace.id,mode=row.querySelector('[data-grant-select]').value;
+                button.disabled=true;
+                try{
+                    const endpoint='/api/workspaces/'+encodeURIComponent(id)+'/members/'+encodeURIComponent(employee.userName);
+                    if(mode==='none'){
+                        if(record.member){const response=await fetch(endpoint,{method:'DELETE'});if(!response.ok)throw Error(await response.text());}
+                    }else{
+                        const permissions=mode==='manager'?permissionsForPreset('manager'):(record.member?.permissions?.accessWorkspace?record.member.permissions:permissionsForPreset('view'));
+                        await json(endpoint,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:employee.userName,displayName:employee.displayName||employee.userName,isActive:true,permissions})});
+                    }
+                    row.querySelector('[data-grant-save]').textContent='Saved';
+                }catch(error){window.alert(error.message||String(error));}
+                finally{button.disabled=false;}
+            };
+        });
+    }catch(error){holder.textContent='Workspace access could not be loaded: '+(error.message||error);}
+}
+async function loadStaffOperationalRoles(employee,holder){
+    try{
+        const roles=(await json('/api/security/global-roles/')).filter(r=>['Front Desk','Operations Manager'].includes(r.name));
+        const records=await Promise.all(roles.map(async role=>({role,members:await json('/api/security/global-roles/'+encodeURIComponent(role.id)+'/members')})));
+        holder.innerHTML='<h3>Operational roles</h3>'+records.map((r,i)=>`<label><input type="checkbox" data-operational-role="${i}" ${r.members.some(m=>m.isActive&&String(m.userName).toLowerCase()===String(employee.userName).toLowerCase())?'checked':''}> ${esc(r.role.name)}</label>`).join('')+'<button type="button" class="action" data-operational-save>Save roles</button><p role="status"></p>';
+        holder.querySelector('[data-operational-save]').onclick=async()=>{
+            const button=holder.querySelector('[data-operational-save]');button.disabled=true;
+            try{
+                for(const [i,r] of records.entries()){
+                    const checked=holder.querySelector('[data-operational-role="'+i+'"]').checked;
+                    const present=r.members.some(m=>m.isActive&&String(m.userName).toLowerCase()===String(employee.userName).toLowerCase());
+                    if(checked===present)continue;
+                    const endpoint='/api/security/global-roles/'+encodeURIComponent(r.role.id)+'/members/'+encodeURIComponent(employee.userName);
+                    if(checked)await json(endpoint,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:employee.userName,displayName:employee.displayName||employee.userName,isActive:true})});
+                    else {const response=await fetch(endpoint,{method:'DELETE'});if(!response.ok)throw Error(await response.text());}
+                }
+                holder.querySelector('[role=status]').textContent='Roles saved.';
+            }catch(error){holder.querySelector('[role=status]').textContent=error.message||String(error);}
+            finally{button.disabled=false;}
+        };
+    }catch(error){holder.textContent='Operational roles unavailable: '+(error.message||error);}
+}
 function openStudioStaffDetails(employee) {
-    const d=studioDialog('Staff details',`<form class="request-form" data-staff-details><p><strong>${esc(employee.userName)}</strong> · Studio staff identity</p><label>Display name<input name="displayName" required value="${esc(employee.displayName||'')}"></label><label>Email<input name="email" type="email" value="${esc(employee.emailAddress||'')}"></label><label><input name="active" type="checkbox" ${employee.isActive?'checked':''}> Active</label><label><input name="assignable" type="checkbox" ${employee.isAssignable?'checked':''}> Assignable</label><p><strong>Roles:</strong> ${esc((employee.roles||[]).join(', ')||'None')}</p><p class="muted">Workspace and job access are granted separately.</p><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`);
-    const form=d.querySelector('form');form.querySelector('[data-cancel]').onclick=()=>d.close();
+    const d=studioDialog('Staff details',`<form class="request-form" data-staff-details><p><strong>${esc(employee.userName)}</strong> · Studio staff identity</p><label>Display name<input name="displayName" required value="${esc(employee.displayName||'')}"></label><label>Email<input name="email" type="email" value="${esc(employee.emailAddress||'')}"></label><label><input name="active" type="checkbox" ${employee.isActive?'checked':''}> Active</label><label><input name="assignable" type="checkbox" ${employee.isAssignable?'checked':''}> Assignable</label><p><strong>Roles:</strong> ${esc((employee.roles||[]).join(', ')||'None')}</p><div data-staff-operational><p>Loading operational roles…</p></div><div data-staff-workspaces><p>Loading workspace grants…</p></div><p class="muted">Job-specific assignments remain managed within each job.</p><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`);
+    const form=d.querySelector('form');void loadStaffOperationalRoles(employee,form.querySelector('[data-staff-operational]'));void loadStaffWorkspaceGrants(employee,form.querySelector('[data-staff-workspaces]'));form.querySelector('[data-cancel]').onclick=()=>d.close();
     form.onsubmit=async event=>{event.preventDefault();const save=form.querySelector('[type=submit]');save.disabled=true;try{
         const latest=(await json('/api/admin/studio-employees/')).find(e=>String(e.userName).toLowerCase()===String(employee.userName).toLowerCase());if(!latest)throw Error('Staff member no longer exists.');
         const payload={...latest,displayName:form.elements.displayName.value.trim(),emailAddress:form.elements.email.value.trim()||null,isActive:form.elements.active.checked,isAssignable:form.elements.assignable.checked};
