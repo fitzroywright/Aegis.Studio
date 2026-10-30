@@ -95,6 +95,44 @@ public static class MediaProductionEndpoints
             return Write(jobId,user,access,()=>Results.Ok(new MediaUploadReceipts(db,Store(db,storage)).Receive(jobId,uploadId,form.Files[0],Name(user))));
         }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(101_000_000)).DisableAntiforgery().RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/unmatched/{id:guid}/match",(Guid jobId,Guid id,MatchUploadRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>{Store(db,storage).Resolve(jobId,id,request.AssetId,Name(user));return Results.NoContent();})).RequireAuthorization();
+        app.MapGet("/api/workspaces/{workspaceId:guid}/cover",(Guid workspaceId,ClaimsPrincipal user,WorkspaceAccessService access,StudioDatabase db)=>
+        {
+            if(!access.HasPermission(user,workspaceId,"AccessWorkspace"))return Results.Forbid();
+            using var c=db.OpenConnection();
+            using var check=new NpgsqlCommand("select system_key from studio_workspaces where id=$1",c);check.Parameters.AddWithValue(workspaceId);
+            var key=check.ExecuteScalar();if(key is null)return Results.NotFound();
+            if(string.Equals(key as string,"unassigned",StringComparison.OrdinalIgnoreCase))return Results.NotFound();
+            using var cmd=new NpgsqlCommand("select content_type,image_data from studio_workspace_covers where workspace_id=$1",c);
+            cmd.Parameters.AddWithValue(workspaceId);using var reader=cmd.ExecuteReader();
+            return reader.Read()?Results.File((byte[])reader[1],reader.GetString(0)):Results.NotFound();
+        }).RequireAuthorization();
+        app.MapPut("/api/workspaces/{workspaceId:guid}/cover",async (Guid workspaceId,HttpRequest request,ClaimsPrincipal user,WorkspaceAccessService access,StudioDatabase db)=>
+        {
+            if(!access.HasPermission(user,workspaceId,"EditWorkspace"))return Results.Forbid();
+            if(!request.HasFormContentType)return Results.BadRequest(new{error="Select an image file."});
+            var form=await request.ReadFormAsync();var file=form.Files.GetFile("image");
+            if(file is null||file.Length==0||file.Length>2*1024*1024)return Results.BadRequest(new{error="Choose an image smaller than 2 MB."});
+            var type=file.ContentType.ToLowerInvariant();
+            if(type is not ("image/jpeg" or "image/png" or "image/webp"))return Results.BadRequest(new{error="Use JPEG, PNG or WebP."});
+            await using var stream=file.OpenReadStream();using var buffer=new MemoryStream();await stream.CopyToAsync(buffer);
+            var bytes=buffer.ToArray();
+            var valid=type switch
+            {
+                "image/jpeg"=>bytes.Length>3&&bytes[0]==255&&bytes[1]==216&&bytes[2]==255,
+                "image/png"=>bytes.Length>8&&bytes.AsSpan(0,8).SequenceEqual(new byte[]{137,80,78,71,13,10,26,10}),
+                _=>bytes.Length>12&&System.Text.Encoding.ASCII.GetString(bytes,0,4)=="RIFF"&&System.Text.Encoding.ASCII.GetString(bytes,8,4)=="WEBP"
+            };
+            if(!valid)return Results.BadRequest(new{error="Invalid image file."});
+            using var c=db.OpenConnection();
+            using var check=new NpgsqlCommand("select system_key from studio_workspaces where id=$1",c);check.Parameters.AddWithValue(workspaceId);
+            var key=check.ExecuteScalar();if(key is null)return Results.NotFound();
+            if(string.Equals(key as string,"unassigned",StringComparison.OrdinalIgnoreCase))return Results.Forbid();
+            using var cmd=new NpgsqlCommand(@"insert into studio_workspace_covers(workspace_id,content_type,image_data,updated_at_utc)
+                values($1,$2,$3,now()) on conflict(workspace_id) do update
+                set content_type=excluded.content_type,image_data=excluded.image_data,updated_at_utc=now()",c);
+            cmd.Parameters.AddWithValue(workspaceId);cmd.Parameters.AddWithValue(type);cmd.Parameters.AddWithValue(bytes);
+            cmd.ExecuteNonQuery();return Results.NoContent();
+        }).RequireAuthorization();
         app.MapGet("/api/workspaces/{workspaceId:guid}/appearance",(Guid workspaceId,ClaimsPrincipal user,WorkspaceAccessService access,StudioDatabase db)=>
         {
             if(!access.HasPermission(user,workspaceId,"AccessWorkspace"))return Results.Forbid();
