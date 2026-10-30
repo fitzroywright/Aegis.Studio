@@ -311,6 +311,7 @@ async function refreshStudioEmployees(){
     holder.innerHTML=`<table class="staff-editable-grid"><caption class="sr-only">Editable staff directory</caption><thead><tr><th>User name</th><th>Display name</th><th>Email</th><th>Active</th><th>Assignable</th><th>Roles / source</th><th>Actions</th></tr></thead><tbody>${employees.map((e,i)=>`<tr data-employee-row="${i}"><td>${esc(e.userName)}</td><td><input data-employee-name aria-label="Display name for ${esc(e.userName)}" required value="${esc(e.displayName)}"></td><td><input data-employee-email type="email" aria-label="Email for ${esc(e.userName)}" value="${esc(e.emailAddress||'')}"></td><td><input data-employee-active type="checkbox" aria-label="Active: ${esc(e.userName)}" ${e.isActive?'checked':''}></td><td><input data-employee-assignable type="checkbox" aria-label="Assignable: ${esc(e.userName)}" ${e.isAssignable?'checked':''}></td><td>${esc((e.roles||[]).join(', ')||e.source||'Studio')}</td><td><div class="staff-row-actions"><button type="button" class="action" data-employee-save disabled>Save</button><button type="button" class="action" data-employee-undo disabled>Undo</button>${registered.has(String(e.userName).toLowerCase())?'<span class="studio-status-pill">Photographer</span>':`<button type="button" class="action" data-register-photographer ${!e.isActive||!e.isAssignable?'disabled':''}>Register photographer</button>`}</div><span data-row-status role="status"></span></td></tr>`).join('')||'<tr><td colspan="7">No staff members yet.</td></tr>'}</tbody></table>`;
     holder.querySelectorAll('[data-employee-row]').forEach(row=>{
         const employee=employees[Number(row.dataset.employeeRow)],save=row.querySelector('[data-employee-save]'),undo=row.querySelector('[data-employee-undo]'),status=row.querySelector('[data-row-status]');
+        row.ondblclick=event=>{if(event.target.closest('input,button'))return;openStudioStaffDetails(employee);};
         const dirty=()=>{save.disabled=false;undo.disabled=false;status.textContent='Unsaved';};row.querySelectorAll('input').forEach(input=>input.oninput=dirty);
         undo.onclick=()=>{row.querySelector('[data-employee-name]').value=employee.displayName||'';row.querySelector('[data-employee-email]').value=employee.emailAddress||'';row.querySelector('[data-employee-active]').checked=employee.isActive;row.querySelector('[data-employee-assignable]').checked=employee.isAssignable;save.disabled=undo.disabled=true;status.textContent='';};
         save.onclick=async()=>{
@@ -323,6 +324,17 @@ async function refreshStudioEmployees(){
         };
         const register=row.querySelector('[data-register-photographer]');if(register)register.onclick=()=>registerStudioPhotographer(employee);
     });
+}
+function openStudioStaffDetails(employee) {
+    const d=studioDialog('Staff details',`<form class="request-form" data-staff-details><p><strong>${esc(employee.userName)}</strong> · Studio staff identity</p><label>Display name<input name="displayName" required value="${esc(employee.displayName||'')}"></label><label>Email<input name="email" type="email" value="${esc(employee.emailAddress||'')}"></label><label><input name="active" type="checkbox" ${employee.isActive?'checked':''}> Active</label><label><input name="assignable" type="checkbox" ${employee.isAssignable?'checked':''}> Assignable</label><p><strong>Roles:</strong> ${esc((employee.roles||[]).join(', ')||'None')}</p><p class="muted">Workspace and job access are granted separately.</p><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`);
+    const form=d.querySelector('form');form.querySelector('[data-cancel]').onclick=()=>d.close();
+    form.onsubmit=async event=>{event.preventDefault();const save=form.querySelector('[type=submit]');save.disabled=true;try{
+        const latest=(await json('/api/admin/studio-employees/')).find(e=>String(e.userName).toLowerCase()===String(employee.userName).toLowerCase());if(!latest)throw Error('Staff member no longer exists.');
+        const payload={...latest,displayName:form.elements.displayName.value.trim(),emailAddress:form.elements.email.value.trim()||null,isActive:form.elements.active.checked,isAssignable:form.elements.assignable.checked};
+        if(!payload.displayName)throw Error('Display name is required.');
+        await json('/api/admin/studio-employees/'+encodeURIComponent(employee.userName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        d.close();await refreshStudioEmployees();
+    }catch(error){form.querySelector('[role=alert]').textContent=error.message||String(error);}finally{save.disabled=false;}};
 }
 function registerStudioPhotographer(employee){
     if(!employee.isActive||!employee.isAssignable)return;
