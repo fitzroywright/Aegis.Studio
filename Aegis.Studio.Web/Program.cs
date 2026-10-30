@@ -38,6 +38,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Npgsql;
 
+if (args.FirstOrDefault() == "maintenance")
+{
+    Environment.ExitCode = await StudioMaintenanceCommand.RunAsync(args.Skip(1).ToArray());
+    return;
+}
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 string operationsLogInstanceId = builder.Configuration["Service:Identity"]?.Trim() ?? Environment.MachineName;
 string operationsLogIdentityFile = builder.Configuration["Aegis:Registration:IdentityFile"]
@@ -139,7 +145,7 @@ builder.Services.AddSingleton<StudioMessagingDatabase>();
 
 if (builder.Configuration.GetValue("AuthenticationPlugin:Enabled", true))
     AuthenticationPluginLoader.Register(builder.Services, builder.Configuration, builder.Environment.ContentRootPath);
-var studioAuthentication = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => { options.Cookie.Name = "Aegis.Studio.Auth"; options.Cookie.HttpOnly = true; options.Cookie.SameSite = SameSiteMode.Strict; options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; options.LoginPath = "/login"; options.AccessDeniedPath = "/login"; options.ExpireTimeSpan = TimeSpan.FromHours(8); options.SlidingExpiration = true; options.Events.OnValidatePrincipal = StudioSignIn.ValidateCookieAsync; options.Events.OnRedirectToLogin = context => { if (context.Request.Path.StartsWithSegments("/api")) { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; } context.Response.Redirect(context.RedirectUri); return Task.CompletedTask; }; });
+var studioAuthentication = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => { options.Cookie.Name = "Aegis.Studio.Auth"; options.Cookie.HttpOnly = true; options.Cookie.SameSite = SameSiteMode.Strict; options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; options.LoginPath = "/login"; options.AccessDeniedPath = "/login"; options.ExpireTimeSpan = TimeSpan.FromHours(8); options.SlidingExpiration = true; options.Events.OnValidatePrincipal = StudioSignIn.ValidateCookieAsync; options.Events.OnRedirectToAccessDenied = StudioSignIn.RedirectAccessDeniedAsync; options.Events.OnRedirectToLogin = context => { if (context.Request.Path.StartsWithSegments("/api")) { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; } context.Response.Redirect(context.RedirectUri); return Task.CompletedTask; }; });
 if (builder.Configuration.GetValue("Authentication:Entra:Enabled", false))
 {
     string tenant = Guid.Parse(builder.Configuration["Authentication:Entra:TenantId"] ?? "").ToString("D");
