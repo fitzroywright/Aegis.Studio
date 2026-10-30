@@ -11,6 +11,18 @@
   const current=open.find(x=>x.status==='InProgress')||open.find(x=>x.status==='Available')||open[0]||null;
   return current?{nodeId:current.id,task:current.task,status:current.status}:null;
  }
+ // Time in Stage comes from the persisted job transition, including waiting stages.
+ function stageAge(view,now=Date.now()){
+  const data=view?.data||view;
+  let started=Date.parse(data?.enteredAt||'');
+  if(!Number.isFinite(started)){
+   const recorded=(data?.history||[]).filter(item=>item.new_stage===data.stage).map(item=>Date.parse(item.entered_at_utc||'')).filter(Number.isFinite);
+   if(recorded.length)started=Math.max(...recorded);
+  }
+  if(!Number.isFinite(started)||!Number.isFinite(now))return 'Timing unavailable';
+  const minutes=Math.floor(Math.max(0,now-started)/60000),days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60);
+  return days?`${days}d ${hours}h`:minutes>=60?`${hours}h ${minutes%60}m`:minutes?`${minutes}m`:'Less than a minute';
+ }
  function nextActionLink(host,view,activate){
   if(!host)return;
   const current=workflowAction(view),task=current?.task;
@@ -347,5 +359,5 @@
   host.studioJobMedia?.dispose();host.studioJobMedia=controller;
   await load();return controller;
  }
- root.StudioJobDetails={media,openGallery,nextActionLink,workflowAction};
+ root.StudioJobDetails={media,openGallery,nextActionLink,workflowAction,stageAge};
 })(window);
