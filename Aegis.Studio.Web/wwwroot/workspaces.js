@@ -345,8 +345,21 @@ function drawStudioStaffList() {
         const status=e.securityAccount?.status || 'Setup required';
         const roles=state.roles.filter((role,i)=>staffGlobalMembership(e,i)).map(r=>r.name);
         if (state.photographers.some(p=>p.isActive && p.userName.toLowerCase()===e.userName.toLowerCase())) roles.push('Photographer');
-        return `<tr data-staff-index="${index}" aria-selected="${state.selected===e.userName}"><td><button type="button" class="staff-person" onclick="openStaffEditor(${index})"><span class="staff-avatar" aria-hidden="true">${esc(staffInitials(e))}</span><span><strong>${esc(e.displayName||e.userName)}</strong><small>${esc(e.emailAddress||e.userName)}</small></span></button></td><td>${roles.map(role=>`<span class="staff-role-badge">${esc(role)}</span>`).join(' ')||'<span class="muted">No roles</span>'}</td><td><span class="staff-access-badge" data-state="${esc(status)}">${esc(status==='PendingAccess'?'Awaiting approval':status==='Active'&&!e.isActive?'Staff inactive':status)}</span></td><td><button type="button" class="staff-edit-link" aria-label="Edit ${esc(e.displayName||e.userName)}" onclick="openStaffEditor(${index})">•••</button></td></tr>`;
+        return `<tr data-staff-index="${index}" data-staff-user="${esc(e.userName)}" tabindex="0" aria-label="Select ${esc(e.displayName||e.userName)}" aria-selected="${state.selected===e.userName}"><td><button type="button" class="staff-person"><span class="staff-avatar" aria-hidden="true">${esc(staffInitials(e))}</span><span><strong>${esc(e.displayName||e.userName)}</strong><small>${esc(e.emailAddress||e.userName)}</small></span></button></td><td>${roles.map(role=>`<span class="staff-role-badge">${esc(role)}</span>`).join(' ')||'<span class="muted">No roles</span>'}</td><td><span class="staff-access-badge" data-state="${esc(status)}">${esc(status==='PendingAccess'?'Awaiting approval':status==='Active'&&!e.isActive?'Staff inactive':status)}</span></td><td><button type="button" class="staff-edit-link" aria-label="Edit ${esc(e.displayName||e.userName)}">•••</button></td></tr>`;
     }).join('')||'<tr><td colspan="4">No matching staff members.</td></tr>'}</tbody></table>`;
+    const holder=document.getElementById('studioEmployeeList');
+    const selectRow=row=>{
+        if(!row||staffDirectoryState.selected===row.dataset.staffUser)return;
+        const index=staffDirectoryState.employees.findIndex(employee=>employee.userName===row.dataset.staffUser);
+        if(index>=0)openStaffEditor(index);
+    };
+    holder.onclick=event=>selectRow(event.target.closest('[data-staff-user]'));
+    holder.onkeydown=event=>{
+        if(!['Enter',' '].includes(event.key)||event.target.closest('button'))return;
+        const row=event.target.closest('[data-staff-user]');if(!row)return;
+        event.preventDefault();selectRow(row);
+        [...holder.querySelectorAll('[data-staff-user]')].find(item=>item.dataset.staffUser===staffDirectoryState.selected)?.focus({preventScroll:true});
+    };
     genericView.querySelector('[data-staff-count]').textContent = `${rows.length} of ${state.employees.length} staff members`;
 }
 

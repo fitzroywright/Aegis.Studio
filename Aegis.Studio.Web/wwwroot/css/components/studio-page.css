@@ -183,6 +183,8 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .staff-approval-note { margin:0 0 10px; font-size:12px; color:var(--theme-text,#213951); }
 .staff-approval-note:empty { display:none; }
 .staff-directory-table { border:1px solid var(--theme-border,#d9e2e9); }
+.staff-directory-table [data-staff-user] { cursor:pointer; }
+.staff-directory-table [data-staff-user]:focus-visible { outline:2px solid var(--theme-accent,#a5783d); outline-offset:-2px; }
 .staff-directory-table tr[aria-selected=true] { background:var(--theme-selected,#fbefd5); }
 .staff-person { display:flex; align-items:center; gap:10px; padding:6px 0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; }
 .staff-person small,.staff-checkbox small { display:block; margin-top:4px; color:var(--theme-muted,#64748b); font-size:11px; font-weight:400; }

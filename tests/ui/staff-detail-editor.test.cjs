@@ -55,3 +55,29 @@ test('stale staff loading cannot replace a newer view and errors provide retry',
  const {w}=await setup(t);w.json=async()=>{throw Error('Directory unavailable');};await w.refreshStudioEmployees();assert.match(w.document.getElementById('studioEmployeeList').textContent,/Directory unavailable/);assert.match(w.document.getElementById('studioEmployeeList').textContent,/Retry/);
  let release;const barrier=new Promise(resolve=>release=resolve);w.json=()=>barrier;const pending=w.refreshStudioEmployees();w.genericView.innerHTML='<p>Another view</p>';release([]);await pending;assert.equal(w.genericView.textContent,'Another view');
 });
+
+test('clicking staff row cells selects the matching person and saves only that identity',async t=>{
+ const {w,writes}=await setup(t);
+ const row=[...w.document.querySelectorAll('[data-staff-index]')].find(r=>r.textContent.includes('Sam Lee'));
+ row.querySelector('.staff-access-badge').click();
+ assert.equal(w.document.querySelector('.staff-person-heading h2').textContent,'Sam Lee');
+ const form=w.document.querySelector('.staff-person-form');form.elements.displayName.value='Selected Sam';
+ await form.onsubmit({preventDefault(){}});
+ assert.equal(writes[0].url,'/api/admin/studio-employees/domain%2Fuser');
+ assert.equal(writes[0].body.displayName,'Selected Sam');
+ assert.equal(w.document.querySelector('[aria-selected="true"][data-staff-index] .staff-person strong').textContent,'Selected Sam');
+});
+
+test('filtered row selection works through name and keyboard and respects unsaved changes',async t=>{
+ const {w,selectSam}=await setup(t);selectSam();
+ w.filterStudioStaff('Anna');w.document.querySelector('.staff-person strong').click();
+ assert.equal(w.document.querySelector('.staff-person-heading h2').textContent,'Anna Clarke');
+ w.filterStudioStaff('Sam');const row=w.document.querySelector('[data-staff-index]');
+ row.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+ assert.equal(w.document.querySelector('.staff-person-heading h2').textContent,'Sam Lee');
+ const form=w.document.querySelector('.staff-person-form');form.elements.displayName.value='Draft Sam';form.oninput();w.confirm=()=>false;
+ w.filterStudioStaff('Anna');w.document.querySelector('[data-staff-index] td').click();
+ assert.equal(w.document.querySelector('.staff-person-form').elements.displayName.value,'Draft Sam');
+ w.confirm=()=>true;w.document.querySelector('[data-staff-index]').dispatchEvent(new w.KeyboardEvent('keydown',{key:' ',bubbles:true,cancelable:true}));
+ assert.equal(w.document.querySelector('.staff-person-heading h2').textContent,'Anna Clarke');
+});
