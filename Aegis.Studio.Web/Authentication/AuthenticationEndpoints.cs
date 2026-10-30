@@ -17,7 +17,7 @@ public static class AuthenticationEndpoints
 {
     public static void MapStudioAuthentication(this WebApplication app)
     {
-        var mock = MockAuthenticationConfiguration.Read(app.Configuration.GetSection("MockAuthentication"),
+        var mock = StudioAuthenticationProvider.ReadMockOptions(app.Configuration.GetSection("MockAuthentication"),
             app.Environment.EnvironmentName, "Aegis.Studio");
         bool mockEnabled = MockEnvironmentPolicy.IsPermitted(mock.Enabled, mock.EnvironmentName, mock.IsolationConfirmed);
         if (mock.Enabled && !mockEnabled) throw new InvalidOperationException("Mock authentication requires an explicitly isolated Development or Demo environment.");
@@ -25,7 +25,6 @@ public static class AuthenticationEndpoints
         string provider = StudioAuthenticationProvider.Resolve(app.Configuration, mockEnabled, entraEnabled);
         app.MapGet("/api/auth/options", () => Results.Ok(new
         {
-            mockPasswordRequired = provider == "Mock" && !string.IsNullOrEmpty(mock.Password),
             defaultUserName = provider == "Mock" ? mock.Identities.FirstOrDefault()?.LoginName ?? "" : "",
             defaultSource = provider
         })).AllowAnonymous();
@@ -40,7 +39,7 @@ public static class AuthenticationEndpoints
                 "ActiveDirectory" => services.GetService<IAuthenticator>()?.Authenticate(request.UserName, request.Password)
                     ?? AuthenticationResult.Failed(AuthenticationFailure.ProviderUnavailable),
                 "LocalDatabase" => new LocalDatabaseAuthenticator(services.GetRequiredService<ILocalCredentialStore>()).Authenticate(request.UserName, request.Password),
-                "Mock" => new MockAuthenticator(mock).Authenticate(request.UserName, request.Password),
+                "Mock" => new MockAuthenticator(mock).Authenticate(request.UserName, string.Empty),
                 _ => AuthenticationResult.Failed(AuthenticationFailure.Prohibited)
             };
             if (!result.IsAuthenticated) return Results.Unauthorized();
@@ -153,4 +152,4 @@ public static class StudioSignIn
     }
 }
 
-public sealed record LoginRequest(string UserName, string Password, string? Source = null);
+public sealed record LoginRequest(string UserName, string Password = "", string? Source = null);

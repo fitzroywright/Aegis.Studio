@@ -25,7 +25,7 @@ document.getElementById('togglePassword').addEventListener('click', () => {
         userName.required = !redirect;
         userName.disabled = redirect;
         document.getElementById('userNameLabel').hidden = redirect;
-        password.required = !redirect && (!mock || authenticationOptions.mockPasswordRequired === true);
+        password.required = !redirect && !mock;
         password.disabled = redirect || (mock && !password.required);
         document.getElementById('passwordLabel').hidden = password.disabled;
         document.getElementById('recoveryToggle').hidden = provider !== 'LocalDatabase';
