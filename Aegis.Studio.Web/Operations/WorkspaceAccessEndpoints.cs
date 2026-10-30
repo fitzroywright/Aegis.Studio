@@ -1,3 +1,4 @@
+using Common.Security.Integration;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using Aegis.Studio.Web.Email;
@@ -87,7 +88,7 @@ public static class WorkspaceAccessEndpoints
                 .Select(x => new { x.UserName, x.DisplayName, x.Permissions }));
         }).RequireAuthorization();
 
-        app.MapPut("/api/workspaces/{workspaceId:guid}/managers/{userName}", (Guid workspaceId, string userName, WorkspaceMemberRequest request, ClaimsPrincipal user, StudioDatabase database) =>
+        app.MapPut("/api/workspaces/{workspaceId:guid}/managers/{userName}", (Guid workspaceId, string userName, WorkspaceMemberRequest request, ClaimsPrincipal user, StudioDatabase database, RelationalAccountStore security) =>
         {
             WorkspaceAccessService access = new(database);
             WorkspacePermissionSet caller = access.GetPermissions(user, workspaceId);
@@ -99,7 +100,7 @@ public static class WorkspaceAccessEndpoints
                 Permissions = WorkspacePermissionSet.Manager,
                 IsActive = true
             };
-            return Results.Ok(access.SaveMember(workspaceId, normalized));
+            return Results.Ok(StudioStaffAuthorization.Change(security,user,userName,(connection,transaction,alias)=>access.SaveMember(workspaceId,normalized with {UserName=alias},connection,transaction)));
         }).RequireAuthorization();
 
 
@@ -119,7 +120,7 @@ public static class WorkspaceAccessEndpoints
             return Results.Ok(access.GetMembers(workspaceId));
         }).RequireAuthorization();
 
-        app.MapPut("/api/workspaces/{workspaceId:guid}/members/{userName}", (Guid workspaceId, string userName, WorkspaceMemberRequest request, ClaimsPrincipal user, StudioDatabase database) =>
+        app.MapPut("/api/workspaces/{workspaceId:guid}/members/{userName}", (Guid workspaceId, string userName, WorkspaceMemberRequest request, ClaimsPrincipal user, StudioDatabase database, RelationalAccountStore security) =>
         {
             WorkspaceAccessService access = new(database);
             WorkspacePermissionSet caller = access.GetPermissions(user, workspaceId);
@@ -132,10 +133,10 @@ public static class WorkspaceAccessEndpoints
                 && (!normalized.IsActive || !IsManager(normalized.Permissions ?? WorkspacePermissionSet.ViewOnly));
             if (removingManager && access.GetMembers(workspaceId).Count(x => x.IsActive && IsManager(x.Permissions)) <= 1)
                 return Results.BadRequest(new { error = "Assign another Workspace Manager before removing or changing the current manager." });
-            return Results.Ok(access.SaveMember(workspaceId, normalized));
+            return Results.Ok(StudioStaffAuthorization.Change(security,user,userName,(connection,transaction,alias)=>access.SaveMember(workspaceId,normalized with {UserName=alias},connection,transaction)));
         }).RequireAuthorization();
 
-        app.MapDelete("/api/workspaces/{workspaceId:guid}/members/{userName}", (Guid workspaceId, string userName, ClaimsPrincipal user, StudioDatabase database) =>
+        app.MapDelete("/api/workspaces/{workspaceId:guid}/members/{userName}", (Guid workspaceId, string userName, ClaimsPrincipal user, StudioDatabase database, RelationalAccountStore security) =>
         {
             WorkspaceAccessService access = new(database);
             WorkspacePermissionSet caller = access.GetPermissions(user, workspaceId);
@@ -145,7 +146,7 @@ public static class WorkspaceAccessEndpoints
             if (target is not null && target.IsActive && IsManager(target.Permissions)
                 && access.GetMembers(workspaceId).Count(x => x.IsActive && IsManager(x.Permissions)) <= 1)
                 return Results.BadRequest(new { error = "Assign another Workspace Manager before removing the current manager." });
-            access.RemoveMember(workspaceId, userName);
+            StudioStaffAuthorization.Change(security,user,userName,(connection,transaction,alias)=>{access.RemoveMember(workspaceId,alias,connection,transaction);return true;});
             return Results.NoContent();
         }).RequireAuthorization();
 

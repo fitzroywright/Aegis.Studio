@@ -1,3 +1,5 @@
+using Common.Security.Hosting;
+using Common.Security.Integration;
 using System.Security.Claims;
 using Aegis.Studio.Web.Persistence;
 using Common.Security.Abstractions;
@@ -219,32 +221,38 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         return members;
     }
 
-    public GlobalOperationalRoleMember SaveMember(Guid roleId, GlobalOperationalRoleMemberRequest request)
+    public GlobalOperationalRoleMember SaveMember(Guid roleId, GlobalOperationalRoleMemberRequest request, NpgsqlConnection? transactionConnection = null, NpgsqlTransaction? transaction = null)
     {
         if (string.IsNullOrWhiteSpace(request.UserName)) throw new InvalidOperationException("User name is required.");
         if (!GetRoles().Any(role => role.Id == roleId && role.IsActive)) throw new KeyNotFoundException("Global operational role was not found.");
 
         string userName = request.UserName.Trim();
         string displayName = string.IsNullOrWhiteSpace(request.DisplayName) ? userName : request.DisplayName.Trim();
-        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlConnection? ownedConnection = transactionConnection is null ? database.OpenConnection() : null;
+        NpgsqlConnection connection = transactionConnection ?? ownedConnection!;
         using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             insert into studio_global_operational_role_members(role_id,user_name,display_name,is_active,created_at_utc,updated_at_utc)
             values($1,$2,$3,$4,now(),now())
             on conflict(role_id,user_name) do update set display_name=excluded.display_name,is_active=excluded.is_active,updated_at_utc=now()
+            returning role_id,user_name,display_name,is_active,created_at_utc,updated_at_utc
             """;
         command.Parameters.AddWithValue(roleId);
         command.Parameters.AddWithValue(userName);
         command.Parameters.AddWithValue(displayName);
         command.Parameters.AddWithValue(request.IsActive);
-        command.ExecuteNonQuery();
-        return GetMembers(roleId).First(member => string.Equals(member.UserName, userName, StringComparison.OrdinalIgnoreCase));
+        using var reader=command.ExecuteReader();
+        if(!reader.Read())throw new InvalidOperationException("The role membership was not persisted.");
+        return new GlobalOperationalRoleMember(reader.GetGuid(0),reader.GetString(1),reader.GetString(2),reader.GetBoolean(3),reader.GetFieldValue<DateTimeOffset>(4),reader.GetFieldValue<DateTimeOffset>(5));
     }
 
-    public void RemoveMember(Guid roleId, string userName)
+    public void RemoveMember(Guid roleId, string userName, NpgsqlConnection? transactionConnection = null, NpgsqlTransaction? transaction = null)
     {
-        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlConnection? ownedConnection = transactionConnection is null ? database.OpenConnection() : null;
+        NpgsqlConnection connection = transactionConnection ?? ownedConnection!;
         using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "delete from studio_global_operational_role_members where role_id=$1 and lower(user_name)=lower($2)";
         command.Parameters.AddWithValue(roleId);
         command.Parameters.AddWithValue(userName.Trim());
@@ -270,20 +278,24 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         return results;
     }
 
-    public void SaveGroupMapping(string groupName, Guid roleId)
+    public void SaveGroupMapping(string groupName, Guid roleId, NpgsqlConnection? transactionConnection = null, NpgsqlTransaction? transaction = null)
     {
-        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlConnection? ownedConnection = transactionConnection is null ? database.OpenConnection() : null;
+        NpgsqlConnection connection = transactionConnection ?? ownedConnection!;
         using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "insert into studio_directory_group_roles(group_name,role_id) values($1,$2) on conflict do nothing";
         command.Parameters.AddWithValue(groupName.Trim());
         command.Parameters.AddWithValue(roleId);
         command.ExecuteNonQuery();
     }
 
-    public void RemoveGroupMapping(string groupName, Guid roleId)
+    public void RemoveGroupMapping(string groupName, Guid roleId, NpgsqlConnection? transactionConnection = null, NpgsqlTransaction? transaction = null)
     {
-        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlConnection? ownedConnection = transactionConnection is null ? database.OpenConnection() : null;
+        NpgsqlConnection connection = transactionConnection ?? ownedConnection!;
         using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "delete from studio_directory_group_roles where lower(group_name)=lower($1) and role_id=$2";
         command.Parameters.AddWithValue(groupName.Trim());
         command.Parameters.AddWithValue(roleId);
@@ -418,19 +430,38 @@ public static class GlobalOperationalRoleEndpoints
             .Get<string[]>() ?? [];
         roles.EnsureSchema(administratorGroups);
 
-        RouteGroupBuilder group = app.MapGroup("/api/security/global-roles").RequireAuthorization(new AuthorizeAttribute { Roles = StudioRoleNames.Administrator });
+        RouteGroupBuilder group = app.MapGroup("/api/security/global-roles").RequireAuthorization(new AuthorizeAttribute { AuthenticationSchemes=Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme, Roles = StudioRoleNames.Administrator });
         group.MapGet("/", () => Results.Ok(roles.GetRoles()));
         group.MapGet("/{roleId:guid}/members", (Guid roleId) => Results.Ok(roles.GetMembers(roleId)));
-        group.MapPut("/{roleId:guid}/members/{userName}", (Guid roleId, string userName, GlobalOperationalRoleMemberRequest request) =>
+        var accounts=app.Services.GetRequiredService<RelationalAccountStore>();
+        string Actor(ClaimsPrincipal principal)=>principal.FindFirstValue(AccountSecurityHosting.AccountIdClaim)
+            ?? throw new UnauthorizedAccessException("A verified staff account is required.");
+        group.MapPut("/{roleId:guid}/members/{userName}", (Guid roleId,string userName,GlobalOperationalRoleMemberRequest request,ClaimsPrincipal actor)=>
         {
-            try { return Results.Ok(roles.SaveMember(roleId, request with { UserName = userName })); }
-            catch (KeyNotFoundException) { return Results.NotFound(); }
-            catch (InvalidOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
+            try
+            {
+                return Results.Ok(StudioStaffAuthorization.Change(accounts,actor,userName,(connection,transaction,alias)=>
+                    roles.SaveMember(roleId,request with {UserName=alias},connection,transaction)));
+            }
+            catch(KeyNotFoundException){return Results.NotFound();}
+            catch(InvalidOperationException exception){return Results.BadRequest(new {error=exception.Message});}
         });
-        group.MapDelete("/{roleId:guid}/members/{userName}", (Guid roleId, string userName) => { roles.RemoveMember(roleId, userName); return Results.NoContent(); });
-        group.MapGet("/directory-groups", () => Results.Ok(roles.GetGroupMappings()));
-        group.MapPut("/{roleId:guid}/directory-groups/{groupName}", (Guid roleId, string groupName) => { roles.SaveGroupMapping(groupName, roleId); return Results.NoContent(); });
-        group.MapDelete("/{roleId:guid}/directory-groups/{groupName}", (Guid roleId, string groupName) => { roles.RemoveGroupMapping(groupName, roleId); return Results.NoContent(); });
+        group.MapDelete("/{roleId:guid}/members/{userName}",(Guid roleId,string userName,ClaimsPrincipal actor)=>
+        {
+            StudioStaffAuthorization.Change(accounts,actor,userName,(connection,transaction,alias)=>{roles.RemoveMember(roleId,alias,connection,transaction);return true;});
+            return Results.NoContent();
+        });
+        group.MapGet("/directory-groups",()=>Results.Ok(roles.GetGroupMappings()));
+        group.MapPut("/{roleId:guid}/directory-groups/{groupName}",(Guid roleId,string groupName,ClaimsPrincipal actor)=>
+        {
+            string id=Actor(actor);accounts.ChangeAuthorization(id,id,(connection,transaction)=>roles.SaveGroupMapping(groupName,roleId,(NpgsqlConnection)connection,(NpgsqlTransaction)transaction));
+            return Results.NoContent();
+        });
+        group.MapDelete("/{roleId:guid}/directory-groups/{groupName}",(Guid roleId,string groupName,ClaimsPrincipal actor)=>
+        {
+            string id=Actor(actor);accounts.ChangeAuthorization(id,id,(connection,transaction)=>roles.RemoveGroupMapping(groupName,roleId,(NpgsqlConnection)connection,(NpgsqlTransaction)transaction));
+            return Results.NoContent();
+        });
 
         app.MapGet("/api/security/global-role-me", (ClaimsPrincipal user) => Results.Ok(new
         {
