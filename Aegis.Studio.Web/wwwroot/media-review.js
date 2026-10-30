@@ -18,11 +18,13 @@
   try{[jobs,workspaces]=await Promise.all([json('/api/jobs'),json('/api/workspaces')]);jobs=Array.isArray(jobs)?jobs:jobs.jobs||[];workspaces=Array.isArray(workspaces)?workspaces:workspaces.workspaces||[];}
   catch(error){if(generation===revision)genericView.innerHTML=`<p role="alert">${esc(error.message)}</p>`;return;}
   if(generation!==revision)return;
+  let workspace=window.sessionStorage.getItem('studio.footer.workspace.selection')||'';
+  if(!workspaces.some(w=>String(w.id)===workspace))workspace='';
+  const availableJobs=()=>jobs.filter(j=>!workspace||String(j.workspaceId)===workspace);
   genericView.innerHTML=`<div class="studio-media-page">
    <header class="studio-media-heading"><h1>Media</h1><button type="button" class="action" data-plan disabled>Open session plan ↗</button></header>
    <section class="studio-media-panel studio-media-context" aria-label="Media context">
-    <label>Workspace<select data-workspace aria-label="Workspace"><option value="">All workspaces</option>${workspaces.map(w=>`<option value="${esc(w.id)}">${esc(w.name||w.title)}</option>`).join('')}</select></label>
-    <label>Job<select data-job data-job-picker aria-label="Job"><option value="">Choose a job…</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label>
+    <label>Job<select data-job data-job-picker aria-label="Job"><option value="">Choose a job…</option>${StudioSubjectPicker.jobOptions(availableJobs())}</select></label>
     <label>Upload session<select data-session aria-label="Upload session" disabled><option value="">Choose a job first</option></select></label>
     <button type="button" class="action" data-open-job disabled>View job details ↗</button>
    </section>
@@ -62,10 +64,11 @@
    q('[data-collection]').innerHTML=options(['Unclassified',...state.collections.filter(c=>c!=='Unclassified')].map(c=>[c,c]),state.collection||'Unclassified');
    q('[data-subject]').innerHTML='<option value="">Assign later</option>'+options(state.subjects.filter(s=>!state.collection||(s.collection||'Unclassified')===state.collection).map(s=>[s.id,[s.name,s.reference].filter(Boolean).join(' · ')]),state.subject);
    const locked=state.running||Boolean(state.batch);
-   for(const control of root.querySelectorAll('[data-job],[data-workspace],[data-session],[data-collection],[data-subject]'))control.disabled=locked||!state.ready&&control.matches('[data-session],[data-collection],[data-subject]');
+   for(const control of root.querySelectorAll('[data-job],[data-session],[data-collection],[data-subject]'))control.disabled=locked||!state.ready&&control.matches('[data-session],[data-collection],[data-subject]');
    for(const control of root.querySelectorAll('[data-choose],[data-folder]'))control.disabled=!state.ready||!state.canEdit||locked;
    q('[data-drop]').setAttribute('aria-disabled',String(!state.ready||!state.canEdit||locked));
    q('[data-plan]').disabled=!state.ready;q('[data-open-job]').disabled=!state.job;q('[data-handoff]').disabled=!state.ready||state.running||Boolean(state.batch);
+   window.StudioShell?.setMediaWorkspaceFilter(workspaces,workspace,changeWorkspace,locked);
    remember();
   }
   function planRows(){return state.subjects.filter(s=>!state.collection||(s.collection||'Unclassified')===state.collection);}
@@ -148,7 +151,16 @@
   q('[data-plan]').onclick=run(openPlan);q('[data-handoff]').onclick=run(()=>state.job&&StudioWorkflow.open(state.job));
   q('[data-open-job]').onclick=run(()=>state.job&&openWorkspaceJob(state.job));
   q('[data-job]').onchange=run(()=>loadJob(q('[data-job]').value));
-  q('[data-workspace]').onchange=run(async()=>{const ws=q('[data-workspace]').value;const available=jobs.filter(j=>!ws||String(j.workspaceId)===ws);q('[data-job]').innerHTML='<option value="">Choose a job…</option>'+StudioSubjectPicker.jobOptions(available);StudioSubjectPicker.enhance(q('[data-job]')).sync();await loadJob('');});
+  async function changeWorkspace(id){
+   if(!alive())return;
+   if(state.batch||state.running){showDestination();feedback('Finish or retry the current upload before changing workspaces.');return;}
+   workspace=id;window.sessionStorage.setItem('studio.footer.workspace.selection',workspace);
+   const available=availableJobs();
+   q('[data-job]').innerHTML='<option value="">Choose a job…</option>'+StudioSubjectPicker.jobOptions(available);
+   StudioSubjectPicker.enhance(q('[data-job]')).sync();
+   if(state.job&&available.some(j=>String(j.id)===state.job)){q('[data-job]').value=state.job;showDestination();}
+   else await loadJob('');
+  }
   q('[data-session]').onchange=()=>{state.session=q('[data-session]').value;showDestination();};
   q('[data-refresh]').onclick=run(()=>loadJob(state.job,true));
   q('[data-collection]').onchange=()=>{state.collection=q('[data-collection]').value;state.subject='';state.selected.clear();q('[data-person]').value='';render();};
@@ -236,6 +248,7 @@
   transfer.notify=completed=>{if(!alive())return;if(state.batch)renderQueue(state.batch);else if(completed){q('[data-progress]').textContent=completed.files.length+' of '+completed.files.length+' uploaded';q('[data-queue]').replaceChildren();q('[data-pause]').disabled=true;q('[data-retry]').hidden=true;q('[data-cancel-upload]').hidden=true;void loadJob(state.job,true);}};
   const initial=transfer.batch?{jobId:transfer.batch.jobId,sessionId:transfer.batch.declaration.sessionId,collection:transfer.batch.declaration.collection,subjectId:transfer.batch.declaration.subjectId}:window.studioMediaFocus||window.studioMediaContext||{};
   const initialJob=transfer.batch?.jobId||window.history.state?.studioJobId||initial.jobId;
-  if(initialJob&&jobs.some(j=>String(j.id)===String(initialJob))){q('[data-job]').value=String(initialJob);const matching=String(initial.jobId)===String(initialJob);state.collection=matching?initial.collection||'':'';state.subject=matching?initial.subjectId||'':'';state.session=matching?initial.sessionId||'':'';await loadJob(String(initialJob),true);if(state.batch)renderQueue(state.batch);}else showDestination();
+  if(transfer.batch||window.history.state?.studioJobId||window.studioMediaFocus?.jobId){workspace=String(jobs.find(j=>String(j.id)===String(initialJob))?.workspaceId||'');q('[data-job]').innerHTML='<option value="">Choose a job…</option>'+StudioSubjectPicker.jobOptions(availableJobs());}
+  if(initialJob&&availableJobs().some(j=>String(j.id)===String(initialJob))){q('[data-job]').value=String(initialJob);const matching=String(initial.jobId)===String(initialJob);state.collection=matching?initial.collection||'':'';state.subject=matching?initial.subjectId||'':'';state.session=matching?initial.sessionId||'':'';await loadJob(String(initialJob),true);if(state.batch)renderQueue(state.batch);}else showDestination();
  };
 })();

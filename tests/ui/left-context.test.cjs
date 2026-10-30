@@ -31,7 +31,7 @@ test('Jobs uses its inline status filter and the shared attention drawer without
 
 test('Job Details shows current status and stage age in the identity overlay without a rail',async t=>{
  const {w}=require('./job-detail-fixture.cjs').environment(t);await w.openWorkspaceJob('job');await settle();
- const menu=w.document.querySelector('#jobIdentityMenu');assert.equal(menu.hidden,true);w.document.querySelector('.jd-job-name-toggle').click();assert.equal(menu.hidden,false);assert.match(menu.textContent,/Current StatusProduction.*Days in Stage.*Williams & Clarke/s);assert.equal(w.document.querySelector('#studioContextRail,.job-detail-right'),null);
+ const menu=w.document.querySelector('#jobIdentityMenu');assert.equal(menu.hidden,true);w.document.querySelector('.jd-job-name-toggle').click();assert.equal(menu.hidden,false);assert.match(menu.textContent,/Current StatusProduction.*Time in Stage.*Williams & Clarke/s);assert.equal(w.document.querySelector('#studioContextRail,.job-detail-right'),null);
 });
 
 test('retired Activity actions stay out of the avatar, footer and page',async t=>{

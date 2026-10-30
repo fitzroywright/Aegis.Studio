@@ -34,15 +34,43 @@ internal static class DemoDatasetFinalizer
                   select md5('demo-unclassified:'||id)::uuid,id,id,'Unclassified','','','demo-seed','Unclassified',true from studio_jobs
                   where not exists(select 1 from studio_job_subjects s where s.job_id=studio_jobs.id and s.is_system and lower(s.name)='unclassified');
                 """);
-            var jobs = new List<Guid>();
-            using (var command = new NpgsqlCommand("select id from studio_jobs where not exists(select 1 from studio_job_template_instances t where t.job_id=studio_jobs.id) order by id", connection, transaction))
-            using (var reader = command.ExecuteReader()) while (reader.Read()) jobs.Add(reader.GetGuid(0));
-            Guid templateId;
-            using (var command = new NpgsqlCommand("select id from studio_commercial_templates where kind='Job' and active order by definition->>'name' limit 1", connection, transaction))
-                templateId = command.ExecuteScalar() is Guid id ? id : throw new InvalidOperationException("Demo Job Templates were not created.");
-            var template = CommercialTemplateStore.Get(connection, transaction, templateId)!;
-            foreach (Guid job in jobs) CommercialTemplateStore.ApplyNewJob(connection, transaction, job, template, Guid.NewGuid(), actor);
-            Run("update studio_job_activities a set status='Completed',started_at_utc=now(),completed_at_utc=now() from studio_jobs j where a.job_id=j.id and j.status='Completed' and a.workflow_node_id is not null");
+            var jobs = new List<(Guid Id,string Title)>();
+            using (var command = new NpgsqlCommand("select id,title from studio_jobs where not exists(select 1 from studio_job_template_instances t where t.job_id=studio_jobs.id) order by id", connection, transaction))
+            using (var reader = command.ExecuteReader()) while (reader.Read()) jobs.Add((reader.GetGuid(0),reader.GetString(1)));
+            foreach (var job in jobs)
+            {
+                using var command = new NpgsqlCommand("select id from studio_commercial_templates where kind='Job' and active and definition->>'name'=$1 limit 1", connection, transaction);
+                command.Parameters.AddWithValue(DemoJobWorkflowGraphs.TemplateName(job.Title));
+                Guid templateId = command.ExecuteScalar() is Guid id ? id : throw new InvalidOperationException("A matching demo Job Template was not created.");
+                CommercialTemplateStore.ApplyNewJob(connection, transaction, job.Id, CommercialTemplateStore.Get(connection, transaction, templateId)!, Guid.NewGuid(), actor);
+            }
+            // Complete prerequisite graph tasks to match the actual Job stage. A
+            // production job must not suggest photographing it again as its next step.
+            Run("""
+                update studio_job_activities a set status='Completed',started_at_utc=coalesce(a.started_at_utc,now()),completed_at_utc=coalesce(a.completed_at_utc,now()),blocked_reason=null
+                from studio_jobs j where a.job_id=j.id and a.workflow_node_id is not null and (
+                  j.status in ('Ready for Delivery','Delivered','Completed') and a.workflow_node_id<>'delivery'
+                  or j.status in ('Delivered','Completed')
+                  or j.status in ('Awaiting Upload','Awaiting Production Review','Active Production','Awaiting Approval','Changes Requested') and a.workflow_node_id in ('review','capture/shoot')
+                  or j.status in ('Awaiting Production Review','Active Production','Awaiting Approval','Changes Requested') and a.workflow_node_id='capture/ingest'
+                  or j.status='Awaiting Approval' and a.workflow_node_id in ('digital','retouch','print'));
+                update studio_jobs set correction_kind='Production',blocked_reason=coalesce(blocked_reason,'Client requested corrections to the edited photographs.') where status='Changes Requested';
+                insert into studio_media_collections(job_id,name)
+                  select distinct job_id,collection_name from studio_job_subjects where not is_system and nullif(trim(collection_name),'') is not null on conflict do nothing;
+                insert into studio_media_collections(job_id,name)
+                  select distinct job_id,collection_name from studio_job_asset_collections on conflict do nothing;
+                """);
+            // Populate the authoritative staff directory, including operational task
+            // owners. Do not overwrite the staff accounts preserved by factory reset.
+            Run("""
+                insert into studio_employees(user_name,display_name,is_active,is_assignable,source,workday_user_name)
+                select user_name,display_name,true,true,'Demo',user_name from studio_workers where user_name like 'demo.%'
+                on conflict(user_name) do nothing;
+                insert into studio_employees(user_name,display_name,is_active,is_assignable,source)
+                select distinct assigned_to,initcap(replace(substring(assigned_to from 6),'.',' ')),true,true,'Demo'
+                  from studio_job_activities where assigned_to like 'demo.%'
+                on conflict(user_name) do nothing;
+                """);
             transaction.Commit();
             void Run(string sql) { using var command = new NpgsqlCommand(sql, connection, transaction); command.ExecuteNonQuery(); }
         }
@@ -53,6 +81,8 @@ internal static class DemoDatasetFinalizer
         }
         Check("select count(*) from studio_jobs j where j.job_lead is not null and not exists(select 1 from studio_job_owner_assignments a where a.id=j.owner_assignment_id and a.job_id=j.id)", "Demo ownership is incomplete.");
         Check("select count(*) from studio_jobs j where not exists(select 1 from studio_job_template_instances t where t.job_id=j.id)", "Demo template coverage is incomplete.");
+        Check("select count(*) from studio_jobs where status='Changes Requested' and correction_kind not in ('Source','Production') or status='Changes Requested' and correction_kind is null", "Demo correction actions are incomplete.");
+        Check("select count(*) from studio_job_subjects s where not s.is_system and nullif(trim(s.collection_name),'') is not null and not exists(select 1 from studio_media_collections c where c.job_id=s.job_id and c.name=s.collection_name)", "A Session Plan collection is missing from the demo gallery.");
         using (var command=new NpgsqlCommand("select j.id,j.title,count(m.asset_key)::int from studio_jobs j left join studio_media_assets m on m.job_id=j.id group by j.id,j.title order by j.id",connection))
         using (var reader=command.ExecuteReader())
             while(reader.Read())

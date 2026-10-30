@@ -26,7 +26,7 @@ internal static partial class DemoDataExpansion
         string[] names=["Morgan","Taylor","Alex","Jordan","Casey","Riley"];
         for(int workspace=1;workspace<=3;workspace++)
         {
-            Execute(connection,transaction,"insert into studio_workspace_announcements(id,workspace_id,title,body,created_by) values($1,$2,$3,$4,$5)",Id(20,workspace),Id(1,workspace),"DEMO — Explore this workspace","Open a job to try Media collections and version history, People, Tasks / Calendar and Activity. Carter Wedding includes fifty seeded wedding photographs with people assignments; nothing is published.",login);
+            Execute(connection,transaction,"insert into studio_workspace_announcements(id,workspace_id,title,body,created_by) values($1,$2,$3,$4,$5)",Id(20,workspace),Id(1,workspace),"DEMO — Explore this workspace","Open a job to explore its Session Plan, Media collections, version history, tasks and schedule. Carter Wedding links local wedding photographs to named people and groups; nothing is published.",login);
             Execute(connection,transaction,"insert into studio_schedule_resources(id,name,resource_type,is_active,notes,created_at_utc) values($1,$2,'Room',true,'Fictional demo resource',now())",Id(21,workspace),$"DEMO — Studio {workspace}");
         }
         for(int index=0;index<JobNumbers.Length;index++)
@@ -136,8 +136,8 @@ internal static partial class DemoDataExpansion
                 }
             }
             string mediaMessage=number==4
-                ?"Demo gallery ready: five distinct wedding photographs across Getting Ready, Ceremony, Portraits and Reception, linked to the people and groups in the People roster."
-                :"Demo gallery ready: four real public-domain photographs across Selects and Proofs, with two versions of the first image.";
+                ?"Demo wedding photographs are linked to named people and groups in the Session Plan. Available photographs come from the installed local demo library."
+                :"Demo photographs are loaded from the installed local library, with version history on the first image.";
             Execute(connection,transaction,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'Studio','Internal',$3,now())",Id(28,number),Id(2,number),mediaMessage);
         }
         Execute(connection,transaction,"insert into studio_state(key,value,updated_at_utc) values('demo-data-v3',$1,now()) on conflict(key) do update set value=excluded.value,updated_at_utc=excluded.updated_at_utc",login);
