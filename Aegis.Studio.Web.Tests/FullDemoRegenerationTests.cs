@@ -80,7 +80,7 @@ public class FullDemoRegenerationTests
         string? previousPhotoRoot=Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS");
         string photoRoot=Path.Combine(Path.GetTempPath(),"aegis-demo-photo-library-"+Guid.NewGuid().ToString("N"));
         byte[] photo=await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory,"Fixtures","portrait.jpg"));
-        foreach(string category in new[]{"people","wedding","graduation","family","sports","product"})
+        foreach(string category in new[]{"people","wedding","graduation","family","sports","product","staff"})
         {
             string directory=Path.Combine(photoRoot,category);Directory.CreateDirectory(directory);
             for(int i=0;i<4;i++)await File.WriteAllBytesAsync(Path.Combine(directory,$"fixture-{i}.jpg"),photo);
