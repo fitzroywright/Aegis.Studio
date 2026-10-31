@@ -51,9 +51,27 @@ values
     ('RETOUCHER','Retoucher',false),
     ('REVIEWER','Reviewer',false),
     ('DELIVERY','Delivery',false)
-on conflict(code) do update set display_name=excluded.display_name,can_be_primary=excluded.can_be_primary,updated_at_utc=now();
+on conflict(code) do nothing;
 
 insert into studio_workers(user_name,display_name,worker_type_code,is_active,created_at_utc,updated_at_utc)
 select p.user_name,p.display_name,'PHOTOGRAPHER',p.is_active,p.created_at_utc,p.updated_at_utc
 from studio_photographers p
-on conflict(user_name) do update set display_name=excluded.display_name,is_active=excluded.is_active,updated_at_utc=now();
+on conflict(user_name) do nothing;
+
+
+-- Membership rows also record removals, so startup never restores a removed role.
+create table if not exists studio_worker_roles
+(
+    user_name text not null references studio_workers(user_name),
+    role_code text not null references studio_worker_types(code),
+    is_active boolean not null default true,
+    updated_at_utc timestamptz not null default now(),
+    primary key(user_name,role_code)
+);
+insert into studio_worker_roles(user_name,role_code,is_active)
+select candidate.user_name,candidate.role_code,candidate.active from (
+    select user_name,worker_type_code role_code,true active from studio_workers
+    union select user_name,'PHOTOGRAPHER',is_active from studio_photographers
+) candidate
+where not exists(select 1 from studio_worker_roles r where r.user_name=candidate.user_name)
+on conflict do nothing;

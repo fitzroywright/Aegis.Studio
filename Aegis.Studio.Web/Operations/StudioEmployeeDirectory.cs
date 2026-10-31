@@ -47,6 +47,7 @@ public sealed class StudioEmployeeDirectoryStore
                 union all select 1,user_name,display_name,null,is_active,is_active,'Studio photographer',null,skills,user_name,null from studio_photographers
                 union all select 2,user_name,display_name,null,is_active,true,'Studio role member',null,'{}'::text[],null,null from studio_global_operational_role_members
                 union all select 3,user_name,display_name,null,is_active,true,'Workspace member',null,'{}'::text[],null,null from studio_workspace_members
+                union all select 4,user_name,display_name,email,is_active,true,'Job Role',null,'{}'::text[],null,null from studio_workers
               ) identities order by lower(user_name),priority,display_name
             ) e where not $1 or (e.is_active and e.is_assignable) order by e.display_name,e.user_name
             """;

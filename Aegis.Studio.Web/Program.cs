@@ -780,6 +780,25 @@ app.MapGet("/api/admin/job-roles", (ClaimsPrincipal user, [Microsoft.AspNetCore.
     if (!user.IsInRole("Administrator")) return Results.Forbid();
     return Results.Ok(workers.GetTypes(includeInactive: true));
 }).RequireAuthorization();
+app.MapGet("/api/admin/workers", (ClaimsPrincipal user, [Microsoft.AspNetCore.Mvc.FromServices] Aegis.Studio.Web.Workers.WorkerDirectory workers) =>
+{
+    if (!user.IsInRole("Administrator")) return Results.Forbid();
+    return Results.Ok(workers.GetRoleMemberships(includeInactive: true));
+}).RequireAuthorization();
+app.MapPut("/api/admin/workers/{userName}/roles", (string userName, Aegis.Studio.Web.Workers.WorkerRolesRequest request, ClaimsPrincipal user, StudioEmployeeDirectoryStore employees, [Microsoft.AspNetCore.Mvc.FromServices] Aegis.Studio.Web.Workers.WorkerDirectory workers) =>
+{
+    if (!user.IsInRole("Administrator")) return Results.Forbid();
+    var employee = employees.GetAll().FirstOrDefault(person => person.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase));
+    if (employee is null) return Results.NotFound(new { error = "Staff member was not found." });
+    if (request.RoleCodes is null || request.RoleCodes.Count > 100 || request.RoleCodes.Any(string.IsNullOrWhiteSpace))
+        return Results.BadRequest(new { error = "Choose valid Job Roles." });
+    try
+    {
+        workers.SaveRoles(employee.UserName,employee.DisplayName,employee.EmailAddress,employee.IsActive && employee.IsAssignable,request.RoleCodes);
+        return Results.Ok(workers.GetRoleMemberships(true).Where(person => person.UserName.Equals(employee.UserName,StringComparison.OrdinalIgnoreCase)));
+    }
+    catch (ArgumentException exception) { return Results.BadRequest(new { error = exception.Message }); }
+}).RequireAuthorization();
 app.MapPost("/api/admin/job-roles", (Aegis.Studio.Domain.Workers.JobRole request, ClaimsPrincipal user, [Microsoft.AspNetCore.Mvc.FromServices] Aegis.Studio.Web.Workers.WorkerDirectory workers) =>
 {
     if (!user.IsInRole("Administrator")) return Results.Forbid();
@@ -794,9 +813,3 @@ app.MapPut("/api/admin/job-roles/{code}/active", (string code, bool active, Clai
 }).RequireAuthorization();
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
-
-
-
-
-
-

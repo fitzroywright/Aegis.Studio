@@ -7,7 +7,7 @@ async function setup(t,{accounts=true,roleFailure=false,demo=false,provider="Moc
  const account={id:'account',loginName:employee.userName,displayName:employee.displayName,providerKind:'ActiveDirectory',status:'PendingAccess'};
  const roles=[{id:'front',name:'Front Desk',description:'Reception',isActive:true},{id:'inactive',name:'Old role',isActive:false}];
  const writes=[];let fail=roleFailure;
- w.json=async(url,options)=>{
+ w.json=async(url,options)=>{if(!options&&(url==='/api/admin/job-roles'||url==='/api/admin/workers'))return [];
   if(options){writes.push({url,method:options.method,body:options.body?JSON.parse(options.body):null});if(url==='/api/admin/security/demo-accounts/'&&JSON.parse(options.body).accountId)account.identities=[{providerKind:'Mock',key:{providerId:'mock',scopeId:'Aegis.Studio',subjectId:'persisted-subject'}}];if(fail&&url.includes('/members/')){fail=false;throw Error('Role unavailable');}return {id:'created'};}
   if(url.includes('studio-employees'))return [{...employee}, {userName:'second',displayName:'Anna Clarke',isActive:true,isAssignable:false,skills:[]}];
   if(url==='/api/auth/options')return {defaultSource:provider,demoAccountsEnabled:demo};
@@ -23,26 +23,26 @@ async function setup(t,{accounts=true,roleFailure=false,demo=false,provider="Moc
  const selectSam=()=>{const button=[...w.document.querySelectorAll('.staff-person')].find(b=>b.textContent.includes('Sam Lee'));w.openStaffEditor(Number(button.closest('[data-staff-index]').dataset.staffIndex));return w.document.querySelector('.staff-person-form');};
  return {w,employee,writes,selectSam,dom};
 }
-test('staff page has one editor, searchable rows, separate role tab and collapsed technical controls',async t=>{
- const {w,selectSam}=await setup(t);selectSam();assert.equal(w.document.querySelectorAll('.staff-person-form').length,1);assert.equal(w.document.getElementById('rolesPanel').hidden,true);assert.equal(w.document.querySelector('.staff-advanced').open,false);assert.equal(w.document.querySelector('.staff-person-form input[readonly]').value,'Active Directory');
+test('staff page has one editor, searchable rows, role tokens and collapsed technical controls',async t=>{
+ const {w,selectSam}=await setup(t);selectSam();assert.equal(w.document.querySelectorAll('.staff-person-form').length,1);assert.equal(w.document.getElementById('rolesPanel'),null);assert.equal(w.document.querySelector('.staff-advanced').open,false);assert.equal(w.document.querySelector('.staff-person-form input[readonly]').value,'Active Directory');
  w.filterStudioStaff('sam@example');assert.equal(w.document.querySelectorAll('[data-staff-index]').length,1);w.filterStudioStaff('nobody');assert.match(w.document.getElementById('studioEmployeeList').textContent,/No matching/);
- w.selectStaffTab('roles');assert.equal(w.document.getElementById('staffPanel').hidden,true);assert.equal(w.document.getElementById('rolesTab').getAttribute('aria-selected'),'true');
+ assert.equal(w.document.querySelector('[data-manage-job-roles]').textContent,'Manage Job Roles');
 });
 test('staff save preserves fresh directory and WorkDay metadata and encodes identity paths',async t=>{
  const {w,writes,employee,selectSam}=await setup(t);const form=selectSam();form.elements.displayName.value='Updated name';await w.saveStaffDetails({...employee,securityAccount:{id:'account',status:'PendingAccess'}},form);
  const save=writes.find(x=>x.url.includes('studio-employees/'));assert.equal(save.url,'/api/admin/studio-employees/domain%2Fuser');assert.equal(save.body.displayName,'Updated name');for(const key of ['source','externalId','skills','workDayUserName','lastSyncedAtUtc'])assert.deepEqual(save.body[key],employee[key]);assert.ok(!('securityAccount'in save.body));assert.equal(form.querySelector('[data-editor-status]').textContent,'Saved');
 });
 test('role assignments save before account approval and inactive roles stay disabled',async t=>{
- const {w,writes,selectSam}=await setup(t);const form=selectSam();form.querySelector('[data-staff-role="0"]').checked=true;form.elements.accountStatus.value='Active';await form.onsubmit({preventDefault(){}});
- assert.equal(writes[1].url,'/api/security/global-roles/front/members/domain%2Fuser');assert.equal(writes[1].body.isActive,true);assert.equal(writes[2].url,'/api/admin/security/accounts/account/status');assert.equal(writes[2].body.status,'Active');assert.equal(form.querySelector('[data-staff-role="1"]').disabled,true);
+ const {w,writes,selectSam}=await setup(t);const form=selectSam();form.querySelector('[data-token-kind=access] input').focus();form.querySelector('[data-add-token="0"]').click();form.elements.accountStatus.value='Active';await form.onsubmit({preventDefault(){}});
+ assert.equal(writes[1].url,'/api/security/global-roles/front/members/domain%2Fuser');assert.equal(writes[1].body.isActive,true);assert.equal(writes[2].url,'/api/admin/security/accounts/account/status');assert.equal(writes[2].body.status,'Active');assert.equal(form.querySelector('[data-add-token="1"]'),null);
 });
 test('partial role failures retain edits and retry completes without approving access early',async t=>{
- const {writes,selectSam}=await setup(t,{roleFailure:true});const form=selectSam();form.querySelector('[data-staff-role="0"]').checked=true;form.elements.accountStatus.value='Active';form.elements.displayName.value='Draft';await form.onsubmit({preventDefault(){}});
+ const {writes,selectSam}=await setup(t,{roleFailure:true});const form=selectSam();form.querySelector('[data-token-kind=access] input').focus();form.querySelector('[data-add-token="0"]').click();form.elements.accountStatus.value='Active';form.elements.displayName.value='Draft';await form.onsubmit({preventDefault(){}});
  assert.match(form.querySelector('[data-editor-status]').textContent,/Role unavailable/);assert.equal(form.elements.displayName.value,'Draft');assert.equal(writes.filter(x=>x.url.endsWith('/status')).length,0);assert.equal(form.querySelector('[type=submit]').disabled,false);
  await form.onsubmit({preventDefault(){}});assert.equal(writes.filter(x=>x.url.endsWith('/status')).length,1);assert.equal(form.querySelector('[data-editor-status]').textContent,'Saved');
 });
 test('directory staff without an enrolled account cannot receive global roles and can start sign-in setup',async t=>{
- const {w,selectSam}=await setup(t,{accounts:false});const form=selectSam();assert.equal(form.querySelector('[data-staff-role="0"]').disabled,true);form.querySelector('[data-enroll]').click();assert.equal(w.document.getElementById('employeeUserName').value,'domain/user');assert.equal(w.document.getElementById('employeeUserName').readOnly,true);assert.equal(w.document.getElementById('employeeEmail').value,'sam@example.test');
+ const {w,selectSam}=await setup(t,{accounts:false});const form=selectSam();assert.equal(form.querySelector('[data-token-kind=access] input').disabled,true);form.querySelector('[data-enroll]').click();assert.equal(w.document.getElementById('employeeUserName').value,'domain/user');assert.equal(w.document.getElementById('employeeUserName').readOnly,true);assert.equal(w.document.getElementById('employeeEmail').value,'sam@example.test');
 });
 test('new staff form only requires a password for local authentication and preserves creation API',async t=>{
  const {w,writes}=await setup(t);w.openStaffEditor(null);const d=w.document;d.getElementById('employeeUserName').value='new.user';d.getElementById('employeeDisplayName').value='New User';

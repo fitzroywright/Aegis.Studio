@@ -255,11 +255,7 @@ let staffDirectoryState = null;
 function renderEmployeeDirectorySection() {
     staffDirectoryState = null;
     return `<section class="staff-administration">
-      <div class="staff-tabs" role="tablist" aria-label="Staff and roles">
-        <button type="button" id="staffTab" role="tab" aria-selected="true" aria-controls="staffPanel" onclick="selectStaffTab('staff')">Staff</button>
-        <button type="button" id="rolesTab" role="tab" aria-selected="false" aria-controls="rolesPanel" tabindex="-1" onclick="selectStaffTab('roles')">Roles</button>
-      </div>
-      <section id="staffPanel" role="tabpanel" aria-labelledby="staffTab" class="staff-master-detail">
+      <section id="staffPanel" class="staff-master-detail">
         <div class="staff-master"><div class="staff-toolbar"><input type="search" aria-label="Search staff by name or email" placeholder="Search staff by name or email…" oninput="filterStudioStaff(this.value)"><button type="button" class="primary" onclick="openStaffEditor(null)">+ Add staff</button></div>
           <p data-staff-approvals class="staff-approval-note" role="status"></p>
           <div id="studioEmployeeList" class="staff-grid-scroll"><p role="status">Loading staff…</p></div>
@@ -267,23 +263,58 @@ function renderEmployeeDirectorySection() {
         </div>
         <section class="staff-detail" aria-label="Staff editor" aria-live="polite"><p>Select a staff member to edit their details and roles.</p></section>
       </section>
-      <section id="rolesPanel" role="tabpanel" aria-labelledby="rolesTab" hidden><div data-staff-global-roles></div><details class="staff-reusable-roles"><summary>Reusable job and workspace roles</summary>${renderStudioRoleEditor()}${renderStudioRoleGrid()}</details></section>
     </section>`;
 }
 
-async function selectStaffTab(tab) {
-    const state=staffDirectoryState,previous=document.getElementById('staffTab').getAttribute('aria-selected')==='true'?'staff':'roles';
-    if(previous===tab)return;
-    if(state?.saving||state?.loading)return;
-    if(state?.dirty){if(!confirm('Discard unsaved staff changes?'))return;openStaffEditor(state.selected===null?null:state.employees.findIndex(e=>e.userName===state.selected),true);}
-    for (const name of ['staff','roles']) {
-        const selected = tab === name, button = document.getElementById(name+'Tab');
-        button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1;
-        document.getElementById(name+'Panel').hidden = !selected;
-    }
-    const root=genericView.querySelector('.staff-administration'),current=()=>root?.isConnected===true;
-    if(tab==='roles')await renderGlobalRoleAdministration(current);
-    else await refreshStudioEmployees(current);
+function openStaffPermissionTemplates(){return studioDialog('Permission templates',renderStudioRoleEditor()+renderStudioRoleGrid());}
+
+function mountStaffTokenEditor(holder,options,values,onchange,disabled=false){
+    holder.tokenValues=new Set(values);
+    holder.innerHTML=`<div class="staff-token-input"><div data-tokens></div><input type="text" aria-label="${holder.dataset.tokenKind==='job'?'Add Job Role':'Add access role'}" placeholder="${holder.dataset.tokenKind==='job'?'Add role…':'Add access role…'}" autocomplete="off" aria-expanded="false"></div><div class="staff-token-menu" hidden></div>`;
+    const input=holder.querySelector('input'),menu=holder.querySelector('.staff-token-menu');
+    const draw=()=>{
+        holder.querySelector('[data-tokens]').innerHTML=[...holder.tokenValues].map(value=>{const option=options.find(option=>option.id===value);return `<button type="button" class="staff-role-badge" data-remove-token="${esc(value)}" aria-label="Remove ${esc(option?.label||value)}" ${disabled||(holder.dataset.tokenKind==='access'&&option?.disabled)?'disabled':''}>${esc(option?.label||value)}${option?.disabled?' (inactive)':''} <span aria-hidden="true">×</span></button>`;}).join('');
+        input.disabled=disabled;
+        menu.innerHTML=options.filter(option=>!option.disabled&&!holder.tokenValues.has(option.id)&&option.label.toLowerCase().includes(input.value.toLowerCase())).map(option=>`<button type="button" data-add-token="${esc(option.id)}">${esc(option.label)}</button>`).join('')||'<p>No matching roles.</p>';
+    };
+    const show=()=>{if(disabled)return;draw();menu.hidden=false;input.setAttribute('aria-expanded','true');};
+    const hide=()=>{menu.hidden=true;input.setAttribute('aria-expanded','false');};
+    input.onfocus=show;input.oninput=show;
+    input.onkeydown=event=>{
+        if(event.key==='Escape'){hide();event.preventDefault();}
+        if(event.key==='Enter'){event.preventDefault();if(menu.hidden)show();else menu.querySelector('[data-add-token]')?.click();}
+        if(event.key==='ArrowDown'){event.preventDefault();show();menu.querySelector('button')?.focus();}
+        if(event.key==='Backspace'&&!input.value&&holder.tokenValues.size){const last=[...holder.tokenValues].pop();if(holder.dataset.tokenKind==='access'&&options.find(option=>option.id===last)?.disabled)return;holder.tokenValues.delete(last);onchange();draw();}
+    };
+    holder.onfocusout=event=>{if(!holder.contains(event.relatedTarget))hide();};
+    holder.onclick=event=>{
+        const remove=event.target.closest('[data-remove-token]'),add=event.target.closest('[data-add-token]');
+        if(disabled||staffDirectoryState?.saving)return;
+        if(remove){holder.tokenValues.delete(remove.dataset.removeToken);onchange();draw();input.focus();}
+        if(add){holder.tokenValues.add(add.dataset.addToken);input.value='';onchange();draw();input.focus();hide();}
+    };
+    holder.refreshTokens=draw;draw();
+}
+
+async function renderJobRoleAdministration(current=()=>true,holder=genericView.querySelector('[data-job-role-admin]')) {if(!holder||!current())return;
+    holder.innerHTML='<h2>Job Roles</h2><p role="status">Loading Job Roles…</p>';
+    try {
+        const roles=await json('/api/admin/job-roles');if(!holder.isConnected||!current())return;
+        holder.innerHTML=`<h2>Job Roles</h2><p>Manage roles such as Editor and Retoucher, then assign them from a person’s Staff details. These roles are shared with scheduling.</p><div class="staff-grid-scroll"><table class="staff-editable-grid"><caption class="sr-only">Job Role definitions</caption><thead><tr><th>Job Role</th><th>Code</th><th>Can be primary</th><th>Status</th><th>Action</th></tr></thead><tbody>${roles.map((role,i)=>`<tr><td>${esc(role.displayName)}</td><td>${esc(role.code)}</td><td>${role.canBePrimary?'Yes':'No'}</td><td>${role.isActive===false?'Inactive':'Active'}</td><td><button type="button" data-edit-job-role="${i}">Edit</button></td></tr>`).join('')||'<tr><td colspan="5">No Job Roles defined.</td></tr>'}</tbody></table></div><form class="staff-person-form" data-job-role-form><h3 data-role-heading>Add Job Role</h3><div class="staff-field-pair"><label>Code<input name="code" required maxlength="80" autocomplete="off"></label><label>Name<input name="displayName" required maxlength="200"></label></div><label class="staff-checkbox"><input name="canBePrimary" type="checkbox"><span>Can be the primary person on a job</span></label><label class="staff-checkbox"><input name="isActive" type="checkbox" checked><span>Active</span></label><p data-job-role-status role="status"></p><div class="staff-detail-actions"><button type="reset">New role</button><button type="submit" class="primary">Save Job Role</button></div></form>`;
+        const form=holder.querySelector('form'),status=form.querySelector('[data-job-role-status]');
+        holder.querySelectorAll('[data-edit-job-role]').forEach(button=>button.onclick=()=>{const role=roles[Number(button.dataset.editJobRole)];form.elements.code.value=role.code;form.elements.code.readOnly=true;form.elements.displayName.value=role.displayName;form.elements.canBePrimary.checked=role.canBePrimary;form.elements.isActive.checked=role.isActive!==false;form.querySelector('[data-role-heading]').textContent='Edit Job Role';status.textContent='';form.elements.displayName.focus();});
+        form.onreset=()=>{form.elements.code.readOnly=false;form.querySelector('[data-role-heading]').textContent='Add Job Role';status.textContent='';};
+        form.onsubmit=async event=>{
+            event.preventDefault();if(!form.reportValidity())return;
+            const payload={code:form.elements.code.value.trim().toUpperCase(),displayName:form.elements.displayName.value.trim(),canBePrimary:form.elements.canBePrimary.checked,isActive:form.elements.isActive.checked};
+            if(!payload.code||!payload.displayName){status.textContent='Code and name are required.';return;}
+            if(!form.elements.code.readOnly&&roles.some(role=>role.code.toUpperCase()===payload.code)){status.textContent='This code already exists. Edit the existing Job Role.';return;}
+            const controls=[...form.querySelectorAll('input,button')];controls.forEach(control=>control.disabled=true);status.textContent='Saving…';
+            try{await json('/api/admin/job-roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});await renderJobRoleAdministration(current,holder);}
+            catch(error){status.textContent=error.message||'Could not save Job Role.';}
+            finally{controls.forEach(control=>control.disabled=false);}
+        };
+    }catch(error){if(!holder.isConnected||!current())return;holder.innerHTML='<h2>Job Roles</h2><p role="alert"></p><button type="button">Retry loading Job Roles</button>';holder.querySelector('p').textContent=error.message;holder.querySelector('button').onclick=()=>renderJobRoleAdministration(current,holder);}
 }
 
 async function refreshStudioEmployees(current=()=>true) {
@@ -294,9 +325,9 @@ async function refreshStudioEmployees(current=()=>true) {
     genericView.querySelector('.staff-detail').textContent='Loading staff details…';
     const generation = (holder.staffGeneration || 0) + 1; holder.staffGeneration = generation;
     try {
-        const [employees, photographers, accounts, roles, authentication] = await Promise.all([
-            json('/api/admin/studio-employees/'), json('/api/photographers'),
-            json('/api/admin/security/accounts/'), json('/api/security/global-roles/'), json('/api/auth/options')
+        const [employees, accounts, roles, authentication, jobRoles, workers] = await Promise.all([
+            json('/api/admin/studio-employees/'),
+            json('/api/admin/security/accounts/'), json('/api/security/global-roles/'), json('/api/auth/options'), json('/api/admin/job-roles'), json('/api/admin/workers')
         ]);
         const memberships = await Promise.all(roles.map(role => json(`/api/security/global-roles/${encodeURIComponent(role.id)}/members`)));
         if (!current() || !holder.isConnected || holder.staffGeneration !== generation) return;
@@ -309,15 +340,10 @@ async function refreshStudioEmployees(current=()=>true) {
             employee.securityAccount = account;
         }
         const selected = staffDirectoryState?.selected;
-        staffDirectoryState = {employees:employees.sort((a,b)=>(a.displayName||a.userName).localeCompare(b.displayName||b.userName)), photographers, roles, memberships, demoAccountsEnabled:authentication?.demoAccountsEnabled===true&&authentication?.defaultSource==='Mock', selected:null, query:genericView.querySelector('.staff-toolbar input').value, dirty:false, saving:false};
+        staffDirectoryState = {employees:employees.sort((a,b)=>(a.displayName||a.userName).localeCompare(b.displayName||b.userName)), roles, memberships, jobRoles, workers, demoAccountsEnabled:authentication?.demoAccountsEnabled===true&&authentication?.defaultSource==='Mock', selected:null, query:genericView.querySelector('.staff-toolbar input').value, dirty:false, saving:false};
         drawStudioStaffList();
         const index = employees.findIndex(e=>e.userName===selected);
         openStaffEditor(index >= 0 ? index : employees.length ? 0 : null, true);
-        genericView.querySelectorAll('[role=tab]').forEach(button=>button.onkeydown=event=>{
-            if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
-            event.preventDefault(); const tab = event.key==='Home'?'staff':event.key==='End'?'roles':button.id==='staffTab'?'roles':'staff';
-            selectStaffTab(tab); document.getElementById(tab+'Tab').focus();
-        });
     } catch (error) {
         if (!current() || !holder.isConnected || holder.staffGeneration !== generation) return;
         if(staffDirectoryState)staffDirectoryState.loading=false;
@@ -341,11 +367,10 @@ function drawStudioStaffList() {
     genericView.querySelector('[data-staff-approvals]').textContent=pending?`${pending} staff awaiting approval — select a person to review access and roles.`:'';
     const query = state.query.toLowerCase();
     const rows = state.employees.map((employee,index)=>({employee,index})).filter(({employee:e})=>[e.displayName,e.emailAddress,e.userName].some(x=>String(x||'').toLowerCase().includes(query)));
-    document.getElementById('studioEmployeeList').innerHTML = `<table class="staff-editable-grid staff-directory-table"><caption class="sr-only">Staff directory. Select a person to edit.</caption><thead><tr><th>Staff member</th><th>Roles</th><th>Status</th><th><span class="sr-only">Edit</span></th></tr></thead><tbody>${rows.map(({employee:e,index})=>{
+    document.getElementById('studioEmployeeList').innerHTML = `<table class="staff-editable-grid staff-directory-table"><caption class="sr-only">Staff directory. Select a person to edit.</caption><thead><tr><th>Staff member</th><th>Job Roles</th><th>Status</th><th><span class="sr-only">Edit</span></th></tr></thead><tbody>${rows.map(({employee:e,index})=>{
         const status=e.securityAccount?.status || 'Setup required';
-        const roles=state.roles.filter((role,i)=>staffGlobalMembership(e,i)).map(r=>r.name);
-        if (state.photographers.some(p=>p.isActive && p.userName.toLowerCase()===e.userName.toLowerCase())) roles.push('Photographer');
-        return `<tr data-staff-index="${index}" data-staff-user="${esc(e.userName)}" tabindex="0" aria-label="Select ${esc(e.displayName||e.userName)}" aria-selected="${state.selected===e.userName}"><td><button type="button" class="staff-person"><span class="staff-avatar" aria-hidden="true">${esc(staffInitials(e))}</span><span><strong>${esc(e.displayName||e.userName)}</strong><small>${esc(e.emailAddress||e.userName)}</small></span></button></td><td>${roles.map(role=>`<span class="staff-role-badge">${esc(role)}</span>`).join(' ')||'<span class="muted">No roles</span>'}</td><td><span class="staff-access-badge" data-state="${esc(status)}">${esc(status==='PendingAccess'?'Awaiting approval':status==='Active'&&!e.isActive?'Staff inactive':status)}</span></td><td><button type="button" class="staff-edit-link" aria-label="Edit ${esc(e.displayName||e.userName)}">•••</button></td></tr>`;
+        const roles=state.workers.filter(p=>p.userName.toLowerCase()===e.userName.toLowerCase()).map(p=>state.jobRoles.find(r=>r.code===p.jobRoleCode)?.displayName||p.jobRoleCode);
+        return `<tr data-staff-index="${index}" data-staff-user="${esc(e.userName)}" tabindex="0" aria-label="Select ${esc(e.displayName||e.userName)}" aria-selected="${state.selected===e.userName}"><td><button type="button" class="staff-person"><span class="staff-avatar" aria-hidden="true">${esc(staffInitials(e))}</span><span><strong>${esc(e.displayName||e.userName)}</strong><small>${esc(e.emailAddress||e.userName)}</small></span></button></td><td>${roles.map(role=>`<span class="staff-role-badge">${esc(role)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td><span class="staff-access-badge" data-state="${esc(status)}">${esc(status==='PendingAccess'?'Awaiting approval':status==='Active'&&!e.isActive?'Staff inactive':status)}</span></td><td><button type="button" class="staff-edit-link" aria-label="Edit ${esc(e.displayName||e.userName)}">•••</button></td></tr>`;
     }).join('')||'<tr><td colspan="4">No matching staff members.</td></tr>'}</tbody></table>`;
     const holder=document.getElementById('studioEmployeeList');
     const selectRow=row=>{
@@ -383,13 +408,15 @@ function openStaffEditor(index, force=false) {
         form.querySelector('[data-cancel]').onclick=()=>{if(state.employees.length)openStaffEditor(0);else if(!state.dirty||confirm('Discard unsaved staff changes?')){state.dirty=false;panel.innerHTML='<p>Select Add staff to create your first staff member.</p>';}};
         drawStudioStaffList();return;
     }
+    const assignedJobRoles=state.workers.filter(p=>p.userName.toLowerCase()===employee.userName.toLowerCase()).map(p=>p.jobRoleCode);
     const account=employee.securityAccount;
     const demoBound=(account?.identities||[]).some(identity=>identity.providerKind==='Mock'&&identity.key?.providerId==='mock'&&identity.key?.scopeId==='Aegis.Studio');
     const provider=state.demoAccountsEnabled&&demoBound?'Demo':{ActiveDirectory:'Active Directory',EntraId:'Microsoft Entra ID',LocalDatabase:'Local account',Mock:'Demo'}[account?.providerKind]||account?.providerKind||'Not configured';
     panel.innerHTML=`<header class="staff-person-heading"><span class="staff-avatar" aria-hidden="true">${esc(staffInitials(employee))}</span><div><h2>${esc(employee.displayName||employee.userName)}</h2><p>Edit staff member · ${esc(employee.userName)}</p></div></header>
       <form class="staff-person-form"><section class="staff-detail-card"><h3>Details</h3><div class="staff-field-pair"><label>Display name<input name="displayName" required value="${esc(employee.displayName||employee.userName)}"></label><label>Email<input name="email" type="email" value="${esc(employee.emailAddress||'')}"></label></div><label>Sign-in method<input readonly value="${esc(provider)}"></label><p class="muted">${state.demoAccountsEnabled&&demoBound?'Demo sign-in uses this user name with no password.':account?'Sign-in identity is managed under Advanced.':'Sign-in setup is required before assigning access roles.'}</p>${state.demoAccountsEnabled&&account&&!demoBound&&!['Disabled','Suspended'].includes(account.status)?'<button type="button" data-enable-demo>Enable demo sign-in</button>':''}${account?`<label>Account status<select name="accountStatus">${['PendingAccess','Active','Suspended','Disabled'].map(s=>`<option value="${s}" ${s===account.status?'selected':''}>${s==='PendingAccess'?'Awaiting approval':s}</option>`).join('')}</select></label>`:'<button type="button" data-enroll>Set up sign-in</button>'}</section>
-      <section class="staff-detail-card"><h3>Access &amp; roles</h3><p class="muted">Global roles apply across workspaces.</p><div class="staff-role-options">${state.roles.map((role,i)=>`<label class="staff-checkbox"><input type="checkbox" data-staff-role="${i}" ${staffGlobalMembership(employee,i)?'checked':''} ${!account||role.isActive===false?'disabled':''}><span><strong>${esc(role.name)}</strong><small>${esc(role.description||'')}${role.isActive===false?' (inactive)':''}</small></span></label>`).join('')||'<p>No global roles available.</p>'}</div><label class="staff-checkbox"><input name="isActive" type="checkbox" ${employee.isActive?'checked':''}><span>Staff record active</span></label><label class="staff-checkbox"><input name="isAssignable" type="checkbox" ${employee.isAssignable?'checked':''}><span>Available for job assignments</span></label><div class="staff-photographer">${state.photographers.some(p=>p.isActive&&p.userName.toLowerCase()===employee.userName.toLowerCase())?'<span class="staff-role-badge">Registered photographer</span>':`<button type="button" data-register-photographer ${!employee.isActive||!employee.isAssignable?'disabled':''}>Register photographer</button>`}<small>Photographer registration enables scheduling and WorkDay; it is separate from access permissions.</small></div>
-      <details class="staff-advanced"><summary>Advanced</summary>${account?`<div class="staff-row-actions"><button type="button" data-identity-bind>Manage sign-in identity</button><button type="button" data-account-revoke>Revoke sessions</button>${account.providerKind==='LocalDatabase'?'<button type="button" data-account-recover>Account recovery</button>':''}</div>`:'<p>Complete sign-in setup to manage identity and recovery.</p>'}</details></section><p data-editor-status role="status"></p><div class="staff-detail-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`;
+      <section class="staff-detail-card"><header class="staff-card-heading"><h3>Job Roles</h3><button type="button" class="staff-text-action" data-manage-job-roles>Manage Job Roles</button></header><div data-token-kind="job"></div><p class="muted">Select all roles this person can perform.</p><label class="staff-checkbox"><input name="isAssignable" type="checkbox" ${employee.isAssignable?'checked':''}><span>Available for job assignments</span></label></section>
+      <section class="staff-detail-card"><h3>Access permissions</h3><div data-token-kind="access"></div><p class="muted">Controls what this person can see and change.</p>
+      <details class="staff-advanced"><summary>Advanced</summary><label class="staff-checkbox"><input name="isActive" type="checkbox" ${employee.isActive?'checked':''}><span>Staff record active</span></label><button type="button" data-permission-templates>Manage permission templates</button>${account?`<div class="staff-row-actions"><button type="button" data-identity-bind>Manage sign-in identity</button><button type="button" data-account-revoke>Revoke sessions</button>${account.providerKind==='LocalDatabase'?'<button type="button" data-account-recover>Account recovery</button>':''}</div>`:'<p>Complete sign-in setup to manage identity and recovery.</p>'}</details></section><p data-editor-status role="status"></p><div class="staff-detail-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`;
     const form=panel.querySelector('form');
     form.oninput=()=>state.dirty=true;
     form.querySelector('[data-cancel]').onclick=()=>openStaffEditor(index);
@@ -404,7 +431,15 @@ function openStaffEditor(index, force=false) {
         finally{state.saving=false;controls.forEach(({element,disabled})=>{if(element.isConnected)element.disabled=disabled;});}
     };
     const enroll=form.querySelector('[data-enroll]');if(enroll)enroll.onclick=()=>{openStaffEditor(null);const input=document.getElementById('employeeUserName');if(!input)return;input.value=employee.userName;input.readOnly=true;document.getElementById('employeeDisplayName').value=employee.displayName||employee.userName;document.getElementById('employeeEmail').value=employee.emailAddress||'';document.getElementById('employeeAssignable').value=String(employee.isAssignable);};
-    const register=form.querySelector('[data-register-photographer]');if(register)register.onclick=()=>{if(!state.dirty)registerStudioPhotographer(employee);else form.querySelector('[data-editor-status]').textContent='Save or cancel your changes before registering a photographer.';};
+    mountStaffTokenEditor(form.querySelector('[data-token-kind=job]'),state.jobRoles.map(role=>({id:role.code,label:role.displayName,disabled:role.isActive===false})),assignedJobRoles,()=>state.dirty=true);
+    mountStaffTokenEditor(form.querySelector('[data-token-kind=access]'),state.roles.map((role,i)=>({id:String(i),label:role.name,disabled:!account||role.isActive===false})),state.roles.map((role,i)=>staffGlobalMembership(employee,i)?String(i):null).filter(x=>x!==null),()=>state.dirty=true,!account);
+    form.querySelector('[data-manage-job-roles]').onclick=async()=>{
+        if(state.dirty){form.querySelector('[data-editor-status]').textContent='Save or cancel your changes before managing Job Roles.';return;}
+        const d=studioDialog('Manage Job Roles','<section data-job-role-admin></section>');
+        await renderJobRoleAdministration(()=>d.isConnected,d.querySelector('[data-job-role-admin]'));
+        d.addEventListener('close',()=>refreshStudioEmployees(),{once:true});
+    };
+    form.querySelector('[data-permission-templates]').onclick=openStaffPermissionTemplates;
     const revoke=form.querySelector('[data-account-revoke]');if(revoke)revoke.onclick=async()=>{revoke.disabled=true;try{await json('/api/admin/security/accounts/'+encodeURIComponent(account.id)+'/revoke',{method:'POST'});form.querySelector('[data-editor-status]').textContent='Sessions revoked.';}catch(error){form.querySelector('[data-editor-status]').textContent=error.message;}finally{revoke.disabled=false;}};
     const recovery=form.querySelector('[data-account-recover]');if(recovery)recovery.onclick=async()=>{recovery.disabled=true;try{const proof=await json('/api/admin/security/accounts/'+encodeURIComponent(account.id)+'/recovery',{method:'POST'});const d=studioDialog('Local account recovery',`<p>This proof expires in 15 minutes and works once. Give it only to the verified account owner.</p><label>Recovery proof<input readonly value="${esc(proof.token)}"></label><button type="button" data-close>Close</button>`);d.querySelector('[data-close]').onclick=()=>d.close();}catch(error){form.querySelector('[data-editor-status]').textContent=error.message;}finally{recovery.disabled=false;}};
     drawStudioStaffList();
@@ -415,7 +450,8 @@ async function saveStaffDetails(employee,form) {
     if(state.saving||!form.reportValidity())return;
     const displayName=form.elements.displayName.value.trim();if(!displayName){status.textContent='Display name is required.';return;}
     const isActive=form.elements.isActive.checked,isAssignable=form.elements.isAssignable.checked;
-    const desired=new Set([...form.querySelectorAll('[data-staff-role]:checked')].map(input=>Number(input.dataset.staffRole)));
+    const desired=new Set([...form.querySelector('[data-token-kind=access]').tokenValues].map(Number));
+    const roleCodes=[...form.querySelector('[data-token-kind=job]').tokenValues];
     const accountStatus=form.elements.accountStatus?.value;
     state.saving=true;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=true);status.textContent='Saving…';
     try {
@@ -424,6 +460,11 @@ async function saveStaffDetails(employee,form) {
         const payload={...(latest||employee),displayName,emailAddress:form.elements.email.value.trim()||null,isActive,isAssignable};delete payload.securityAccount;
         await json('/api/admin/studio-employees/'+encodeURIComponent(employee.userName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
         Object.assign(employee,payload);
+        const assigned=state.workers.filter(person=>person.userName.toLowerCase()===employee.userName.toLowerCase());
+        if(roleCodes.length||assigned.length){
+            const saved=await json('/api/admin/workers/'+encodeURIComponent(employee.userName)+'/roles',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({roleCodes})});
+            state.workers=state.workers.filter(person=>person.userName.toLowerCase()!==employee.userName.toLowerCase()).concat(saved);
+        }
         for(const [i,role] of state.roles.entries()) {
             if(role.isActive===false||desired.has(i)===staffGlobalMembership(employee,i))continue;
             const url=globalRoleMemberUrl(role.id,employee.userName);
@@ -434,22 +475,10 @@ async function saveStaffDetails(employee,form) {
         if(employee.securityAccount&&accountStatus!==employee.securityAccount.status){await json('/api/admin/security/accounts/'+encodeURIComponent(employee.securityAccount.id)+'/status',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:accountStatus})});employee.securityAccount.status=accountStatus;}
         state.dirty=false;status.textContent='Saved';if(form.isConnected){const heading=form.parentElement.querySelector('.staff-person-heading');heading.querySelector('h2').textContent=displayName;heading.querySelector('.staff-avatar').textContent=staffInitials(employee);drawStudioStaffList();}
     } catch(error) {status.textContent=(error.message||'Could not save.')+' Some earlier changes may have saved. Your edits are retained; retry to finish.';}
-    finally {state.saving=false;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=false);form.querySelectorAll('[data-staff-role]').forEach(input=>input.disabled=!employee.securityAccount||state.roles[Number(input.dataset.staffRole)].isActive===false);const register=form.querySelector('[data-register-photographer]');if(register)register.disabled=!employee.isActive||!employee.isAssignable;}
+    finally {state.saving=false;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=false);form.querySelectorAll('[data-token-kind]').forEach(editor=>editor.refreshTokens());}
+
 }
 
-function registerStudioPhotographer(employee){
-    if(!employee.isActive||!employee.isAssignable)return;
-    const d=studioDialog('Register photographer',`<form class="request-form"><p><strong>${esc(employee.displayName)}</strong> · ${esc(employee.userName)}</p><p class="muted">This uses the existing Studio employee identity for assignments and WorkDay.</p><label>Employment type<select name="employmentType"><option>Employee</option><option>PartTime</option><option>Contractor</option><option>Freelance</option></select></label><label>Skills (comma separated)<input name="skills" maxlength="1000" value="${esc((employee.skills||[]).join(', '))}"></label><label>Default equipment notes<textarea name="equipment" maxlength="4000"></textarea></label><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Register photographer</button></div></form>`);
-    d.querySelector('[data-cancel]').onclick=()=>d.close();
-    d.querySelector('form').onsubmit=async event=>{
-        event.preventDefault();const form=event.currentTarget,save=form.querySelector('[type=submit]');if(save.disabled)return;save.disabled=true;
-        try{
-            await json('/api/photographers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:employee.userName,displayName:employee.displayName,employmentType:form.elements.employmentType.value,isActive:true,skills:form.elements.skills.value.split(',').map(x=>x.trim()).filter(Boolean),defaultEquipmentNotes:form.elements.equipment.value.trim()||null,scheduleResourceId:null})});
-            d.close();await refreshStudioEmployees();
-        }catch(error){if(d.isConnected)form.querySelector('[role=alert]').textContent=error.message||String(error);else alert(error.message||error);}
-        finally{if(save.isConnected)save.disabled=false;}
-    };
-}
 async function saveStudioEmployee(){
     const userName=document.getElementById('employeeUserName').value.trim(),status=document.getElementById('employeeAccountStatus');
     if(!userName){status.textContent='User name is required.';return;}
@@ -505,9 +534,9 @@ function roleTemplate(scope, template) {
 
 async function createStudioRole() {
     const name=document.getElementById('roleName').value.trim(); if(!name)return alert('Role name is required.'); const scope=document.getElementById('roleScope').value; const permissions=roleTemplate(scope,document.getElementById('roleTemplate').value);
-    await json('/api/security/roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,scope,description:document.getElementById('roleDescription').value.trim()||null,permissionsJson:JSON.stringify(permissions),isActive:true})}); await studioNavigate('staff-roles');
+    await json('/api/security/roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,scope,description:document.getElementById('roleDescription').value.trim()||null,permissionsJson:JSON.stringify(permissions),isActive:true})}); document.getElementById('roleName')?.closest('dialog')?.close(); await studioNavigate('staff-roles');
 }
-async function deleteStudioRole(id){if(!confirm('Delete this reusable role? Existing members keep their copied permissions but lose the role link.'))return;const r=await fetch('/api/security/roles/'+id,{method:'DELETE'});if(!r.ok)throw new Error(await r.text());await studioNavigate('staff-roles');}
+async function deleteStudioRole(id){if(!confirm('Delete this reusable role? Existing members keep their copied permissions but lose the role link.'))return;const r=await fetch('/api/security/roles/'+id,{method:'DELETE'});if(!r.ok)throw new Error(await r.text());document.getElementById('securityRoleList')?.closest('dialog')?.close();await studioNavigate('staff-roles');}
 
 function renderWorkflowSection() {
     return `<section class="job-section"><h2>Workflow automation</h2><p class="muted">Database-backed event/condition/action workflows. Supported triggers include JobStatusChanged, ScheduleChanged, ProductionChanged and DeliveryChanged. Actions: coordination CreateActivity, NotifyJob, NotifyRequester and WaitMinutes. Job status, ownership, production dispatch and scheduling require authorized Job workflow decisions.</p><div id="workflowList"><p class="muted">Loading…</p></div><h3>Create workflow</h3><div class="pos-entry"><label>Name<input id="workflowName"></label><label>Trigger<select id="workflowTrigger"><option>JobStatusChanged</option><option>ScheduleChanged</option><option>ProductionChanged</option><option>DeliveryChanged</option></select></label><label>Job status condition<input id="workflowStatusCondition" placeholder="optional, e.g. Shoot Complete"></label></div><label style="display:block;margin-top:10px">Actions JSON<textarea id="workflowActions" rows="8" style="width:100%">[{"type":"CreateActivity","activityType":"Other","title":"Review backup verification","dueMinutes":120},{"type":"NotifyJob","subject":"Workflow started","body":"Automated production workflow started."}]</textarea></label><button class="primary" onclick="createWorkflowDefinition()">Create workflow</button><h3>Authorization audit</h3><button class="action" onclick="runAuthorizationAudit()">Run endpoint audit</button><div id="authorizationAuditResult" class="meta"></div></section>`;
@@ -535,4 +564,3 @@ async function seedStudioDemoData(button) {
         button.disabled = false;
     }
 }
-

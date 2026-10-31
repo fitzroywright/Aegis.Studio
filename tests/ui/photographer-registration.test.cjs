@@ -1,15 +1,36 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),{JSDOM}=require('jsdom');
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{JSDOM}=require('jsdom');
 async function setup(t,{failure=false}={}){
- const dom=new JSDOM('<main id="genericView"></main>',{url:'https://studio.test',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window,calls=[],writes=[];
- const employees=[{userName:'photo.user',displayName:'Photo Person',isActive:true,isAssignable:true,skills:['Portrait']},{userName:'inactive',displayName:'Inactive',isActive:false,isAssignable:true},{userName:'not.assignable',displayName:'Not assignable',isActive:true,isAssignable:false}];let photographers=[];
- w.esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- w.studioDialog=(title,content)=>{const d=w.document.createElement('dialog');d.innerHTML=content;d.close=()=>d.remove();w.document.body.append(d);return d;};
- w.json=async(url,options)=>{if(url==='/api/auth/options')return {defaultSource:'ActiveDirectory',demoAccountsEnabled:false};if((url==='/api/admin/security/accounts/'||url==='/api/security/global-roles/')&&!options)return [];calls.push(url);if(options){writes.push(JSON.parse(options.body));if(failure)throw Error('Registration failed');photographers=[{userName:'photo.user',isActive:true}];return photographers[0];}if(url==='/api/admin/studio-employees/')return employees;if(url==='/api/photographers')return photographers;throw Error('Unexpected API: '+url);};
- vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/workspaces.js'),'utf8'),dom.getInternalVMContext());w.document.getElementById('genericView').innerHTML=w.renderEmployeeDirectorySection();await w.refreshStudioEmployees();const select=name=>{const row=[...w.document.querySelectorAll('[data-staff-index]')].find(r=>r.textContent.includes(name));w.openStaffEditor(Number(row.dataset.staffIndex));};select('Photo Person');return {w,calls,writes,select};
+ const dom=new JSDOM('<main id="genericView"></main>',{url:'https://studio.test',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window,writes=[];
+ const employee={userName:'photo.user',displayName:'Photo Person',isActive:true,isAssignable:true,skills:['Portrait']};let workers=[];
+ const roles=[{code:'PHOTOGRAPHER',displayName:'Photographer',isActive:true},{code:'EDITOR',displayName:'Editor',isActive:true},{code:'OLD',displayName:'Inactive role',isActive:false}];
+ w.esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));w.confirm=()=>true;
+ w.studioDialog=(title,content)=>{const d=w.document.createElement('dialog');d.innerHTML=content;d.close=()=>{d.dispatchEvent(new w.Event('close'));d.remove();};w.document.body.append(d);return d;};
+ w.json=async(url,options)=>{
+  if(options){const body=JSON.parse(options.body);writes.push({url,body});if(url.endsWith('/roles')){if(failure)throw Error('Role save failed');workers=body.roleCodes.map(jobRoleCode=>({...employee,jobRoleCode}));return workers;}if(url==='/api/admin/job-roles'){roles.push(body);return body;}return {};}
+  if(url==='/api/auth/options')return {defaultSource:'ActiveDirectory',demoAccountsEnabled:false};
+  if(url==='/api/admin/security/accounts/'||url==='/api/security/global-roles/')return [];
+  if(url==='/api/admin/studio-employees/')return [{...employee}];
+  if(url==='/api/admin/job-roles')return roles;
+  if(url==='/api/admin/workers')return workers;
+  throw Error('Unexpected API: '+url);
+ };
+ w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/workspaces.js'),'utf8'));w.genericView=w.document.getElementById('genericView');w.genericView.innerHTML=w.renderEmployeeDirectorySection();await w.refreshStudioEmployees();return {w,writes};
 }
-test('registration uses the selected Studio identity and existing photographer service',async t=>{const {w,calls,writes}=await setup(t);w.document.querySelector('[data-register-photographer]').click();const form=w.document.querySelector('dialog form');form.elements.employmentType.value='Freelance';form.elements.skills.value='Portrait, Wedding';form.elements.equipment.value='Lighting kit';await form.onsubmit({preventDefault(){},currentTarget:form});assert.equal(writes.length,1);assert.equal(writes[0].userName,'photo.user');assert.equal(writes[0].displayName,'Photo Person');assert.equal(writes[0].employmentType,'Freelance');assert.deepEqual(writes[0].skills,['Portrait','Wedding']);assert.equal(writes[0].scheduleResourceId,null);assert.equal(w.document.querySelector('[data-register-photographer]'),null);assert.match(w.document.querySelector('#studioEmployeeList').textContent,/Photographer/);assert.ok(calls.every(url=>['/api/admin/studio-employees/','/api/photographers'].includes(url)));});
-test('inactive and nonassignable employee registration stays disabled and cannot submit',async t=>{const {w,writes,select}=await setup(t);assert.equal(w.document.querySelector('[data-register-photographer]').disabled,false);for(const name of ['Inactive','Not assignable']){select(name);const button=w.document.querySelector('[data-register-photographer]');assert.equal(button.disabled,true);button.click();}assert.equal(w.document.querySelector('dialog'),null);assert.equal(writes.length,0);});
-test('registration failure keeps entered details for retry',async t=>{const {w}=await setup(t,{failure:true});w.document.querySelector('[data-register-photographer]').click();const form=w.document.querySelector('dialog form');form.elements.equipment.value='Lighting kit';await form.onsubmit({preventDefault(){},currentTarget:form});assert.match(form.querySelector('[role=alert]').textContent,/Registration failed/);assert.equal(form.elements.equipment.value,'Lighting kit');assert.equal(form.querySelector('[type=submit]').disabled,false);});
-
-
-
+function add(w,code){const editor=w.document.querySelector('[data-token-kind=job]');editor.querySelector('input').focus();editor.querySelector('[data-add-token="'+code+'"]').click();}
+test('Photographer and Editor use one token selector and persist together as pills after reload',async t=>{
+ const {w,writes}=await setup(t);assert.equal(w.document.getElementById('rolesTab'),null);assert.equal(w.document.querySelector('[data-register-photographer]'),null);
+ add(w,'PHOTOGRAPHER');add(w,'EDITOR');const form=w.document.querySelector('.staff-person-form');await form.onsubmit({preventDefault(){}});
+ assert.deepEqual(writes.find(write=>write.url.endsWith('/roles')).body.roleCodes,['PHOTOGRAPHER','EDITOR']);
+ await w.refreshStudioEmployees();assert.equal(w.document.querySelectorAll('.staff-directory-table .staff-role-badge').length,2);
+ const editor=w.document.querySelector('[data-token-kind=job]');assert.equal(editor.querySelectorAll('[data-remove-token]').length,2);assert.equal(editor.querySelector('[data-add-token=OLD]'),null);
+ editor.querySelector('[data-remove-token=PHOTOGRAPHER]').click();await w.document.querySelector('form').onsubmit({preventDefault(){}});await w.refreshStudioEmployees();assert.equal(w.document.querySelectorAll('.staff-directory-table .staff-role-badge').length,1);assert.match(w.document.querySelector('.staff-directory-table').textContent,/Editor/);
+});
+test('failed Job Role save retains multiple tokens and retries without losing other edits',async t=>{
+ const {w}=await setup(t,{failure:true});add(w,'PHOTOGRAPHER');add(w,'EDITOR');const form=w.document.querySelector('form');form.elements.displayName.value='Updated';await form.onsubmit({preventDefault(){}});assert.match(form.querySelector('[data-editor-status]').textContent,/Role save failed/);assert.equal(form.querySelectorAll('[data-remove-token]').length,2);assert.equal(form.elements.displayName.value,'Updated');assert.equal(form.querySelector('[type=submit]').disabled,false);
+});
+test('token search, keyboard selection and clear-all preserve explicit empty role selection',async t=>{
+ const {w,writes}=await setup(t);const editor=w.document.querySelector('[data-token-kind=job]'),input=editor.querySelector('input');input.value='edit';input.dispatchEvent(new w.Event('input'));assert.equal(editor.querySelectorAll('[data-add-token]').length,1);input.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));assert.equal(editor.querySelector('[data-remove-token=EDITOR]').textContent.trim(),'Editor ×');await w.document.querySelector('form').onsubmit({preventDefault(){}});editor.querySelector('[data-remove-token=EDITOR]').click();await w.document.querySelector('form').onsubmit({preventDefault(){}});assert.deepEqual(writes.at(-1).body.roleCodes,[]);
+});
+test('Manage Job Roles edits definitions through the existing role API without a Roles tab',async t=>{
+ const {w,writes}=await setup(t);await w.document.querySelector('[data-manage-job-roles]').onclick();const form=w.document.querySelector('[data-job-role-form]');form.elements.code.value='assistant';form.elements.displayName.value='Assistant';await form.onsubmit({preventDefault(){}});const saved=writes.find(write=>write.url==='/api/admin/job-roles');assert.equal(saved.body.code,'ASSISTANT');assert.equal(saved.body.displayName,'Assistant');assert.match(w.document.querySelector('dialog').textContent,/Assistant/);
+});
