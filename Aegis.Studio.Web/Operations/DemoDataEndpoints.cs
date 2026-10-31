@@ -116,6 +116,8 @@ public static class DemoDataEndpoints
         SeedWorkspaceCovers(connection,transaction,report);
         report?.Invoke(new(96, "Committing rich demo", 0, 0, "Saving historical workflow and media data."));
         transaction.Commit();
+        report?.Invoke(new(97, "Booking catalog", 0, 0, "Adding Bryan Studios services, session types and opening hours."));
+        DemoBookingCatalog.Seed(database);
         DemoJobPhotoPopulation.Seed(database,storage,login,report);
         DemoDatasetFinalizer.Complete(database,storage,login,report);
         SeedDistinctStaffPhotos(database,report);
