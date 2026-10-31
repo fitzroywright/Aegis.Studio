@@ -25,6 +25,7 @@
     <None Update="Media/raw_preview.py;Media/raw-preview-requirements.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Demo/portrait-catalogue.json" />
     <Content Include="Demo/Prepare-Kratos-Demo-Photo-Library.sh" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Demo/staff/*.jpg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Workflow/WorkflowSchema.sql" />
     <EmbeddedResource Include="Workers/WorkerSchema.sql" />
     <EmbeddedResource Include="Reminders/ClientReminders.sql" />
