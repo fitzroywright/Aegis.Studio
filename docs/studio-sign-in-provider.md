@@ -35,3 +35,41 @@ bundle to apply this source change.
 Studio mock sign-in is password-free. The password field is hidden and a legacy
 `MockAuthentication:Password` value is ignored. Only the server allowlisted identity
 is accepted, and isolation, account approval and role restrictions still apply.
+
+## Manage demo staff through Staff & Roles
+
+When Studio is running in the explicitly isolated `Demo` environment with Mock
+sign-in selected, **Demo (no password)** is available when adding staff or setting
+up sign-in for an existing staff record.
+
+For a directory-only person such as a seeded photographer:
+
+1. Select the person in **Staff & Roles**.
+2. Choose **Set up sign-in**, select **Demo (no password)** and create the account.
+3. Select the person again, choose the appropriate access roles, set **Account
+   status** to **Active**, and save.
+4. Sign in using their existing user name and no password.
+
+For a person who already has an authentication account, **Enable demo sign-in**
+adds a demo binding to that exact account. It preserves the account ID, alias,
+other authentication bindings, approval status and roles. Disabled or suspended
+accounts require a separate status review first. Repeating enrollment preserves
+the existing demo subject.
+
+The administrator-only enrollment endpoint is
+`POST /api/admin/security/demo-accounts/`. It requires a current administrator
+session and rejects cross-origin browser mutations. Its request contains
+`userName`, `displayName` and, when adding a binding to an existing account,
+the explicit `accountId`. Subject IDs are assigned by the server, never the browser.
+
+Managed demo identities are durable bindings in the existing application-scoped
+account database; they do not require editing a JSON allowlist or restarting
+Studio. Configured operator identities remain supported and keep their original
+subject IDs. New accounts are Pending Access and receive no default roles.
+Removing the managed identity or disabling/suspending its account prevents new
+demo sign-ins.
+
+Enrollment and these UI controls are unavailable in Production, Staging,
+Development, non-isolated installations, or when a real authentication provider
+is selected. Common.Security and the other Aegis applications are unchanged.
+

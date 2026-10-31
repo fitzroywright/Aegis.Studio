@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{JSDOM}=require('jsdom');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-async function setup(t,{accounts=true,roleFailure=false}={}){
+async function setup(t,{accounts=true,roleFailure=false,demo=false,provider="Mock"}={}){
  const dom=new JSDOM('<div id="genericView"></div>',{url:'https://studio.test',runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());
  w.genericView=w.document.getElementById('genericView');w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));w.confirm=()=>true;
  const employee={userName:'domain/user',displayName:'Sam Lee',emailAddress:'sam@example.test',isActive:true,isAssignable:true,source:'Directory',externalId:'immutable',skills:['Portraits'],workDayUserName:'sam-day',lastSyncedAtUtc:'2026-10-27T12:00:00Z'};
@@ -8,8 +8,9 @@ async function setup(t,{accounts=true,roleFailure=false}={}){
  const roles=[{id:'front',name:'Front Desk',description:'Reception',isActive:true},{id:'inactive',name:'Old role',isActive:false}];
  const writes=[];let fail=roleFailure;
  w.json=async(url,options)=>{
-  if(options){writes.push({url,method:options.method,body:options.body?JSON.parse(options.body):null});if(fail&&url.includes('/members/')){fail=false;throw Error('Role unavailable');}return {id:'created'};}
+  if(options){writes.push({url,method:options.method,body:options.body?JSON.parse(options.body):null});if(url==='/api/admin/security/demo-accounts/'&&JSON.parse(options.body).accountId)account.identities=[{providerKind:'Mock',key:{providerId:'mock',scopeId:'Aegis.Studio',subjectId:'persisted-subject'}}];if(fail&&url.includes('/members/')){fail=false;throw Error('Role unavailable');}return {id:'created'};}
   if(url.includes('studio-employees'))return [{...employee}, {userName:'second',displayName:'Anna Clarke',isActive:true,isAssignable:false,skills:[]}];
+  if(url==='/api/auth/options')return {defaultSource:provider,demoAccountsEnabled:demo};
   if(url==='/api/photographers')return [];
   if(url==='/api/admin/security/accounts/')return accounts?[account]:[];
   if(url==='/api/security/global-roles/')return roles;
@@ -80,4 +81,52 @@ test('filtered row selection works through name and keyboard and respects unsave
  assert.equal(w.document.querySelector('.staff-person-form').elements.displayName.value,'Draft Sam');
  w.confirm=()=>true;w.document.querySelector('[data-staff-index]').dispatchEvent(new w.KeyboardEvent('keydown',{key:' ',bubbles:true,cancelable:true}));
  assert.equal(w.document.querySelector('.staff-person-heading h2').textContent,'Anna Clarke');
+});
+
+test('isolated Demo offers password-free creation without identity fields and uses the dedicated endpoint',async t=>{
+ const {w,writes}=await setup(t,{demo:true});w.openStaffEditor(null);const d=w.document,source=d.getElementById('employeeAuthSource');
+ assert.equal(source.value,'Mock');assert.match(source.textContent,/Demo \(no password\)/);
+ assert.equal(d.querySelector('[data-local-password]').hidden,true);assert.equal(d.getElementById('employeeLocalPassword').required,false);
+ assert.equal(d.querySelector('[data-identity-settings]').hidden,true);
+ d.getElementById('employeeUserName').value='demo.jason';d.getElementById('employeeDisplayName').value='Jason Brown';
+ await w.saveStudioEmployee();const enrollment=writes.find(x=>x.url==='/api/admin/security/demo-accounts/');
+ assert.deepEqual(enrollment.body,{userName:'demo.jason',displayName:'Jason Brown'});
+ assert.equal(writes.some(x=>x.url==='/api/admin/security/accounts/'),false);
+ assert.equal(writes.some(x=>x.url.endsWith('/status')||x.url.includes('/members/')),false);
+});
+
+test('existing directory-only staff retains its alias and metadata while setting up Demo sign-in',async t=>{
+ const {w,writes,selectSam,employee}=await setup(t,{demo:true,accounts:false});selectSam().querySelector('[data-enroll]').click();
+ assert.equal(w.document.getElementById('employeeUserName').value,employee.userName);assert.equal(w.document.getElementById('employeeUserName').readOnly,true);
+ assert.equal(w.document.getElementById('employeeAuthSource').value,'Mock');await w.saveStudioEmployee();
+ const profile=writes.find(x=>x.url.includes('/studio-employees/')).body;
+ for(const key of ['source','externalId','skills','workDayUserName','lastSyncedAtUtc'])assert.deepEqual(profile[key],employee[key]);
+ assert.equal(writes.find(x=>x.url==='/api/admin/security/demo-accounts/').body.userName,employee.userName);
+});
+
+test('existing account enrollment uses its explicit account ID and displays the persisted Demo binding',async t=>{
+ const {w,writes,selectSam}=await setup(t,{demo:true});const form=selectSam();
+ await form.querySelector('[data-enable-demo]').onclick();
+ assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/admin/security/demo-accounts/');assert.equal(writes[0].body.accountId,'account');
+ assert.equal(w.document.querySelector('.staff-person-form input[readonly]').value,'Demo');
+ assert.equal(w.document.querySelector('[data-enable-demo]'),null);
+ assert.equal(w.document.querySelector('.staff-person-form').elements.accountStatus.value,'PendingAccess');
+});
+
+test('Demo controls stay hidden for other providers and tampered Demo creation cannot send a mutation',async t=>{
+ for(const provider of ['ActiveDirectory','LocalDatabase','EntraId']){
+  const {w,writes,selectSam}=await setup(t,{demo:true,provider});assert.equal(selectSam().querySelector('[data-enable-demo]'),null);w.openStaffEditor(null);
+  const d=w.document,source=d.getElementById('employeeAuthSource');assert.equal([...source.options].some(x=>x.value==='Mock'),false);
+  source.add(new w.Option('Demo','Mock'));source.value='Mock';d.getElementById('employeeUserName').value='demo.new';d.getElementById('employeeDisplayName').value='New Demo';
+  await w.saveStudioEmployee();assert.equal(writes.length,0);assert.match(d.getElementById('employeeAccountStatus').textContent,/not available/);
+ }
+});
+
+test('unsaved staff edits block demo binding and an API failure leaves enrollment available for retry',async t=>{
+ const {w,writes,selectSam}=await setup(t,{demo:true});const form=selectSam(),button=form.querySelector('[data-enable-demo]');
+ form.elements.displayName.value='Draft';form.oninput();await button.onclick();assert.equal(writes.length,0);assert.match(form.querySelector('[data-editor-status]').textContent,/Save or cancel/);
+ form.querySelector('[data-cancel]').click();const again=w.document.querySelector('[data-enable-demo]'),json=w.json;
+ w.json=async(url,options)=>{if(options&&url.includes('/demo-accounts/'))throw Error('Enrollment failed');return json(url,options);};
+ await again.onclick();assert.equal(again.disabled,false);assert.match(w.document.querySelector('[data-editor-status]').textContent,/Enrollment failed/);
+ w.json=json;await again.onclick();assert.equal(writes[0].body.accountId,'account');
 });

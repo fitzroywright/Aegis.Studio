@@ -18,7 +18,7 @@ test('account provisioning retry preserves the pending account after a profile s
  const dom=new JSDOM('<div id="genericView"></div>',{url:'https://studio.test',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
  w.esc=x=>String(x??'');w.showFeedback=()=>{};w.studioFirstName=x=>x.displayName;w.eval(fs.readFileSync(path.join(root,'workspaces.js'),'utf8'));w.document.getElementById('genericView').innerHTML=w.renderEmployeeDirectorySection();
  let account=null,creates=0,profileAttempts=0;
- w.json=async(url,options)=>{if(url==='/api/admin/security/accounts/'){if(options){creates++;account={id:'stable-account',loginName:'local.operator',displayName:'Operator',providerKind:'LocalDatabase',status:'PendingAccess'};return account;}return account?[account]:[];}
+ w.json=async(url,options)=>{if(url==='/api/auth/options')return {defaultSource:'ActiveDirectory',demoAccountsEnabled:false};if(url==='/api/admin/security/accounts/'){if(options){creates++;account={id:'stable-account',loginName:'local.operator',displayName:'Operator',providerKind:'LocalDatabase',status:'PendingAccess'};return account;}return account?[account]:[];}
  if(url.startsWith('/api/admin/studio-employees/')){if(options){profileAttempts++;if(profileAttempts===1)throw Error('Profile save unavailable');return {};}return [];}
  if(url==='/api/photographers'||url==='/api/security/global-roles/')return [];throw Error('Unexpected API '+url);};
  await w.refreshStudioEmployees();w.openStaffEditor(null);w.document.getElementById('employeeUserName').value='local.operator';w.document.getElementById('employeeAuthSource').value='LocalDatabase';w.document.getElementById('employeeLocalPassword').value='new-local-password';

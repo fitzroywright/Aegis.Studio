@@ -26,7 +26,8 @@ public static class AuthenticationEndpoints
         app.MapGet("/api/auth/options", () => Results.Ok(new
         {
             defaultUserName = provider == "Mock" ? mock.Identities.FirstOrDefault()?.LoginName ?? "" : "",
-            defaultSource = provider
+            defaultSource = provider,
+            demoAccountsEnabled = DemoStaffAuthentication.CanManage(mock, provider)
         })).AllowAnonymous();
 
         app.MapPost("/api/auth/login", async (LoginRequest request, IServiceProvider services, HttpContext context) =>
@@ -39,7 +40,7 @@ public static class AuthenticationEndpoints
                 "ActiveDirectory" => services.GetService<IAuthenticator>()?.Authenticate(request.UserName, request.Password)
                     ?? AuthenticationResult.Failed(AuthenticationFailure.ProviderUnavailable),
                 "LocalDatabase" => new LocalDatabaseAuthenticator(services.GetRequiredService<ILocalCredentialStore>()).Authenticate(request.UserName, request.Password),
-                "Mock" => new MockAuthenticator(mock).Authenticate(request.UserName, string.Empty),
+                "Mock" => DemoStaffAuthentication.Authenticate(mock, services.GetRequiredService<IAccountStore>(), request.UserName),
                 _ => AuthenticationResult.Failed(AuthenticationFailure.Prohibited)
             };
             if (!result.IsAuthenticated) return Results.Unauthorized();
@@ -72,6 +73,7 @@ public static class AuthenticationEndpoints
             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.Ok(new { signedOut = true });
         }).RequireAuthorization();
+        app.MapDemoStaffAccounts(mock, provider);
         app.MapCommonAccountAdministration("/api/admin/security/accounts", AccountPopulation.Staff,
             new Dictionary<AuthenticationProviderKind, string>
             {
@@ -153,3 +155,4 @@ public static class StudioSignIn
 }
 
 public sealed record LoginRequest(string UserName, string Password = "", string? Source = null);
+
