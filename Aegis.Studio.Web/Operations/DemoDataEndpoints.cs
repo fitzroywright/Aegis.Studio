@@ -126,11 +126,7 @@ public static class DemoDataEndpoints
     {
         var employees=new StudioEmployeeDirectoryStore(database);
         employees.EnsureSchema();
-        string root=Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS")
-            ?? "/var/lib/aegis-studio/demo-photos";
-        string[] files=Directory.EnumerateFiles(Path.Combine(root,"staff"))
-            .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
-            .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray();
+        string[] files=DemoDataExpansion.StaffPhotos();
         var staff=employees.GetAll().Where(person=>person.UserName.StartsWith("demo.",StringComparison.OrdinalIgnoreCase)).OrderBy(person=>person.UserName,StringComparer.OrdinalIgnoreCase).ToArray();
         if(files.Length<staff.Length)throw new InvalidOperationException($"The staff photo library contains {files.Length} unique images but the demo has {staff.Length} staff users.");
         var used=new HashSet<string>(StringComparer.OrdinalIgnoreCase);

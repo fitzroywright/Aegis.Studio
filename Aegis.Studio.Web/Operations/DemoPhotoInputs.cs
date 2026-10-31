@@ -110,22 +110,29 @@ internal static partial class DemoDataExpansion
         }
     }
 
-    private static string[] LocalStaffPhotos()
+    internal static string[] StaffPhotos()
     {
-        string directory=Path.Combine(photoLibraryRoot,"staff");
-        return Directory.Exists(directory)
-            ? Directory.EnumerateFiles(directory)
+        string localDirectory=Path.Combine(photoLibraryRoot,"staff");
+        string[] local=Directory.Exists(localDirectory)
+            ? Directory.EnumerateFiles(localDirectory)
                 .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
                 .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray()
             : [];
+        if(local.Length>=4)return local;
+
+        string bundledDirectory=Path.Combine(AppContext.BaseDirectory,"Demo","staff");
+        return Directory.Exists(bundledDirectory)
+            ? Directory.EnumerateFiles(bundledDirectory)
+                .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
+                .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray()
+            : local;
     }
 
     internal static void PrepareStaffPhotos(Action<DemoSeedProgress>? report)
     {
-        string directory=Path.Combine(photoLibraryRoot,"staff");
-        string[] files=LocalStaffPhotos();
+        string[] files=StaffPhotos();
         if(files.Length<4)
-            throw new InvalidOperationException($"The local staff photo library must contain at least four unique usable images at '{directory}'. Staff photos are kept separate from job/gallery photos and are never borrowed from a job category.");
+            throw new InvalidOperationException($"Studio requires four unique staff-only demo portraits. None were found in '{Path.Combine(photoLibraryRoot,"staff")}' or the published Demo/staff library. Staff photos are never borrowed from job or gallery categories.");
         HashSet<string> hashes=[];
         for(int index=0;index<files.Length;index++)
         {
