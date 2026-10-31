@@ -16,7 +16,7 @@ public sealed class WorkerRoleMembershipTests
         {
             var workers=new WorkerDirectory(database);
             workers.SaveWorker(new("jason","Jason","EDITOR",true,"jason@example.test","555-0101"));
-            workers.SaveRoles("jason","Jason","jason@example.test",true,["PHOTOGRAPHER","EDITOR","EDITOR"]);
+            workers.SaveRoles("JASON","Jason","jason@example.test",true,["PHOTOGRAPHER","EDITOR","EDITOR"]);
             Assert.Equal(new[]{"EDITOR","PHOTOGRAPHER"},workers.GetRoleMemberships().Select(w=>w.JobRoleCode).OrderBy(x=>x));
             var photos=new PhotographerStore(database);var photo=photos.Get("jason")!;
             Assert.True(photo.IsActive);Guid resource=photo.ScheduleResourceId;

@@ -112,6 +112,8 @@ public sealed class WorkerDirectory(StudioDatabase database)
         using var transaction = connection.BeginTransaction();
         using(var guard = new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",connection,transaction))
         { guard.Parameters.AddWithValue("worker:"+userName.ToLowerInvariant()); guard.ExecuteNonQuery(); }
+        using(var canonical = new NpgsqlCommand("select user_name from studio_workers where lower(user_name)=lower($1) order by (user_name=$1) desc,user_name limit 1",connection,transaction))
+        { canonical.Parameters.AddWithValue(userName); if(canonical.ExecuteScalar() is string existing) userName=existing; }
         using(var validate = new NpgsqlCommand("""
             select count(*) from studio_worker_types t where t.code=any($1) and
             (t.is_active or exists(select 1 from studio_worker_roles r where r.user_name=$2 and r.role_code=t.code and r.is_active))
