@@ -17,6 +17,7 @@ function setup(){
  w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML='<div class="studio-dialog-body">'+html+'</div>';d.close=()=>d.remove();w.document.body.append(d);return d;};
  w.json=async(url,options)=>{fixture.calls.push({url,options});if(fixture.delay&&url.includes('/media?'))await fixture.delay;
  if(url==='/api/production/media-summary')return fixture.mediaSummary||[];if(url==='/api/frontdesk/clients')return fixture.clients;if(url==='/api/jobs')return fixture.jobs;if(url==='/api/workspaces')return[{id:'w1',name:'Portraits'}];
+ if(url.endsWith('/access'))return {permissions:{viewFinancials:true}};
  if(url.endsWith('/workflow'))return{status:'Ready for Delivery',revision:12,actions:fixture.allowed?['publish']:[]};
  if(url.endsWith('/media/publications'))return[];
  if(url.includes('/media?'))return{gallery:{name:'Graduation Selects'},assets:[],collections:['Selects'],totalAssets:42};
@@ -211,4 +212,3 @@ test('link errors remain visible and retryable; client navigation closes the dia
  fixture.failLink=false;let release;fixture.linkDelay=new Promise(resolve=>release=resolve);dialog.querySelector('[data-link-create]').click();dialog.querySelector('[data-link-create]').click();assert.equal(fixture.calls.filter(call=>call.options?.method==='POST').length,2);
  await w.StudioClients.render({clientId:'b',tab:'jobs'});release();await settle();assert.equal(w.document.querySelector('dialog'),null);assert.equal(dialog.querySelector('[data-link-code]').value,'');assert.match(w.document.querySelector('[data-c-content]').textContent,/Other client job/);
 });
-
