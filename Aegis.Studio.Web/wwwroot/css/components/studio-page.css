@@ -431,3 +431,16 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .staff-compact-role-grid td,.staff-compact-role-grid th{padding:4px 7px}
 .staff-compact-role-grid small[role="status"]{display:block;font-size:11px}
 @media(max-width:620px){.staff-access-compact{grid-template-columns:1fr}.staff-access-selector{flex-direction:row;border-right:0;border-bottom:1px solid #ddd;padding:0 0 8px;max-height:none;overflow:auto}.staff-access-editor .staff-entry{grid-template-columns:1fr}}
+
+
+/* Compact Job Roles dialog */
+[data-job-role-admin]{display:block;max-width:720px}
+[data-job-role-admin] .staff-grid-scroll{max-height:min(58vh,480px);overflow:auto;border:1px solid var(--border-color,#d9dfe5);border-radius:10px}
+[data-job-role-admin] .staff-compact-role-grid{width:100%;border-collapse:collapse}
+[data-job-role-admin] .staff-compact-role-grid th{position:sticky;top:0;background:var(--surface,#f5f7fa);font-weight:600;text-align:left;white-space:nowrap}
+[data-job-role-admin] .staff-compact-role-grid tr+tr td{border-top:1px solid var(--border-color,#e5e8ed)}
+[data-job-role-admin] .staff-compact-role-grid td:nth-child(3),[data-job-role-admin] .staff-compact-role-grid td:nth-child(4){text-align:center}
+[data-job-role-admin] .staff-compact-role-grid input[type="checkbox"]{accent-color:var(--accent-color,#476f9d)}
+[data-job-role-admin] .staff-compact-footer{display:flex;justify-content:flex-end;padding:10px 2px 0}
+[data-job-role-admin] .staff-compact-footer button{border-radius:8px;padding:7px 13px;font-weight:600}
+[data-job-role-admin] .staff-compact-role-grid [data-role-row="new"]{background:rgba(76,125,190,.07)}
