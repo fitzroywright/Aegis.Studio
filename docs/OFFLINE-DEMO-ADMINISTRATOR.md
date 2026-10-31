@@ -89,16 +89,23 @@ logout/relogin, Front Desk, scheduling, Job Details, gallery metadata and Sessio
 Plan. This does not verify real AD/Entra/social providers or production readiness.
 Private installation details and protected backup evidence remain local.
 
-## Isolated Demo runtime and reviewed target
+## Demo runtime and optional emergency isolation
 
-A Demo host using mock sign-in also requires
-`Demo:IsolateExternalIntegrations=true`. Production mock sign-in remains
-prohibited. The Demo policy pauses external delivery/ingestion, public-site and
-WorkDay exchanges, webhooks, accounting export and control-plane publishing.
-It retains protected credential values, database/storage configuration and queued
-work. Request-driven named clients and the Public Site client also fail before
-transport. Internal Studio work and its selected Demo database/storage continue.
-No optional AD/Entra provider is enabled by this profile.
+Demo data, the Demo environment name and mock authentication do not disable
+integrations. Each integration follows its own explicit enable setting and
+credential configuration. A connected Demo may therefore publish booking
+catalogues, poll website intake, exchange WorkDay data, publish galleries or send
+messages when the corresponding feature is intentionally enabled.
+
+`Demo:IsolateExternalIntegrations` is retired and ignored. Operators who need a
+global emergency stop can explicitly set
+`ExternalIntegrations:IsolationEnabled=true`. That switch pauses external
+delivery and ingestion, public-site and WorkDay exchanges, webhooks, accounting
+export and control-plane publishing without erasing protected credentials,
+database/storage configuration or queued work. Request-driven clients also fail
+before transport. Turn integrations back on by removing or setting that emergency
+switch to `false`; the individual feature flags remain the source of normal
+runtime behavior.
 
 `maintenance version` reports the package informational version without loading
 application configuration or secrets. The bootstrap command optionally accepts
