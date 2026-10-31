@@ -266,10 +266,40 @@ function renderEmployeeDirectorySection() {
     </section>`;
 }
 
-function openStaffPermissionTemplates(){
+const staffAccessPermissionChoices=[
+    ['studio.access','Use Studio'],['studio.jobs.view_all','View all jobs'],['studio.clients.reply','Reply to clients'],
+    ['studio.jobs.notify_members','Notify job members'],['studio.billing.manage','Manage billing'],['studio.attachments.view','View client attachments'],
+    ['studio.attachments.add','Add client attachments'],['studio.media.delete','Delete and restore media'],['studio.security.manage','Manage security'],['*','Full administrative access']
+];
+
+function renderStaffAccessPermissionChoices(selected=[]){
+    const values=new Set(selected);
+    return `<div class="permission-grid">${staffAccessPermissionChoices.map(([key,label])=>`<label><input type="checkbox" data-access-permission value="${esc(key)}" ${values.has(key)?'checked':''}><span>${esc(label)}</span></label>`).join('')}</div>`;
+}
+
+function renderStaffAccessPermissionManager(roles){
+    return `<section class="staff-editor"><h2>Create access role</h2><p>Access roles control what a staff member can see and change throughout Studio.</p><form class="staff-access-role-form" data-create-access-role><div class="staff-entry"><label>Name<input name="name" maxlength="100" required></label><label>Description<input name="description" maxlength="500"></label></div>${renderStaffAccessPermissionChoices(['studio.access'])}<label class="staff-checkbox"><input name="isActive" type="checkbox" checked><span>Available for assignment</span></label><div class="dialog-actions"><span data-row-status role="status"></span><button type="submit" class="primary">Create role</button></div></form></section><section class="staff-grid-section"><header><h2>Existing access roles</h2><span>Edit a role or retire it by clearing Available for assignment.</span></header><div class="staff-access-role-list">${roles.map(role=>`<form class="staff-editor staff-access-role-form" data-access-role="${esc(role.id)}"><div class="staff-entry"><label>Name<input name="name" maxlength="100" required value="${esc(role.name)}"></label><label>Description<input name="description" maxlength="500" value="${esc(role.description||'')}"></label></div>${renderStaffAccessPermissionChoices(role.permissions)}<label class="staff-checkbox"><input name="isActive" type="checkbox" ${role.isActive!==false?'checked':''}><span>Available for assignment</span></label><div class="dialog-actions"><span data-row-status role="status"></span><button type="submit">Save role</button></div></form>`).join('')||'<p class="muted">No access roles have been created.</p>'}</div></section>`;
+}
+
+async function openStaffAccessPermissions(){
     if(staffDirectoryState?.saving||staffDirectoryState?.loading)return;
-    if(staffDirectoryState?.dirty){genericView.querySelector('[data-editor-status]').textContent='Save or cancel your changes before managing permission templates.';return;}
-    return studioDialog('Permission templates',renderStudioRoleEditor()+renderStudioRoleGrid());
+    if(staffDirectoryState?.dirty){genericView.querySelector('[data-editor-status]').textContent='Save or cancel your changes before managing access permissions.';return;}
+    const dialog=studioDialog('Manage Access Permissions','<p role="status">Loading access roles…</p>'),host=dialog.querySelector('.studio-dialog-body');let changed=false;
+    const payload=form=>({name:form.elements.name.value.trim(),description:form.elements.description.value.trim()||null,permissions:[...form.querySelectorAll('[data-access-permission]:checked')].map(input=>input.value),isActive:form.elements.isActive.checked});
+    const load=async()=>{
+        try{
+            const roles=await json('/api/security/global-roles/');if(!dialog.isConnected)return;
+            host.innerHTML=renderStaffAccessPermissionManager(roles);
+            host.querySelectorAll('.staff-access-role-form').forEach(form=>form.onsubmit=async event=>{
+                event.preventDefault();if(!form.reportValidity()||form.dataset.saving)return;
+                const status=form.querySelector('[data-row-status]'),button=form.querySelector('[type=submit]'),id=form.dataset.accessRole;
+                form.dataset.saving='true';button.disabled=true;status.textContent=id?'Saving…':'Creating…';
+                try{await json(id?'/api/security/global-roles/'+encodeURIComponent(id):'/api/security/global-roles/',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(form))});changed=true;await load();}
+                catch(error){status.textContent=error.message||(id?'Could not save this access role.':'Could not create the access role.');button.disabled=false;delete form.dataset.saving;}
+            });
+        }catch(error){host.innerHTML='<p role="alert"></p><button type="button" data-retry>Retry</button>';host.querySelector('[role=alert]').textContent=error.message||'Access roles could not be loaded.';host.querySelector('[data-retry]').onclick=load;}
+    };
+    dialog.addEventListener('close',()=>{if(changed)refreshStudioEmployees();},{once:true});await load();return dialog;
 }
 
 function mountStaffTokenEditor(holder,options,values,onchange,disabled=false){
@@ -424,8 +454,8 @@ function openStaffEditor(index, force=false) {
       <form class="staff-person-form"><div class="staff-card-grid"><section class="staff-detail-card"><h3>Details</h3><label>User name<input name="userName" readonly value="${esc(employee.userName)}"></label><div class="staff-field-pair"><label>Display name<input name="displayName" required value="${esc(employee.displayName||employee.userName)}"></label><label>Email<input name="email" type="email" value="${esc(employee.emailAddress||'')}"></label></div><label>Sign-in method<input name="signInMethod" readonly value="${esc(provider)}"></label><p class="muted">${state.demoAccountsEnabled&&demoBound?'Demo sign-in uses this user name with no password.':account?'Sign-in identity is managed under Advanced.':'Sign-in setup is required before this person can use assigned access permissions.'}</p>${state.demoAccountsEnabled&&account&&!demoBound&&!['Disabled','Suspended'].includes(account.status)?'<button type="button" data-enable-demo>Enable demo sign-in</button>':''}${account?`<label>Account status<select name="accountStatus">${['PendingAccess','Active','Suspended','Disabled'].map(s=>`<option value="${s}" ${s===account.status?'selected':''}>${s==='PendingAccess'?'Awaiting approval':s}</option>`).join('')}</select></label>`:'<button type="button" data-enroll>Set up sign-in</button>'}</section>
       <section class="staff-detail-card staff-photo-card"><h3>Photo</h3><div class="staff-photo-frame">${employee.photoUrl?`<img src="${esc(employee.photoUrl)}" alt="${esc(employee.displayName||employee.userName)}">`:`<span class="staff-photo-placeholder" aria-hidden="true">${esc(staffInitials(employee))}</span>`}</div><p class="muted">${employee.photoUrl?`Source: ${esc(staffPhotoSourceLabel(employee.photoSource))}`:'No staff photo is available.'}</p><input type="file" accept="image/jpeg,image/png,image/webp" data-staff-photo-file hidden><div class="staff-photo-actions"><button type="button" data-change-photo>${employee.photoUrl?'Change Photo':'Add Photo'}</button>${employee.photoSource==='Studio'?'<button type="button" data-remove-photo>Remove</button>':''}</div></section>
       <section class="staff-detail-card"><header class="staff-card-heading"><h3>Job Roles</h3><button type="button" class="staff-text-action" data-manage-job-roles>Manage Job Roles</button></header><div data-token-kind="job"></div><p class="muted">Select all roles this person can perform.</p><label class="staff-checkbox"><input name="isAssignable" type="checkbox" ${employee.isAssignable?'checked':''}><span>Available for job assignments</span></label></section>
-      <section class="staff-detail-card"><h3>Access Permissions</h3><div data-token-kind="access"></div><p class="muted">Controls what this person can see and change.</p>
-      <details class="staff-advanced"><summary>Advanced</summary><label class="staff-checkbox"><input name="isActive" type="checkbox" ${employee.isActive?'checked':''}><span>Staff record active</span></label><button type="button" data-permission-templates>Manage permission templates</button>${account?`<div class="staff-row-actions"><button type="button" data-identity-bind>Manage sign-in identity</button><button type="button" data-account-revoke>Revoke sessions</button>${account.providerKind==='LocalDatabase'?'<button type="button" data-account-recover>Account recovery</button>':''}</div>`:'<p>Complete sign-in setup to manage identity and recovery.</p>'}</details></section></div><p data-editor-status role="status"></p><div class="staff-detail-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`;
+      <section class="staff-detail-card"><header class="staff-card-heading"><h3>Access Permissions</h3><button type="button" class="staff-text-action" data-manage-access-permissions>Manage Access Permissions</button></header><div data-token-kind="access"></div><p class="muted">Controls what this person can see and change.</p>
+      <details class="staff-advanced"><summary>Advanced</summary><label class="staff-checkbox"><input name="isActive" type="checkbox" ${employee.isActive?'checked':''}><span>Staff record active</span></label>${account?`<div class="staff-row-actions"><button type="button" data-identity-bind>Manage sign-in identity</button><button type="button" data-account-revoke>Revoke sessions</button>${account.providerKind==='LocalDatabase'?'<button type="button" data-account-recover>Account recovery</button>':''}</div>`:'<p>Complete sign-in setup to manage identity and recovery.</p>'}</details></section></div><p data-editor-status role="status"></p><div class="staff-detail-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`;
     const form=panel.querySelector('form');
     form.oninput=()=>state.dirty=true;
     form.querySelector('[data-cancel]').onclick=()=>openStaffEditor(index);
@@ -448,7 +478,7 @@ function openStaffEditor(index, force=false) {
         await renderJobRoleAdministration(()=>d.isConnected,d.querySelector('[data-job-role-admin]'));
         d.addEventListener('close',()=>refreshStudioEmployees(),{once:true});
     };
-    form.querySelector('[data-permission-templates]').onclick=openStaffPermissionTemplates;
+    form.querySelector('[data-manage-access-permissions]').onclick=openStaffAccessPermissions;
     const photoInput=form.querySelector('[data-staff-photo-file]'),changePhoto=form.querySelector('[data-change-photo]'),removePhoto=form.querySelector('[data-remove-photo]');
     photoInput.oninput=event=>event.stopPropagation();
     changePhoto.onclick=()=>{if(state.dirty){form.querySelector('[data-editor-status]').textContent='Save or cancel your changes before changing the photo.';return;}photoInput.click();};

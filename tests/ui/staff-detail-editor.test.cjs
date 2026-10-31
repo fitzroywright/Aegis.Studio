@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
 async function setup(t,{accounts=true,roleFailure=false,demo=false,provider="Mock",photoSource=null}={}){
  const dom=new JSDOM('<div id="genericView"></div>',{url:'https://studio.test',runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());
- w.genericView=w.document.getElementById('genericView');w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));w.confirm=()=>true;
+ w.genericView=w.document.getElementById('genericView');w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));w.confirm=()=>true;w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML=`<h2>${title}</h2><div class="studio-dialog-body">${html}</div>`;d.close=()=>{d.dispatchEvent(new w.Event('close'));d.remove();};w.document.body.append(d);return d;};
  const employee={userName:'domain/user',displayName:'Sam Lee',emailAddress:'sam@example.test',isActive:true,isAssignable:true,source:'Directory',externalId:'immutable',skills:['Portraits'],workDayUserName:'sam-day',lastSyncedAtUtc:'2026-10-27T12:00:00Z',photoSource,photoUrl:photoSource?'/api/studio-employees/domain%2Fuser/photo?v=1':null};
  const account={id:'account',loginName:employee.userName,displayName:employee.displayName,providerKind:'ActiveDirectory',status:'PendingAccess'};
  const roles=[{id:'front',name:'Front Desk',description:'Reception',isActive:true},{id:'inactive',name:'Old role',isActive:false}];
@@ -27,6 +27,15 @@ test('staff page has one editor, searchable rows, role tokens and collapsed tech
  const {w,selectSam}=await setup(t);const form=selectSam();assert.equal(w.document.querySelectorAll('.staff-person-form').length,1);assert.equal(w.document.getElementById('rolesPanel'),null);assert.equal(w.document.querySelector('.staff-advanced').open,false);assert.equal(form.elements.userName.value,'domain/user');assert.equal(form.elements.userName.readOnly,true);assert.equal(form.elements.signInMethod.value,'Active Directory');assert.equal(w.document.querySelectorAll('.staff-card-grid>.staff-detail-card').length,4);
  w.filterStudioStaff('sam@example');assert.equal(w.document.querySelectorAll('[data-staff-index]').length,1);w.filterStudioStaff('nobody');assert.match(w.document.getElementById('studioEmployeeList').textContent,/No matching/);
  assert.equal(w.document.querySelector('[data-manage-job-roles]').textContent,'Manage Job Roles');
+ assert.equal(w.document.querySelector('[data-manage-access-permissions]').textContent,'Manage Access Permissions');
+});
+test('Manage Access Permissions creates and edits the roles used by the staff token editor',async t=>{
+ const {w,writes,selectSam}=await setup(t);const form=selectSam();await form.querySelector('[data-manage-access-permissions]').onclick();let dialog=w.document.querySelector('dialog');
+ assert.match(dialog.querySelector('h2').textContent,/Manage Access Permissions/);assert.equal(dialog.querySelectorAll('[data-access-role]').length,2);
+ const create=dialog.querySelector('[data-create-access-role]');create.elements.name.value='Editor';create.elements.description.value='Can edit assigned work';create.querySelector('[data-access-permission][value="studio.jobs.view_all"]').checked=true;await create.onsubmit({preventDefault(){}});
+ assert.deepEqual(writes.find(x=>x.url==='/api/security/global-roles/'&&x.method==='POST').body,{name:'Editor',description:'Can edit assigned work',permissions:['studio.access','studio.jobs.view_all'],isActive:true});
+ dialog=w.document.querySelector('dialog');const edit=dialog.querySelector('[data-access-role="front"]');edit.elements.name.value='Client Services';edit.elements.isActive.checked=false;await edit.onsubmit({preventDefault(){}});
+ const update=writes.find(x=>x.url==='/api/security/global-roles/front'&&x.method==='PUT');assert.equal(update.body.name,'Client Services');assert.equal(update.body.isActive,false);
 });
 test('staff photo card prefers directory photos and supports a Studio override and removal',async t=>{
  const directory=await setup(t,{photoSource:'ActiveDirectory'}),form=directory.selectSam(),card=form.querySelector('.staff-photo-card');

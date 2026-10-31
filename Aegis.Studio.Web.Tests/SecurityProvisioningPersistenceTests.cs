@@ -15,6 +15,26 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class SecurityProvisioningPersistenceTests
 {
     [StudioPostgresFact]
+    public async Task GlobalAccessRolesCanBeCreatedAndEditedWithoutLosingAssignments()
+    {
+        string connection=Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES")!,schema="studio_access_roles_"+Guid.NewGuid().ToString("N");
+        await using var admin=new NpgsqlConnection(connection);await admin.OpenAsync();
+        await using(var create=new NpgsqlCommand($"CREATE SCHEMA {schema}",admin))await create.ExecuteNonQueryAsync();
+        try
+        {
+            await using var source=NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(connection){SearchPath=schema}.ConnectionString);
+            var store=new GlobalOperationalRoleStore(new StudioDatabase(source));store.EnsureSchema();
+            var created=store.CreateRole(new GlobalOperationalRoleDefinitionRequest("Editor","Edits assigned work",[StudioPermissions.Access,StudioPermissions.ViewAllJobs],true));
+            store.SaveMember(created.Id,new GlobalOperationalRoleMemberRequest("domain/editor","Studio Editor",true));
+            var updated=store.UpdateRole(created.Id,new GlobalOperationalRoleDefinitionRequest("Senior Editor","Reviews and edits work",[StudioPermissions.Access,StudioPermissions.AddClientAttachments],true));
+            Assert.Equal("Senior Editor",updated.Name);Assert.Contains(StudioPermissions.AddClientAttachments,updated.Permissions);Assert.DoesNotContain(StudioPermissions.ViewAllJobs,updated.Permissions);
+            Assert.Equal("domain/editor",Assert.Single(store.GetMembers(created.Id)).UserName);
+            Assert.Throws<InvalidOperationException>(()=>store.UpdateRole(created.Id,new GlobalOperationalRoleDefinitionRequest("Senior Editor",null,["unsupported.permission"],true)));
+        }
+        finally{await using var drop=new NpgsqlCommand($"DROP SCHEMA {schema} CASCADE",admin);await drop.ExecuteNonQueryAsync();}
+    }
+
+    [StudioPostgresFact]
     public async Task WorkspaceAndJobPermissionWritesShareTheAccountAuditAndRollbackBoundary()
     {
         string connection=Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES")!,schema="studio_permission_audit_"+Guid.NewGuid().ToString("N");
@@ -94,3 +114,4 @@ public sealed class SecurityProvisioningPersistenceTests
         finally{await using var drop=new NpgsqlCommand($"DROP SCHEMA {schema} CASCADE",admin);await drop.ExecuteNonQueryAsync();}
     }
 }
+
