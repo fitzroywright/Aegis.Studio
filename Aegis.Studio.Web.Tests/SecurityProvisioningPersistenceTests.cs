@@ -30,8 +30,12 @@ public sealed class SecurityProvisioningPersistenceTests
             Assert.Equal(2,store.GetMembers(role.Id).Count(x=>x.IsActive));
 
             await using(var databaseConnection=await source.OpenConnectionAsync())
-            await using(var damage=new NpgsqlCommand("update studio_global_operational_roles set is_active=false where id=$1; delete from studio_global_operational_role_permissions where role_id=$1",databaseConnection))
-            {damage.Parameters.AddWithValue(role.Id);await damage.ExecuteNonQueryAsync();}
+            {
+                await using(var retire=new NpgsqlCommand("update studio_global_operational_roles set is_active=false where id=$1",databaseConnection))
+                {retire.Parameters.AddWithValue(role.Id);await retire.ExecuteNonQueryAsync();}
+                await using(var removePermission=new NpgsqlCommand("delete from studio_global_operational_role_permissions where role_id=$1",databaseConnection))
+                {removePermission.Parameters.AddWithValue(role.Id);await removePermission.ExecuteNonQueryAsync();}
+            }
             store.EnsureSchema();
             role=Assert.Single(store.GetRoles(),x=>x.Name==StudioRoleNames.Administrator);
             Assert.True(role.IsActive);Assert.Contains("*",role.Permissions);
