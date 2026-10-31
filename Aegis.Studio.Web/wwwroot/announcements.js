@@ -2,7 +2,7 @@
 (() => {
     let started = false;
     async function showAtLogin(user) {
-        if (!user || started) return;
+        if (!user || started || window.StudioAccess?.pending()) return;
         started = true;
         const identity = String(user.userName || user.username || user.email || user.id || '').toLowerCase();
         if (!identity || sessionStorage.getItem('studio-announcements-login') === identity) return;
@@ -104,4 +104,5 @@
     window.StudioAnnouncements = {showAtLogin,attachComposer};
     window.studioSignedInUserReady?.then(showAtLogin).catch(error=>console.error('Announcement sign-in check failed.',error));
 })();
+
 
