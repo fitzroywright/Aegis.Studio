@@ -261,7 +261,7 @@
                 <section class="studio-about-card studio-about-demo" id="studioDemoLoader"><div class="studio-about-demo-main"><div class="studio-about-demo-copy"><h2>Demo Data</h2><p class="studio-about-demo-warning">Reset clears business records and files.<span class="studio-about-demo-line">Staff accounts, configuration and Unassigned are preserved.</span></p></div><div class="studio-about-demo-actions"><button class="action" type="button" data-demo-remove>Remove demo data</button><button class="primary" type="button" data-load-demo>Clear and recreate</button></div></div><div class="studio-about-card-body"><progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress><p class="admin-demo-status" data-demo-status role="status" aria-live="polite"></p><small data-demo-elapsed hidden></small></div></section>`:''}`;break;
             case 'staff-roles': content=renderEmployeeDirectorySection();break;
         }
-        genericView.innerHTML=StudioPage.html({title,showHeader:false,scroll:view!=='about',summary:view==='about'?'<p>Product information, support, service health and administrator demo tools.</p>':'',content:view==='about'?`<div class="studio-about-scene"><div class="studio-about-panel"><div class="${isAdministrator?'studio-about-grid':'studio-about-info'}">${content}</div></div></div>`:`<div class="admin-generated-sections">${content}</div>`});
+        genericView.innerHTML=StudioPage.html({title,showHeader:false,scroll:view!=='about'&&view!=='staff-roles',summary:view==='about'?'<p>Product information, support, service health and administrator demo tools.</p>':'',content:view==='about'?`<div class="studio-about-scene"><div class="studio-about-panel"><div class="${isAdministrator?'studio-about-grid':'studio-about-info'}">${content}</div></div></div>`:view==='staff-roles'?content:`<div class="admin-generated-sections">${content}</div>`});
         StudioPage.bind(genericView,current);
 
         if(!current())return;
@@ -490,5 +490,3 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
-
-
