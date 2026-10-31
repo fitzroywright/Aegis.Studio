@@ -16,6 +16,7 @@ namespace Aegis.Studio.Web.Bookings;
 public sealed record PublicBookingSessionType(string Id,string Name,string Description,int DurationMinutes,int SetupBufferMinutes,int CleanupBufferMinutes,long PriceMinor,long DepositMinor,string Currency,IReadOnlyList<string> Locations,IReadOnlyDictionary<string,int> ResourceRequirements,bool IsActive,bool IsPublished,Guid? DefaultWorkspaceId=null,string? Category=null);
 public sealed record PublicBookingCatalog(long Revision,IReadOnlyList<PublicBookingSessionType> SessionTypes);
 public sealed record PublicBookingHours(string LocationCode,int DayOfWeek,string OpensAt,string ClosesAt,int SlotStepMinutes);
+public sealed record PublicBookingLocation(string Code,string Name);
 public sealed record PublicBookingPublicationRequest(bool IsPublished,long ExpectedRevision);
 
 public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
@@ -24,7 +25,20 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
     public void EnsureSchema()
     {
         using var c=database.OpenConnection();
-        using var q=new NpgsqlCommand("create table if not exists studio_public_booking_catalog_state(id integer primary key check(id=1),revision bigint not null default 0); create table if not exists studio_public_booking_session_types(id text primary key,payload jsonb not null); create table if not exists studio_public_booking_hours(location_code text not null,day_of_week integer not null,opens_at time not null,payload jsonb not null,primary key(location_code,day_of_week,opens_at)); insert into studio_public_booking_catalog_state(id,revision) values(1,0) on conflict(id) do nothing",c);q.ExecuteNonQuery();
+        using var q=new NpgsqlCommand("create table if not exists studio_public_booking_catalog_state(id integer primary key check(id=1),revision bigint not null default 0); create table if not exists studio_public_booking_session_types(id text primary key,payload jsonb not null); create table if not exists studio_public_booking_locations(code text primary key,name text not null); create table if not exists studio_public_booking_hours(location_code text not null,day_of_week integer not null,opens_at time not null,payload jsonb not null,primary key(location_code,day_of_week,opens_at)); insert into studio_public_booking_catalog_state(id,revision) values(1,0) on conflict(id) do nothing",c);q.ExecuteNonQuery();
+        using var seed=new NpgsqlCommand("insert into studio_public_booking_locations(code,name) values (\'BK\',\'Kings Plaza\'),(\'BE\',\'East Queen Street\') on conflict(code) do nothing",c);seed.ExecuteNonQuery();
+    }
+    public IReadOnlyList<PublicBookingLocation> GetLocations()
+    {
+        using var c=database.OpenConnection();using var q=new NpgsqlCommand("select code,name from studio_public_booking_locations order by name",c);using var r=q.ExecuteReader();var rows=new List<PublicBookingLocation>();while(r.Read())rows.Add(new(r.GetString(0),r.GetString(1)));return rows;
+    }
+    public PublicBookingLocation AddLocation(PublicBookingLocation location)
+    {
+        var name=(location.Name??string.Empty).Trim();if(name.Length is <2 or >100)throw new ArgumentException("Location name must contain 2–100 characters.");
+        using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        using var check=new NpgsqlCommand("select count(*) from studio_public_booking_locations where lower(name)=lower($1)",c,tx);check.Parameters.AddWithValue(name);if((long)check.ExecuteScalar()!>0)throw new ArgumentException("A location with this name already exists.");
+        string code;do{code="LOC-"+Guid.NewGuid().ToString("N")[..10].ToUpperInvariant();using var exists=new NpgsqlCommand("select count(*) from studio_public_booking_locations where code=$1",c,tx);exists.Parameters.AddWithValue(code);if((long)exists.ExecuteScalar()! == 0)break;}while(true);
+        using var insert=new NpgsqlCommand("insert into studio_public_booking_locations(code,name) values($1,$2)",c,tx);insert.Parameters.AddWithValue(code);insert.Parameters.AddWithValue(name);insert.ExecuteNonQuery();tx.Commit();return new(code,name);
     }
     public PublicBookingCatalog Get(bool publishedOnly=false)
     {
@@ -77,8 +91,9 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
     public long SaveHours(IReadOnlyList<PublicBookingHours> hours,long? expectedRevision=null)
     {
         var keys=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if(hours.Count>56)throw new ArgumentException("Configure up to four opening windows per location and weekday.");
-        foreach(var x in hours){if(x.LocationCode is not ("BK" or "BE")||x.DayOfWeek is <0 or >6||!TimeOnly.TryParse(x.OpensAt,out var opens)||!TimeOnly.TryParse(x.ClosesAt,out var closes)||closes<=opens||x.SlotStepMinutes is <5 or >240||!keys.Add(x.LocationCode+":"+x.DayOfWeek+":"+opens.ToString("HH:mm")))throw new ArgumentException("Hours need unique opening and closing ranges in Jamaica time for each Studio location and weekday.");}
+        if(hours.Count>1000)throw new ArgumentException("Too many opening windows.");
+        var validLocations=GetLocations().Select(x=>x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach(var x in hours){if(!validLocations.Contains(x.LocationCode)||x.DayOfWeek is <0 or >6||!TimeOnly.TryParse(x.OpensAt,out var opens)||!TimeOnly.TryParse(x.ClosesAt,out var closes)||closes<=opens||x.SlotStepMinutes is <5 or >240||!keys.Add(x.LocationCode+":"+x.DayOfWeek+":"+opens.ToString("HH:mm")))throw new ArgumentException("Hours need unique opening and closing ranges in Jamaica time for each Studio location and weekday.");}
         foreach(var day in hours.GroupBy(x=>x.LocationCode+":"+x.DayOfWeek)){var ordered=day.OrderBy(x=>TimeOnly.Parse(x.OpensAt)).ToArray();for(int i=1;i<ordered.Length;i++)if(TimeOnly.Parse(ordered[i].OpensAt)<TimeOnly.Parse(ordered[i-1].ClosesAt))throw new ArgumentException("Opening windows for the same location and weekday cannot overlap.");}
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
         using(var guard=new NpgsqlCommand("select revision from studio_public_booking_catalog_state where id=1 for update",c,tx))
@@ -101,7 +116,7 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
             if(string.IsNullOrWhiteSpace(x.Name)||x.Name.Trim().Length>160||!names.Add(x.Name.Trim()))throw new ArgumentException("Session names must be unique and are limited to 160 characters.");
             if((x.Category?.Length??0)>80)throw new ArgumentException("Session categories are limited to 80 characters.");
             if(x.Description?.Length>1000||x.DurationMinutes is <15 or >1440||x.SetupBufferMinutes is <0 or >480||x.CleanupBufferMinutes is <0 or >480||x.PriceMinor<0||x.DepositMinor<0||x.DepositMinor>x.PriceMinor||x.Currency!="JMD")throw new ArgumentException("Set a JMD price and deposit, a valid duration, and buffers of no more than eight hours.");
-            if(x.Locations is null||x.Locations.Count==0||x.Locations.Any(l=>l is not ("BK" or "BE"))||x.Locations.Distinct().Count()!=x.Locations.Count)throw new ArgumentException("Choose Kings Plaza (BK), East Queen Street (BE), or both.");
+            if(x.Locations is null||x.Locations.Count==0||x.Locations.Any(l=>!GetLocations().Any(loc=>loc.Code==l))||x.Locations.Distinct().Count()!=x.Locations.Count)throw new ArgumentException("Choose Kings Plaza (BK), East Queen Street (BE), or both.");
             if(x.ResourceRequirements is null||x.ResourceRequirements.Any(p=>!Regex.IsMatch(p.Key,@"^[A-Za-z0-9._-]{1,80}$")||p.Value is <0 or >20))throw new ArgumentException("Resource rules must use active Studio resource types and whole-number counts.");
         }
     }
@@ -129,6 +144,8 @@ public static class StudioPublicBookingCatalogEndpoints
             catch(KeyNotFoundException e){return Results.NotFound(new{error=e.Message});}
             catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}
         });
+        app.MapGet("/api/admin/public-booking/locations",(StudioPublicBookingCatalogStore store)=>Results.Ok(store.GetLocations())).RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
+        app.MapPost("/api/admin/public-booking/locations",(PublicBookingLocation location,StudioPublicBookingCatalogStore store)=>{try{return Results.Ok(store.AddLocation(location));}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}}).RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
         app.MapGet("/api/admin/public-booking/hours",(StudioPublicBookingCatalogStore store)=>Results.Ok(store.GetHours())).RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
         app.MapPut("/api/admin/public-booking/hours",(PublicBookingHours[] hours,HttpRequest request,StudioPublicBookingCatalogStore store)=>{try{return Results.Ok(new{revision=store.SaveHours(hours,ExpectedRevision(request))});}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}}).RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
     }
