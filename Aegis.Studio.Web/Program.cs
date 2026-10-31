@@ -45,24 +45,24 @@ if (args.FirstOrDefault() == "maintenance")
 }
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-bool isolatedDemo = DemoIntegrationIsolation.Configure(builder.Configuration, builder.Environment);
-if (isolatedDemo)
+bool externalIntegrationsIsolated = ExternalIntegrationIsolation.Configure(builder.Configuration, builder.Environment);
+if (externalIntegrationsIsolated)
 {
-    builder.Services.AddTransient<DemoIntegrationIsolationHandler>();
-    builder.Services.ConfigureHttpClientDefaults(client => client.AddHttpMessageHandler<DemoIntegrationIsolationHandler>());
+    builder.Services.AddTransient<ExternalIntegrationIsolationHandler>();
+    builder.Services.ConfigureHttpClientDefaults(client => client.AddHttpMessageHandler<ExternalIntegrationIsolationHandler>());
 }
 string operationsLogInstanceId = builder.Configuration["Service:Identity"]?.Trim() ?? Environment.MachineName;
 string operationsLogIdentityFile = builder.Configuration["Aegis:Registration:IdentityFile"]
     ?? (OperatingSystem.IsWindows()
         ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Aegis", "Studio", "registration-identity.json")
         : "/var/lib/aegis/studio/registration-identity.json");
-if (!isolatedDemo) builder.Services.AddAegisOperationsLogging(builder.Configuration, "Aegis.Studio", operationsLogInstanceId, operationsLogIdentityFile, builder.Environment.EnvironmentName);
+if (!externalIntegrationsIsolated) builder.Services.AddAegisOperationsLogging(builder.Configuration, "Aegis.Studio", operationsLogInstanceId, operationsLogIdentityFile, builder.Environment.EnvironmentName);
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSignalR();
 builder.Services.AddStudioEngineeringDiagnostics();
-if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.OperationsTelemetryPublisher>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<Aegis.Studio.Web.OperationsTelemetryPublisher>();
 builder.Services.AddSingleton<StudioOperationsFlowPublisher>();
-if (!isolatedDemo) builder.Services.AddHostedService(sp => sp.GetRequiredService<StudioOperationsFlowPublisher>());
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService(sp => sp.GetRequiredService<StudioOperationsFlowPublisher>());
 
 ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
 builder.Services.AddSingleton(secretProvider);
@@ -249,7 +249,7 @@ builder.Services.AddSingleton<Aegis.Studio.Web.Workers.WorkerDirectory>();
 builder.Services.AddSingleton<ProductionStore>();
 builder.Services.AddSingleton<PerformanceMetricsStore>();
 builder.Services.AddSingleton<WorkDayStore>();
-if (!isolatedDemo) builder.Services.AddHostedService<WorkDayApiExchangeWorker>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<WorkDayApiExchangeWorker>();
 builder.Services.AddSingleton<StudioPosStore>();
 builder.Services.AddStudioPosHardening();
 builder.Services.AddSingleton<AttachmentStore>();
@@ -257,23 +257,23 @@ builder.Services.AddSingleton<OutboundEmailStore>();
 builder.Services.AddSingleton<UnroutedEmailStore>();
 builder.Services.AddSingleton<GraphEmailDeltaStateStore>();
 builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
-if (!isolatedDemo) builder.Services.AddHostedService<InboundEmailWorker>();
-if (!isolatedDemo) builder.Services.AddHostedService<OutboundEmailWorker>();
-if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.WebsiteIntakeWorker>();
-if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GalleryPushWorker>();
-if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GallerySelectionWorker>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<InboundEmailWorker>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<OutboundEmailWorker>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.WebsiteIntakeWorker>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GalleryPushWorker>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GallerySelectionWorker>();
 builder.Services.AddSingleton<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogStore>();
-builder.Services.AddHostedService<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogPublisher>();
-if (!isolatedDemo) builder.Services.AddHostedService<NotificationDeliveryWorker>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogPublisher>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<NotificationDeliveryWorker>();
 builder.Services.AddSingleton<WorkflowStore>();
-if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.PublicApi.PublicWebhookWorker>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<Aegis.Studio.Web.PublicApi.PublicWebhookWorker>();
 builder.Services.AddHostedService<WorkflowMonitorWorker>();
-if (!isolatedDemo) builder.Services.AddHostedService<ConfigurationContractPublisher>();
+if (!externalIntegrationsIsolated) builder.Services.AddHostedService<ConfigurationContractPublisher>();
 builder.Services.AddSingleton<IClientGalleryPublisher,ManifestClientGalleryPublisher>();
 builder.Services.AddHostedService<Aegis.Studio.Web.Media.MediaDerivativeWorker>();
 builder.Services.AddSingleton<Aegis.Studio.Web.WorkDay.IWorkDaySchedulingService>(sp=>new Aegis.Studio.Web.WorkDay.WorkDaySchedulingService(sp.GetRequiredService<StudioDatabase>(),new PhotographerStore(sp.GetRequiredService<StudioDatabase>())));
 
-if (isolatedDemo) DemoIntegrationIsolation.PauseSharedDeliveryProcessor(builder.Services);
+if (externalIntegrationsIsolated) ExternalIntegrationIsolation.PauseSharedDeliveryProcessor(builder.Services);
 WebApplication app = builder.Build();
 var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
@@ -297,7 +297,7 @@ StudioOperationsEnhancements.EnsureSchema(
 WorkDayStore workDayStore=app.Services.GetRequiredService<WorkDayStore>();
 workDayStore.EnsureSchema();
 int workDayLocationRetentionDays=Math.Clamp(app.Configuration.GetValue<int?>("WorkDay:LocationRetentionDays")??30,1,3650);
-if (!isolatedDemo) workDayStore.ApplyLocationRetention(TimeSpan.FromDays(workDayLocationRetentionDays));
+if (!externalIntegrationsIsolated) workDayStore.ApplyLocationRetention(TimeSpan.FromDays(workDayLocationRetentionDays));
 
 app.Use(async(context,next)=>
 {
