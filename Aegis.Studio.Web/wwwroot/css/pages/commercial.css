@@ -264,3 +264,11 @@
 .catalog-page .catalog-product-workspace .pos-grid th:nth-child(2){min-width:130px}
 .catalog-page .catalog-product-workspace .pos-grid th:last-child{min-width:125px}
 .catalog-page .catalog-product-toolbar{justify-content:flex-end}
+
+
+/* Compact segmented page selectors, matching the Jobs filter toggle treatment. */
+.catalog-page .catalog-segmented-tabs{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:4px 0 12px;padding:0;border:0;background:transparent}
+.catalog-page .catalog-segmented-tabs button{appearance:none;display:inline-flex;align-items:center;justify-content:center;min-height:27px;padding:5px 10px;border:1px solid #b7c9db;border-radius:7px;background:#f8fafc;color:#607187;font:600 11px/1.2 inherit;white-space:nowrap;cursor:pointer}
+.catalog-page .catalog-segmented-tabs button:hover:not([aria-pressed="true"]){background:#eef3f8;border-color:#91aac4}
+.catalog-page .catalog-segmented-tabs button[aria-pressed="true"]{background:#9a6850;border-color:#9a6850;color:#fff}
+.catalog-page .catalog-segmented-tabs button:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
