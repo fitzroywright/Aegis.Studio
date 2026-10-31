@@ -56,7 +56,7 @@ test('Schedule shows real work for every job role and has no Messages card',asyn
 test('worker calendar reads configured roles and timed assignments under job access permissions',()=>{
  const source=fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/Scheduling/ScheduleEndpoints.cs'),'utf8');
  const endpoint=source.slice(source.indexOf('app.MapGet("/api/schedule/worker-data"'),source.indexOf('app.MapGet("/api/schedule/worker-availability"'));
- assert.match(endpoint,/directory.GetTypes\(true\)/);assert.match(endpoint,/directory.GetWorkers\(includeInactive:true\)/);
+ assert.match(endpoint,/directory.GetTypes\(true\)/);assert.match(endpoint,/directory.GetRoleMemberships\(includeInactive:true\)/);
  assert.match(endpoint,/from studio_job_worker_assignments a/);assert.match(endpoint,/a.starts_at_utc<\$2 and a.ends_at_utc>\$1/);
  assert.match(endpoint,/a.job_id=any\(\$4\)/);assert.match(endpoint,/access.GetAccessibleJobIds\(user\)/);
  assert.match(endpoint,/assignedResources.Contains\(p.ScheduleResourceId\)/);
@@ -81,5 +81,6 @@ test('Job Roles layout options precede date filters and switch without refetchin
  assert.equal(fixture.calls.length,reads);
  w.document.querySelector('[data-calendar-layout="calendar"]').click();assert.ok(w.document.querySelector('.ps-calendar-row'));
 });
+
 
 
