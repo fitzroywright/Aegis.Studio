@@ -100,3 +100,18 @@
 }
 
 .commercial-page-actions { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+
+/* Templates page guidance notes. The notes explain the three layers before editors are used. */
+.template-guidance{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 14px;padding:4px 2px 0;align-items:stretch}
+.template-postit{position:relative;min-height:154px;padding:16px 16px 14px;border:1px solid rgba(117,91,35,.28);border-radius:2px;box-shadow:2px 3px 8px rgba(42,50,62,.16);color:#26313b;transform:rotate(-.6deg);font-size:12px;line-height:1.45}
+.template-postit:nth-child(2){transform:rotate(.45deg);margin-top:5px}
+.template-postit:nth-child(3){transform:rotate(-.25deg);margin-top:2px}
+.template-postit h2{margin:0 0 8px;font-size:15px;color:#172d4a}
+.template-postit p{margin:6px 0}
+.template-postit-job{background:#fff2a8}
+.template-postit-work{background:#ffd9a8}
+.template-postit-automation{background:#cfe8ff}
+.template-guidance-flow{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:10px;margin:2px 0 0;color:#172d4a;font-size:12px}
+.template-guidance-flow strong{padding:5px 10px;border-radius:999px;background:#eef2f5;border:1px solid #cbd5df}
+.template-guidance-flow span{font-size:18px;color:#986c55}
+@media(max-width:900px){.template-guidance{grid-template-columns:1fr}.template-postit,.template-postit:nth-child(2),.template-postit:nth-child(3){margin:0;transform:none}.template-guidance-flow{flex-wrap:wrap}}
