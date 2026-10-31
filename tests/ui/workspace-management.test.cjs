@@ -38,9 +38,9 @@ test('Create Workspace retains manager assignment and returns to Workspace admin
  const creation=calls.find(call=>call.url==='/api/admin/workspaces/');assert.equal(JSON.parse(creation.options.body).defaultJobLead,'lisa');assert.ok(calls.some(call=>call.url==='/api/workspaces/new/managers/lisa'));assert.equal(navigation.at(-1).view,'workspace-management');assert.equal(w.document.querySelector('dialog #workspaceName'),null);
 });
 
-test('non-administrator Admin menu exposes only permitted workspace access',async t=>{
- const {w}=setup(t,false);w.studioSignedInUserReady=Promise.resolve({isAdministrator:false});w.eval(read('studio-admin.js'));const host=w.document.createElement('div');w.document.body.append(host);w.StudioAdmin.mountMenu(host);await settle();
- const visible=[...host.querySelectorAll('button')].filter(button=>!button.hidden);assert.equal(visible.length,1);assert.equal(visible[0].textContent,'Workspaces');
+test('non-administrator menu exposes Workspaces and About while hiding privileged pages',async t=>{
+ const {w,navigation}=setup(t,false);w.studioSignedInUserReady=Promise.resolve({isAdministrator:false});w.eval(read('studio-admin.js'));const host=w.document.createElement('div');w.document.body.append(host);w.StudioAdmin.mountMenu(host);await settle();
+ const visible=[...host.querySelectorAll('button')].filter(button=>!button.hidden);assert.deepEqual(visible.map(button=>button.textContent),['Workspaces','About']);visible[1].click();assert.equal(navigation.at(-1).view,'about');
 });
 
 test('job role create and delete return to Staff and Roles, preserving workspace role destinations',async t=>{
@@ -100,4 +100,5 @@ test('individual member permissions use a popup with the existing permission val
  w.json=async(url,options)=>{if(options?.method==='PUT'){calls.push({url,options});return {};}if(url==='/api/workspaces/w/members')return [{userName:'lisa',displayName:'Lisa',isActive:true,permissions:{accessWorkspace:true,view:true}}];return original(url,options);};
  await w.StudioWorkspaceManagement.render();await w.editWorkspaceMember('w','lisa','Lisa');const form=w.document.querySelector('dialog:not([id]) form');assert.ok(form);assert.equal(form.elements.namedItem('view').checked,true);assert.equal(form.elements.namedItem('editWorkspace').checked,false);form.elements.namedItem('replyRequester').checked=true;await form.onsubmit({preventDefault(){}});const write=calls.find(call=>call.options?.method==='PUT');assert.equal(write.url,'/api/workspaces/w/members/lisa');const payload=JSON.parse(write.options.body);assert.equal(payload.permissions.replyRequester,true);assert.equal(payload.permissions.view,true);assert.equal(payload.permissions.editWorkspace,false);assert.ok(w.document.querySelector('dialog #workspaceMemberPanel'));
 });
+
 
