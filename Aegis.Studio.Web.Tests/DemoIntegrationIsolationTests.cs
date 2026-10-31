@@ -13,7 +13,7 @@ using Npgsql;
 
 namespace Aegis.Studio.Web.Tests;
 
-public sealed class DemoIntegrationIsolationTests
+public sealed class ExternalIntegrationIsolationTests
 {
     [StudioPostgresFact]
     public async Task MaintenanceDatabaseIdentityUsesTheServerAddressWithoutAnInetNetworkMask()
