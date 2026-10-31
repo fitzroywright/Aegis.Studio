@@ -143,7 +143,7 @@ window.StudioBookingSessions=(()=>{
                 if(!field('editor').contains(document.activeElement))paintDetails();
             }
         });
-        const advanced=row=>({description:row.description,setupBufferMinutes:row.setupBufferMinutes,cleanupBufferMinutes:row.cleanupBufferMinutes,defaultWorkspaceId:row.defaultWorkspaceId,resourceRequirements:clone(row.resourceRequirements||{})});
+        const advanced=row=>({name:row.name,category:row.category,durationMinutes:row.durationMinutes,price:row.price,deposit:row.deposit,locations:clone(row.locations||[]),description:row.description,setupBufferMinutes:row.setupBufferMinutes,cleanupBufferMinutes:row.cleanupBufferMinutes,defaultWorkspaceId:row.defaultWorkspaceId,resourceRequirements:clone(row.resourceRequirements||{})});
         function paintDetails(){
             const row=state.sessions.find(item=>item.id===state.selected),editor=field('editor');
             editor.hidden=!row;if(!row)return;
