@@ -243,7 +243,7 @@
             genericView.innerHTML=StudioPage.html({title,showHeader:false,content:'<section class="admin-card"><h2>Sign in required</h2><p>Sign in to view Studio information and support.</p></section>'});StudioPage.bind(genericView,current);return;
         }
         if(view!=='about'&&!isAdministrator){
-            genericView.innerHTML=StudioPage.html({title,showHeader:false,content:'<section class="admin-card"><h2>Administrator access required</h2><p>Your account does not have permission to administer Studio.</p></section>'});StudioPage.bind(genericView,current);
+            window.StudioAccess.page({title});
             return;
         }
 
@@ -341,6 +341,7 @@
     const routeAliases={today:'dashboard',admin:'about','studio-management':'about','demo-data':'about','api-site-key':'about','booking-sessions':'catalog','job-templates':'templates','work-order-templates':'templates','workflows-admin':'templates','staff-admin':'staff-roles','roles-admin':'staff-roles'};
     const canonicalRoute=view=>routeAliases[view]||view;
     const routes={
+        'access-pending':()=>window.StudioAccess.page({kind:'pending'}),
         dashboard:()=>window.StudioDashboard.render(),
         notifications:()=>showNotifications(),
         clients:()=>window.StudioClients.render({clientId:window.history.state?.studioClientId,tab:window.history.state?.studioClientTab}),
@@ -419,6 +420,12 @@
     window.studioBeginJobNavigation=(id,options={})=>beginNavigation('workspaces',{...options,jobId:id});
 
     window.studioNavigate=async function(view,options={}){
+        if(window.studioSignedInUserReady){
+            const user=await window.studioSignedInUserReady;
+            if(!user)return;
+        }
+        if(window.StudioAccess?.pending()&&view!=='about')view='access-pending';
+        else if(view==='access-pending'&&!window.StudioAccess?.pending())view='dashboard';
         if(view==='workflows-admin')options={...options,kind:'Automation'};
         if(view==='job-templates'||view==='work-order-templates')options={...options,kind:view==='work-order-templates'?'WorkOrder':'Job'};
         if(view==='booking-sessions')options={...options,tab:'booking-sessions'};
@@ -433,6 +440,11 @@
             window.studioSetBreadcrumb?.([{label:navigationLabels[view]||view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
         }
         try{
+            if(['catalog','templates'].includes(view)){
+                const me=await json('/api/auth/me');
+                if(revision!==navigationRevision)return;
+                if((me?.user||me)?.isAdministrator!==true){window.StudioAccess.page({title:navigationLabels[view]});window.StudioShell?.sync(view);return;}
+            }
             if(view==='workspaces'&&context.studioJobId)await window.openWorkspaceJob(context.studioJobId,{navigationRecorded:true,history:false});
             else await route();
             if(revision===navigationRevision){
@@ -442,6 +454,8 @@
             }
         }catch(error){
             if(revision!==navigationRevision)return;
+            if(error?.status===403){window.StudioAccess.page({title:navigationLabels[view]||view});return;}
+            if(error?.status===401){window.location.replace('/login');return;}
             conversationView.classList.add('hidden');
             genericView.classList.remove('hidden');
             genericView.innerHTML='<div class="studio-page-heading"><h1>Unable to load view</h1></div><div class="studio-card"><p>'+esc(error?.message||error)+'</p></div>';
@@ -476,4 +490,5 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+
 
