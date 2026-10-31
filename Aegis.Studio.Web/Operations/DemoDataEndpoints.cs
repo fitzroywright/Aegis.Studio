@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Media;
 using Microsoft.AspNetCore.Authorization;
 using Npgsql;
 using Common.Storage;
@@ -58,6 +59,7 @@ public static class DemoDataEndpoints
 
         DemoDataExpansion.PreparePhotos(report);
         DemoDataExpansion.PrepareStaffPhotos(report);
+        MediaProductionEndpoints.EnsureWorkspaceCoverSchema(database);
 
         // Phase 1: create the high-volume operational workload in small, durable batches.
         // Each batch owns only deterministic DEMO ids, so retries are safe and do not
@@ -105,13 +107,14 @@ public static class DemoDataEndpoints
         report?.Invoke(new(30, "Presentation records", 0, 0, "Linking wedding people, tasks and announcements."));
         bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
         bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage, report);
-        SeedDistinctStaffPhotos(database, report);
         DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
         DemoJobWorkflowGraphs.Seed(connection,transaction,login);
+        SeedWorkspaceCovers(connection,transaction,report);
         report?.Invoke(new(96, "Committing rich demo", 0, 0, "Saving historical workflow and media data."));
         transaction.Commit();
         DemoJobPhotoPopulation.Seed(database,storage,login,report);
         DemoDatasetFinalizer.Complete(database,storage,login,report);
+        SeedDistinctStaffPhotos(database,report);
 
         return fullStudioExpanded
             ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days across all six workspaces, plus the full Studio media demonstration."
@@ -120,6 +123,50 @@ public static class DemoDataEndpoints
                 : expanded
                     ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days. Legacy demo media also expanded."
                     : $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days; existing rich demo data is already up to date.";
+    }
+
+    private static readonly (string Category,int Variant)[] WorkspaceCoverSources =
+    [
+        ("people",0),
+        ("wedding",0),
+        ("graduation",0),
+        ("graduation",1),
+        ("product",0),
+        ("sports",0)
+    ];
+
+    private static void SeedWorkspaceCovers(NpgsqlConnection connection,NpgsqlTransaction transaction,Action<DemoSeedProgress>? report)
+    {
+        var workspaces=new List<(Guid Id,string Name)>();
+        using(var query=new NpgsqlCommand("select id,name from studio_workspaces where system_key is distinct from 'unassigned' order by sort_order,name",connection,transaction))
+        using(var reader=query.ExecuteReader())
+            while(reader.Read())workspaces.Add((reader.GetGuid(0),reader.GetString(1)));
+
+        using(var clearUnassigned=new NpgsqlCommand("delete from studio_workspace_covers where workspace_id in (select id from studio_workspaces where system_key='unassigned')",connection,transaction))
+            clearUnassigned.ExecuteNonQuery();
+
+        for(int index=0;index<workspaces.Count;index++)
+        {
+            var source=WorkspaceCoverSources[index%WorkspaceCoverSources.Length];
+            string[] files=DemoDataExpansion.LocalPhotos(source.Category);
+            if(files.Length==0)throw new InvalidOperationException($"No demo workspace photograph is available for category '{source.Category}'.");
+            string file=files[source.Variant%files.Length];
+            using var decoded=StudioImageProcessor.DecodeOriented(File.OpenRead(file));
+            using var resized=StudioImageProcessor.ResizeMax(decoded,1600);
+            byte[] content=StudioImageProcessor.EncodeJpeg(resized,90);
+            using var save=new NpgsqlCommand("""
+                insert into studio_workspace_covers(workspace_id,content_type,image_data,updated_at_utc)
+                values($1,'image/jpeg',$2,now())
+                on conflict(workspace_id) do update set
+                  content_type=excluded.content_type,
+                  image_data=excluded.image_data,
+                  updated_at_utc=now()
+                """,connection,transaction);
+            save.Parameters.AddWithValue(workspaces[index].Id);
+            save.Parameters.AddWithValue(content);
+            save.ExecuteNonQuery();
+            report?.Invoke(new(94,"Linking workspace photographs",index+1,workspaces.Count,$"Assigned a photograph to {workspaces[index].Name}."));
+        }
     }
 
     private static void SeedDistinctStaffPhotos(StudioDatabase database, Action<DemoSeedProgress>? report)

@@ -70,6 +70,83 @@ internal static class DemoDatasetFinalizer
                 select distinct assigned_to,initcap(replace(substring(assigned_to from 6),'.',' ')),true,true,'Demo'
                   from studio_job_activities where assigned_to like 'demo.%'
                 on conflict(user_name) do nothing;
+
+                insert into studio_worker_types(code,display_name,can_be_primary,is_active)
+                values
+                  ('FRONT_DESK','Front Desk',false,true),
+                  ('SCHEDULER','Scheduler',false,true),
+                  ('MEDIA_INGEST','Media Ingest',false,true),
+                  ('CULLING','Culling',false,true),
+                  ('PRODUCTION','Production',false,true),
+                  ('QUALITY_CONTROL','Quality Control',false,true),
+                  ('ASSISTANT','Studio Assistant',false,true)
+                on conflict(code) do update set display_name=excluded.display_name,is_active=true,updated_at_utc=now();
+
+                insert into studio_workers(user_name,display_name,worker_type_code,is_active,updated_at_utc)
+                select e.user_name,e.display_name,
+                  case e.user_name
+                    when 'demo.sam' then 'PHOTOGRAPHER' when 'demo.jason' then 'PHOTOGRAPHER'
+                    when 'demo.anna' then 'PHOTOGRAPHER' when 'demo.michael' then 'PHOTOGRAPHER'
+                    when 'demo.frontdesk' then 'FRONT_DESK' when 'demo.scheduler' then 'SCHEDULER'
+                    when 'demo.ingest' then 'MEDIA_INGEST' when 'demo.culling' then 'CULLING'
+                    when 'demo.edit' then 'EDITOR' when 'demo.retouch' then 'RETOUCHER'
+                    when 'demo.qc' then 'QUALITY_CONTROL' when 'demo.production' then 'PRODUCTION'
+                    when 'demo.delivery' then 'DELIVERY' when 'demo.editor' then 'EDITOR'
+                    when 'demo.retoucher' then 'RETOUCHER' when 'demo.reviewer' then 'REVIEWER'
+                    else 'ASSISTANT'
+                  end,e.is_active,now()
+                from studio_employees e where e.user_name like 'demo.%'
+                on conflict(user_name) do update set
+                  display_name=excluded.display_name,
+                  worker_type_code=excluded.worker_type_code,
+                  is_active=excluded.is_active,
+                  updated_at_utc=now();
+
+                with role_map(user_name,role_code) as (values
+                  ('demo.sam','PHOTOGRAPHER'),('demo.sam','REVIEWER'),
+                  ('demo.jason','PHOTOGRAPHER'),('demo.jason','SCHEDULER'),
+                  ('demo.anna','PHOTOGRAPHER'),
+                  ('demo.michael','PHOTOGRAPHER'),('demo.michael','EDITOR'),
+                  ('demo.frontdesk','FRONT_DESK'),('demo.scheduler','SCHEDULER'),
+                  ('demo.ingest','MEDIA_INGEST'),('demo.culling','CULLING'),
+                  ('demo.edit','EDITOR'),('demo.retouch','RETOUCHER'),
+                  ('demo.qc','QUALITY_CONTROL'),('demo.qc','REVIEWER'),
+                  ('demo.production','PRODUCTION'),('demo.production','REVIEWER'),
+                  ('demo.delivery','DELIVERY'),('demo.editor','EDITOR'),
+                  ('demo.retoucher','RETOUCHER'),('demo.reviewer','REVIEWER')
+                )
+                insert into studio_worker_roles(user_name,role_code,is_active,updated_at_utc)
+                select m.user_name,m.role_code,e.is_active,now()
+                from role_map m join studio_employees e on e.user_name=m.user_name
+                on conflict(user_name,role_code) do update set is_active=excluded.is_active,updated_at_utc=now();
+
+                insert into studio_worker_roles(user_name,role_code,is_active,updated_at_utc)
+                select e.user_name,'ASSISTANT',e.is_active,now()
+                from studio_employees e
+                where e.user_name like 'demo.%'
+                  and not exists(select 1 from studio_worker_roles r where r.user_name=e.user_name)
+                on conflict(user_name,role_code) do update set is_active=excluded.is_active,updated_at_utc=now();
+
+                insert into studio_global_operational_role_members(role_id,user_name,display_name,is_active,created_at_utc,updated_at_utc)
+                select r.id,e.user_name,e.display_name,e.is_active,now(),now()
+                from studio_employees e cross join studio_global_operational_roles r
+                where e.user_name like 'demo.%' and r.name='User'
+                on conflict(role_id,user_name) do update set display_name=excluded.display_name,is_active=excluded.is_active,updated_at_utc=now();
+
+                with access_map(user_name,role_name) as (values
+                  ('demo.frontdesk','Front Desk'),
+                  ('demo.scheduler','Operations Manager'),
+                  ('demo.ingest','Media Custodian'),('demo.culling','Media Custodian'),
+                  ('demo.editor','Production Manager'),('demo.edit','Production Manager'),
+                  ('demo.retoucher','Production Manager'),('demo.retouch','Production Manager'),
+                  ('demo.reviewer','Production Manager'),('demo.qc','Production Manager'),
+                  ('demo.production','Production Manager'),('demo.delivery','Production Manager')
+                )
+                insert into studio_global_operational_role_members(role_id,user_name,display_name,is_active,created_at_utc,updated_at_utc)
+                select r.id,e.user_name,e.display_name,e.is_active,now(),now()
+                from access_map m join studio_employees e on e.user_name=m.user_name
+                  join studio_global_operational_roles r on r.name=m.role_name
+                on conflict(role_id,user_name) do update set display_name=excluded.display_name,is_active=excluded.is_active,updated_at_utc=now();
                 """);
             transaction.Commit();
             void Run(string sql) { using var command = new NpgsqlCommand(sql, connection, transaction); command.ExecuteNonQuery(); }

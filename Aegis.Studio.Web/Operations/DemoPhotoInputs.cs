@@ -112,20 +112,22 @@ internal static partial class DemoDataExpansion
 
     internal static string[] StaffPhotos()
     {
-        string localDirectory=Path.Combine(photoLibraryRoot,"staff");
-        string[] local=Directory.Exists(localDirectory)
-            ? Directory.EnumerateFiles(localDirectory)
+        static string[] Images(string directory)=>Directory.Exists(directory)
+            ? Directory.EnumerateFiles(directory)
                 .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
                 .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray()
             : [];
-        if(local.Length>=4)return local;
 
-        string bundledDirectory=Path.Combine(AppContext.BaseDirectory,"Demo","staff");
-        return Directory.Exists(bundledDirectory)
-            ? Directory.EnumerateFiles(bundledDirectory)
-                .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
-                .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray()
-            : local;
+        string[] local=Images(Path.Combine(photoLibraryRoot,"staff"));
+        string[] bundled=Images(Path.Combine(AppContext.BaseDirectory,"Demo","staff"));
+        var hashes=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unique=new List<string>();
+        foreach(string file in local.Concat(bundled))
+        {
+            string hash=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(file)));
+            if(hashes.Add(hash))unique.Add(file);
+        }
+        return unique.ToArray();
     }
 
     internal static void PrepareStaffPhotos(Action<DemoSeedProgress>? report)

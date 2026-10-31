@@ -80,7 +80,7 @@ public class FullDemoRegenerationTests
         string? previousPhotoRoot=Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS");
         string photoRoot=Path.Combine(Path.GetTempPath(),"aegis-demo-photo-library-"+Guid.NewGuid().ToString("N"));
         byte[] photo=await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory,"Fixtures","portrait.jpg"));
-        foreach(string category in new[]{"people","wedding","graduation","family","sports","product"})
+        foreach(string category in new[]{"people","wedding","graduation","family","sports","product","staff"})
         {
             string directory=Path.Combine(photoRoot,category);Directory.CreateDirectory(directory);
             for(int i=0;i<4;i++)await File.WriteAllBytesAsync(Path.Combine(directory,$"fixture-{i}.jpg"),photo);
@@ -132,6 +132,13 @@ public class FullDemoRegenerationTests
             Assert.Equal("Graduation Photography",Scalar(ctx.Connection,"select definition->>'name' from studio_job_template_instances where job_id='de000000-0000-4000-0041-000000000401'"));
             Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_job_activities a join studio_jobs j on j.id=a.job_id where j.status in ('Active Production','Awaiting Approval','Changes Requested','Ready for Delivery','Delivered','Completed') and a.workflow_node_id in ('review','capture/shoot','capture/ingest') and a.status<>'Completed'"));
             Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_job_activities a where a.assigned_to like 'demo.%' and not exists(select 1 from studio_employees e where e.user_name=a.assigned_to)"));
+            Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_employees where user_name like 'demo.%'"))>=13);
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_employees e where e.user_name like 'demo.%' and not exists(select 1 from studio_employee_photos p where lower(p.user_name)=lower(e.user_name) and p.source='DemoStaff')"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_employees e where e.user_name like 'demo.%' and e.is_active and not exists(select 1 from studio_worker_roles m join studio_worker_types r on r.code=m.role_code where m.user_name=e.user_name and m.is_active and r.is_active)"));
+            Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from (select user_name from studio_worker_roles where is_active and user_name like 'demo.%' group by user_name having count(*)>1) staff_with_multiple_roles"))>=3);
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_employees e where e.user_name like 'demo.%' and e.is_active and not exists(select 1 from studio_global_operational_role_members m join studio_global_operational_roles r on r.id=m.role_id join studio_global_operational_role_permissions p on p.role_id=r.id where m.user_name=e.user_name and m.is_active and r.is_active)"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_workspaces w where w.system_key is distinct from 'unassigned' and not exists(select 1 from studio_workspace_covers c where c.workspace_id=w.id and octet_length(c.image_data)>0)"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_workspace_covers c join studio_workspaces w on w.id=c.workspace_id where w.system_key='unassigned'"));
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_job_subjects where job_id='de000000-0000-4000-0041-000000000201' and name='Emily Carter'"))>0);
         }
         finally{Environment.SetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS",previousPhotoRoot);if(Directory.Exists(photoRoot))Directory.Delete(photoRoot,true);}
