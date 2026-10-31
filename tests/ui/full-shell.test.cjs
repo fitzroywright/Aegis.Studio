@@ -54,7 +54,7 @@ test('the full shell loads every operational screen with a shared data graph',as
  try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-detail-board'),w.document.getElementById('detailPane').textContent);assert.equal(w.document.querySelectorAll('.jd-photo').length,12)}catch(e){errors.push('job: '+e.message)}
  dom.window.close();assert.deepEqual(errors,[]);});
 
-test('cold workspace opening loads server permissions and keeps actual denial on the landing page',async()=>{
+test('cold workspace opening loads server permissions and presents actual denial in the shared view',async()=>{
  const errors=[],requests=[],vc=new VirtualConsole();let denied=false;
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc,pretendToBeVisual:true}),w=dom.window;
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.remove()};w.HTMLElement.prototype.scrollIntoView=function(){};w.alert=e=>errors.push(String(e));
@@ -72,10 +72,11 @@ test('cold workspace opening loads server permissions and keeps actual denial on
   assert.equal(w.history.state.studioWorkspaceId,'w0');
   denied=true;await w.studioNavigate('workspaces');
   await w.document.querySelector('[data-open-workspace="w1"]').onclick();
-  assert.match(errors.at(-1),/do not have permission/);
+  assert.deepEqual(errors,[]);assert.match(w.document.getElementById('genericView').textContent,/You don’t have access to this page/);
   assert.equal(w.eval('selectedWorkspace'),'w0');
   assert.equal(w.document.getElementById('genericView').classList.contains('hidden'),false);
  }finally{dom.window.close();}
 });
+
 
 

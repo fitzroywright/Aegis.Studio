@@ -353,3 +353,46 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .studio-enquiry-follows{padding-left:18px;color:var(--theme-muted,#69758b);font-size:12px;line-height:1.9}
 @media(max-width:760px){.studio-next-action{grid-template-columns:minmax(0,1fr)}.studio-next-meta{flex-direction:row;flex-wrap:wrap}.studio-enquiry-columns{grid-template-columns:minmax(0,1fr)}.studio-enquiry-columns>aside{padding-left:0;border-left:0;border-top:1px solid var(--theme-border,#dce3eb);padding-top:14px}}
 
+/* Shared access states: page denial, restricted sections and pending enrollment. */
+.studio-access-state {
+    display: grid;
+    place-items: center;
+    min-height: 100%;
+    padding: clamp(24px, 5vw, 64px);
+    box-sizing: border-box;
+    color: var(--text, #243447);
+}
+.studio-access-card {
+    width: min(100%, 720px);
+    text-align: center;
+}
+.studio-access-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background: var(--surface-muted, #edf3fb);
+    color: var(--accent, #2868b2);
+}
+.studio-access-icon svg { width: 42px; height: 42px; }
+.studio-access-card h1, .studio-access-card h2 {
+    margin: 24px 0 14px;
+    font-size: clamp(22px, 2.5vw, 32px);
+    line-height: 1.25;
+}
+.studio-access-card p { line-height: 1.6; margin: 0 auto 20px; max-width: 620px; }
+.studio-access-identity {
+    margin: 28px auto;
+    padding: 20px;
+    border: 1px solid var(--border, #d9e1eb);
+    border-radius: 10px;
+    text-align: left;
+    max-width: 510px;
+}
+.studio-access-identity div { display: flex; gap: 20px; flex-wrap: wrap; padding: 6px 0; }
+.studio-access-identity dt { flex: 0 0 130px; }
+.studio-access-identity dd { margin: 0; overflow-wrap: anywhere; flex: 1 1 180px; font-weight: 600; }
+.studio-access-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 26px 0; }
+.studio-access-card .studio-access-help { font-size: 13px; opacity: .8; }
+.studio-access-section { min-height: 260px; padding: 28px; }

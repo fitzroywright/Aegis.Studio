@@ -33,6 +33,7 @@
     })[character]);
 
     function labelFor(view) {
+        if(view==='access-pending')return 'Access Pending';
         return window.StudioAdmin?.entries.find(entry=>entry.view===view)?.label || ({clients:'Client Management','workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',about:'About','staff-roles':'Staff and Roles','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
             || String(view || 'Studio').replace(/(^|\s)\S/g, match => match.toUpperCase());
     }
@@ -128,6 +129,7 @@
     }
 
     function ensureWorkspaceListLoaded() {
+        if(window.StudioAccess?.pending())return Promise.resolve();
         const cache = typeof workspaceCache !== 'undefined' ? workspaceCache : window.workspaceCache;
         if (Array.isArray(cache) && cache.length) return Promise.resolve();
         if (workspaceLoadPromise || workspaceLoadAttempted || typeof loadWorkspaces !== 'function') return workspaceLoadPromise || Promise.resolve();
@@ -142,6 +144,7 @@
     }
 
     function refreshWorkspaceMenu() {
+        if(window.StudioAccess?.pending()){renderFooterWorkspaceMenu([]);return;}
         const cache = typeof workspaceCache !== 'undefined' ? workspaceCache : window.workspaceCache;
         const workspaces = document.body.dataset.studioView === 'production' && productionWorkspaceFilter
             ? productionWorkspaceFilter.workspaces
@@ -171,6 +174,7 @@
         control.replaceChildren();
         const all = new Option('Workspaces: All', '');
         control.add(all);
+        if(window.StudioAccess?.pending()){all.textContent='No workspace assigned';control.disabled=true;control.onchange=null;return;}
         workspaces.forEach(workspace => control.add(new Option(workspace.name || workspace.title || 'Workspace', String(workspace.id))));
         control.value = workspaces.some(workspace => String(workspace.id) === selectedId) ? selectedId : '';
         control.onchange = () => {
@@ -204,7 +208,7 @@
     window.studioSetBreadcrumb = items => {
         if (!breadcrumb) return;
         const supplied = Array.isArray(items) ? items.filter(Boolean) : [];
-        const crumbs = supplied[0]?.view === 'dashboard'
+        const crumbs = window.StudioAccess?.pending() ? supplied : supplied[0]?.view === 'dashboard'
             ? supplied
             : [{ label: 'Today', view: 'dashboard' }, ...supplied];
         breadcrumb.innerHTML = '<span class="breadcrumb-label">Navigation History</span>' + crumbs.map((item, index) => {
@@ -290,6 +294,8 @@
     // All non-Today views use the same masthead and content frame as Today.
     // The Today route is deliberately excluded from these structural changes.
     function syncPageFrame() {
+        const pending=!!window.StudioAccess?.pending();
+        for(const node of document.querySelectorAll('.studio-navigation-scroll,#studioAttentionTrigger,#studioSessionsTrigger,#notificationButton,#studioContentSearch,#profileButton,[data-studio-avatar-notifications]'))node.classList.toggle('hidden',pending);
         const view = document.body.dataset.studioView || currentView;
         const isToday = view === 'dashboard';
         const announcement = document.getElementById('studioLoginAnnouncements');
@@ -522,6 +528,7 @@
     }
 
     function loadSharedSessions() {
+        if(window.StudioAccess?.pending())return Promise.resolve();
         if (sessionsRequest) return sessionsRequest;
         sessionsState = 'loading';
         refreshPageDrawers();
@@ -552,7 +559,8 @@
         refreshPageDrawers();
     }
 
-    function initialize() {
+    async function initialize() {
+        if(window.studioSignedInUserReady){const user=await window.studioSignedInUserReady;if(!user)return;}
         document.querySelector('[data-studio-home]')?.addEventListener('click', event => {
             if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
             event.preventDefault();
@@ -570,8 +578,9 @@
         syncPageFrame();
         initializeAttentionDrawer();
         refreshPageDrawers();
+        syncPageFrame();
         loadSharedSessions();
-        void loadSharedAttention();
+        if(!window.StudioAccess?.pending())void loadSharedAttention();
         syncGridFooterCount();
         window.addEventListener('studio-jobs-view-changed',()=>{refreshWorkspaceMenu();syncPageFrame();});
         window.addEventListener('studio-next-actions-changed',()=>{void loadSharedAttention();});
@@ -610,4 +619,5 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })()
+
 

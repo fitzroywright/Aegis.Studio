@@ -6,12 +6,12 @@ test('login options failure leaves credential sign-in disabled',async t=>{
  const w=dom.window;w.fetch=async()=>({ok:false});w.eval(fs.readFileSync(path.join(root,'login.js'),'utf8'));await settle();
  assert.equal(w.document.getElementById('signInButton').disabled,true);assert.match(w.document.getElementById('error').textContent,/Could not load/);
 });
-test('pending login shows approval state and clears the password without navigating',async t=>{
- const dom=new JSDOM(fs.readFileSync(path.join(root,'login.html'),'utf8'),{url:'https://studio.test/login',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window,requests=[];
+test('pending login opens the access-pending page and clears the password',async t=>{
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'login.html'),'utf8'),{url:'https://studio.test/login',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window,requests=[],redirects=[];w.recordRedirect=url=>redirects.push(url);
  w.fetch=async(url,options)=>{requests.push({url,options});return {ok:true,status:200,json:async()=>url.endsWith('/options')?{sources:['LocalDatabase'],defaultSource:'LocalDatabase',entraEnabled:false}:{accountState:'PendingAccess'}}};
- w.eval(fs.readFileSync(path.join(root,'login.js'),'utf8'));await settle();w.document.getElementById('userName').value='approved-alias';w.document.getElementById('password').value='temporary-local-password';
+ w.eval(fs.readFileSync(path.join(root,'login.js'),'utf8').replaceAll("location.replace('/#studio=access-pending')","window.recordRedirect('/#studio=access-pending')"));await settle();w.document.getElementById('userName').value='approved-alias';w.document.getElementById('password').value='temporary-local-password';
  w.document.getElementById('loginForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await settle();
- assert.match(w.document.getElementById('error').textContent,/Pending Access/);assert.equal(w.location.pathname,'/login');assert.equal(w.document.getElementById('password').value,'');
+ assert.deepEqual(redirects,['/#studio=access-pending']);assert.equal(w.document.getElementById('password').value,'');
  assert.equal(Object.hasOwn(JSON.parse(requests.at(-1).options.body),'source'),false);
 });
 test('account provisioning retry preserves the pending account after a profile save failure',async t=>{
@@ -25,5 +25,6 @@ test('account provisioning retry preserves the pending account after a profile s
  await w.saveStudioEmployee();assert.equal(creates,1);assert.match(w.document.getElementById('employeeAccountStatus').textContent,/Profile save unavailable/);assert.equal(w.document.getElementById('employeeLocalPassword').value,'');
  await w.saveStudioEmployee();assert.equal(creates,1);assert.equal(profileAttempts,2);assert.match(w.document.querySelector('[data-staff-approvals]').textContent,/awaiting approval/);assert.equal(w.document.querySelector('.staff-person-form input[readonly]').value,'Local account');
 });
+
 
 

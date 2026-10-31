@@ -25,9 +25,10 @@ async function loadSignedInUser() {
     }
 
     const payload = await response.json();
-    if(payload.accountState && payload.accountState !== 'Active'){window.location.replace('/login?pending=1');return;}
     const user = payload.user || payload;
-    try{
+    window.StudioAccess?.setSession(payload);
+    if(payload.accountState && !['Active','PendingAccess'].includes(payload.accountState)){window.location.replace('/login');return;}
+    if(!window.StudioAccess?.pending())try{
         const capabilities=await fetch('/api/workflow/capabilities');
         if(capabilities.ok){window.studioWorkflowCapabilities=await capabilities.json();window.dispatchEvent(new Event('studio-workflow-capabilities'));}
     }catch{/* Operational navigation remains permission-gated by the server. */}
@@ -81,4 +82,5 @@ async function loadSignedInUser() {
 }
 
 window.studioSignedInUserReady = loadSignedInUser();
+
 

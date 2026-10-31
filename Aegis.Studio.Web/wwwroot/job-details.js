@@ -302,16 +302,24 @@
    };
   }
 
+  function restrict(){
+   canEdit=false;data=null;selected.clear();photoDialog?.close();selectionDialog?.close();host.ondrop=null;host.ondragover=null;
+   const detail=host.closest('#detailPane');if(detail){delete detail.dataset.mediaCount;delete detail.dataset.subjectCount;detail.dataset.productionEnabled='false';}
+   root.StudioAccess.render(host,{kind:'section',title:'job media',description:'Your role does not allow you to view photographs or attachments for this job. You can continue working with the job information available to you.'});
+  }
   async function load(){
    const version=++request;
    host.setAttribute('aria-busy','true');
    try{
     const q=new URLSearchParams({limit:'12'});for(const [name,value] of Object.entries({collection,subjectId:subject,assetId,after}))if(value)q.set(name,value);
-    const [snapshot,access]=await Promise.all([json(`/api/jobs/${job.id}/media?${q}`),json(`/api/jobs/${job.id}/access`)]);
+    const access=await json(`/api/jobs/${job.id}/access`);
+    if(!current()||version!==request)return;
+    if((access.permissions||access).viewAttachments===false){restrict();return;}
+    const snapshot=await json(`/api/jobs/${job.id}/media?${q}`);
     if(!current()||version!==request)return;
     data=snapshot;canEdit=!!(access.permissions||access).manageProduction;draw();
     const counts=Object.values(data.collectionCounts||{});onCounts(counts.length?counts.reduce((a,b)=>a+Number(b),0):data.totalAssets??data.assets.length,data.totalSubjects??data.subjects.length,access.permissions||access);
-   }catch(error){if(current()&&version===request){host.innerHTML='<p role="alert"></p><button type="button" class="jd-save">Retry</button>';host.querySelector('p').textContent=error.message;host.querySelector('button').onclick=load;}}
+   }catch(error){if(current()&&version===request){if(error?.status===403){restrict();return;}host.innerHTML='<p role="alert"></p><button type="button" class="jd-save">Retry</button>';host.querySelector('p').textContent=error.message;host.querySelector('button').onclick=load;}}
    finally{if(current()&&version===request)host.removeAttribute('aria-busy');}
   }
   async function upload(files,target=collection||data?.gallery?.default_collection||'Unclassified'){
@@ -355,3 +363,4 @@
  }
  root.StudioJobDetails={media,openGallery,workflowAction,stageAge};
 })(window);
+

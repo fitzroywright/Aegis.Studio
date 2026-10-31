@@ -6,7 +6,7 @@ function setup(t,administrator=true){
  w.json=async url=>url==='/api/auth/me'?{user:{isAdministrator:administrator}}:url==='/api/admin/studio-status'?{database:'Ready',storage:{provider:'Local',available:true,writable:true},previews:{queued:2,failed:0,unsupported:0},messaging:{queuedEmails:1,failedNotifications:0},checkedAtUtc:'2026-10-27T22:00:00Z'}:[];
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  w.ResizeObserver=class{observe(){} disconnect(){}};w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
- for(const file of ['studio-message-card.js','studio-page.js','studio-admin.js','booking-sessions.js','commercial.js','studio-navigation.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));
+ for(const file of ['studio-access.js','studio-message-card.js','studio-page.js','studio-admin.js','booking-sessions.js','commercial.js','studio-navigation.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));
  return {w,dom};
 }
 test('About contains product, support, service health and demo tools; Staff and Roles share one page',async t=>{
@@ -30,7 +30,7 @@ test('About contains product, support, service health and demo tools; Staff and 
 });
 test('Staff and Roles retains its administrator access check',async t=>{
  const {w}=setup(t,false);await w.studioNavigate('staff-roles');
- assert.match(w.document.getElementById('genericView').textContent,/Administrator access required/);assert.equal(w.document.querySelector('[data-demo-remove]'),null);
+ assert.match(w.document.getElementById('genericView').textContent,/You don’t have access to this page/);assert.equal(w.document.querySelector('[data-demo-remove]'),null);
 });
 test('ordinary signed-in staff can open About without privileged controls or API reads',async t=>{
  const {w}=setup(t,false);const read=w.json,calls=[];w.json=async(url,options)=>{calls.push(url);return read(url,options);};
@@ -59,7 +59,7 @@ test('the avatar menu contains one Preferences action and no separate Administra
 
 test('every extracted admin route denies non-administrators before rendering controls',async t=>{
  const {w}=setup(t,false);for(const view of ['staff-admin','roles-admin','workflows-admin']){
-  await w.studioNavigate(view);assert.match(w.document.getElementById('genericView').textContent,/Administrator access required/);assert.equal(w.document.querySelector('[data-about-api-key],[data-api-key-generate],[data-demo-remove],#publicBookingCatalog'),null);
+  await w.studioNavigate(view);assert.match(w.document.getElementById('genericView').textContent,/You don’t have access to this page/);assert.equal(w.document.querySelector('[data-about-api-key],[data-api-key-generate],[data-demo-remove],#publicBookingCatalog'),null);
  }
 });
 test('About support card opens the existing key generator in a dialog without changing the page',async t=>{
@@ -78,5 +78,6 @@ test('About retains demo removal confirmation and does not mutate data on cancel
  w.prompt=()=>null;const button=w.document.querySelector('[data-demo-remove]');await button.onclick();assert.equal(writes.length,0);
  w.prompt=()=>'REMOVE STUDIO DEMO DATA';await button.onclick();assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/admin/connected-workflow/demo-data/remove');assert.equal(JSON.parse(writes[0].options.body).confirmation,'REMOVE STUDIO DEMO DATA');assert.equal(button.disabled,false);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Demo removed/);
 });
+
 
 
