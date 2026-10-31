@@ -19,7 +19,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
     const display = () => { conversationView.classList.remove('hidden'); genericView.classList.add('hidden'); document.body.dataset.studioView='workspaces'; };
     async function selectWorkspaceView(id, name) {
         const workspace = workspaceCache.find(x => String(x.id) === String(id));
-        if (!workspace?.permissions?.accessWorkspace || !workspace.permissions.view) return alert('You do not have permission to view this workspace.');
+        if (!workspace?.permissions?.accessWorkspace || !workspace.permissions.view) return window.StudioAccess.page({title:'this workspace'});
         const version=++revision;
         disposeJobView();disposeJobView=()=>{};
         selectedWorkspace = workspace.id; selectedJob = null; selectedConversation = null;
@@ -45,6 +45,8 @@ function mergeJobMessages(teamMessages, clientMessages) {
     }
     window.StudioWorkspace={select:selectWorkspaceView,load:loadWorkspaceConversations,invalidate(){revision++;disposeJobView();disposeJobView=()=>{};}};
     window.openWorkspaceJob = async function(id,options={}) {
+        if(window.studioSignedInUserReady)await window.studioSignedInUserReady;
+        if(window.StudioAccess?.pending())return window.studioNavigate('access-pending');
         if(!options.navigationRecorded)window.studioBeginJobNavigation?.(id,options);
         const version=beginJobLoading();
         try {
@@ -77,6 +79,8 @@ function mergeJobMessages(teamMessages, clientMessages) {
     function jobLoadFailed(error,version,retry) {
         if(!currentJobOpening(version))return;
         detailPane.removeAttribute('aria-busy');
+        if(error?.status===403){window.StudioAccess.page({title:'this job'});return;}
+        if(error?.status===401){window.location.replace('/login');return;}
         detailPane.innerHTML=`<header class="job-detail-heading"><div class="job-detail-title"><h1>${esc(selectedJob?.title||'Job Details')}</h1><p role="status">Unable to load job</p></div></header><div class="job-detail-center"><section class="job-center-panel"><p role="alert">${esc(error.message||String(error))}</p><button type="button" class="action">Retry</button></section></div>`;
         detailPane.querySelector('button').onclick=retry;
     }
@@ -260,6 +264,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                         return true;
                     }catch(error){
                         if(requestCurrent()){
+                            if(error?.status===403){window.StudioAccess.render(host,{kind:'section',title:name==='subjects'?'this Session Plan':'this section'});return false;}
                             host.innerHTML='<p role="alert"></p><button type="button" class="action">Retry</button>';
                             host.querySelector('p').textContent=error.message||String(error);
                             host.querySelector('button').onclick=()=>loadPanel(name,true);
@@ -444,4 +449,5 @@ function mergeJobMessages(teamMessages, clientMessages) {
 
     }
 })();
+
 
