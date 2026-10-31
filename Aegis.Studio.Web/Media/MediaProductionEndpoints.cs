@@ -11,16 +11,23 @@ namespace Aegis.Studio.Web.Media;
 public static class MediaProductionEndpoints
 {
     private static readonly MediaIngestQueue ingestQueue=new();
-    public static void MapMediaProduction(this WebApplication app)
+
+    internal static void EnsureWorkspaceCoverSchema(StudioDatabase database)
     {
-        MediaProductionStore.Migrate(app.Services.GetRequiredService<StudioDatabase>());
-        using(var connection=app.Services.GetRequiredService<StudioDatabase>().OpenConnection())
-        using(var command=new NpgsqlCommand(@"create table if not exists studio_workspace_covers(
+        using var connection=database.OpenConnection();
+        using var command=new NpgsqlCommand(@"create table if not exists studio_workspace_covers(
             workspace_id uuid primary key references studio_workspaces(id) on delete cascade,
             content_type text not null,
             image_data bytea not null,
-            updated_at_utc timestamptz not null default now())",connection))
-            command.ExecuteNonQuery();
+            updated_at_utc timestamptz not null default now())",connection);
+        command.ExecuteNonQuery();
+    }
+
+    public static void MapMediaProduction(this WebApplication app)
+    {
+        StudioDatabase database=app.Services.GetRequiredService<StudioDatabase>();
+        MediaProductionStore.Migrate(database);
+        EnsureWorkspaceCoverSchema(database);
         app.MapGet("/api/today/media",(Guid? jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db)=>
         {
             var allowed=access.GetAccessibleJobIds(user,requireAttachments:true).Where(id=>!jobId.HasValue||id==jobId.Value).ToArray();
