@@ -52,6 +52,8 @@
                 const context=document.createElement('small');context.className='workspace-announcement-context';context.textContent=item.workspaceName;
                 copy.append(kicker,title,body,context,error);
                 const controls=document.createElement('div');controls.className='workspace-announcement-controls';
+                const close=document.createElement('button');close.type='button';close.className='action';close.textContent='×';close.title='Close announcement banner for this session';close.setAttribute('aria-label','Close announcement banner without dismissing notifications');
+                close.onclick=()=>{host.remove();};
                 const position=document.createElement('small');position.className='workspace-announcement-position';
                 const button=document.createElement('button');button.type='button';button.className='action';button.textContent='Dismiss';button.setAttribute('aria-label','Dismiss announcement: '+item.title);
                 button.onclick=async()=>{
@@ -64,7 +66,7 @@
                         else next?.querySelector('button')?.focus();
                     } catch {error.textContent='Could not dismiss. Please try again.';button.disabled=false;}
                 };
-                controls.append(position,button);article.append(symbol,copy,controls);host.append(article);
+                controls.append(position,close,button);article.append(symbol,copy,controls);host.append(article);
             }
             updatePositions();main.prepend(host);
         } catch(error) { console.error('Announcements could not be loaded.', error); }
