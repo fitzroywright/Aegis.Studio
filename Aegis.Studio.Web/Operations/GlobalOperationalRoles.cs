@@ -63,7 +63,7 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         this.database = database ?? throw new ArgumentNullException(nameof(database));
     }
 
-    public void EnsureSchema(IEnumerable<string>? administratorGroups = null)
+    public void EnsureSchema(IEnumerable<string>? administratorGroups = null, IEnumerable<string>? administratorUsers = null)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
@@ -110,7 +110,7 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         if (EnsureRole(UserRoleId, StudioRoleNames.User, "Baseline role for authenticated Studio users.")) created.Add(UserRoleId);
         if (EnsureRole(FrontDeskRoleId, StudioRoleNames.FrontDesk, "Cross-workspace reception and client-service operations.")) created.Add(FrontDeskRoleId);
         if (EnsureRole(OperationsManagerRoleId, StudioRoleNames.OperationsManager, "Overall Studio operational escalation manager.")) created.Add(OperationsManagerRoleId);
-        if (EnsureRole(AdministratorRoleId, StudioRoleNames.Administrator, "Application security and unrestricted administration.")) created.Add(AdministratorRoleId);
+        EnsureRequiredAdministratorRole();
 
         if (EnsureRole(FinanceManagerRoleId, StudioRoleNames.FinanceManager, "Contractual credit, final delivery authorization and outstanding receivables.")) created.Add(FinanceManagerRoleId);
         if (EnsureRole(ProductionManagerRoleId, StudioRoleNames.ProductionManager, "Production dispatch and final technical approval.")) created.Add(ProductionManagerRoleId);
@@ -150,7 +150,10 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
             SeedPermission(OperationsManagerRoleId, permission);
         }
 
-        SeedPermission(AdministratorRoleId, PermissionAuthorizer.AllPermissions);
+        // Administrator is a system invariant rather than an optional reusable role.
+        // Repair its unrestricted permission on every startup in case an older build
+        // allowed the built-in definition to be edited or retired.
+        EnsurePermission(AdministratorRoleId, PermissionAuthorizer.AllPermissions);
 
         void SeedPermission(Guid role, string permission)
         { if (created.Contains(role)) EnsurePermission(role, permission); }
@@ -162,7 +165,17 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
                 SaveGroupMapping(group.Trim(), AdministratorRoleId);
             }
         }
+
+        foreach (string userName in administratorUsers ?? Array.Empty<string>())
+        {
+            if (!string.IsNullOrWhiteSpace(userName))
+                EnsureAdministrator(userName.Trim());
+        }
     }
+
+    public GlobalOperationalRoleMember EnsureAdministrator(string userName, string? displayName = null)
+        => SaveMember(AdministratorRoleId,
+            new GlobalOperationalRoleMemberRequest(userName, displayName ?? userName, true));
 
     public bool HasRole(ClaimsPrincipal user, string role)
     {
@@ -239,6 +252,8 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
 
     public GlobalOperationalRole UpdateRole(Guid roleId,GlobalOperationalRoleDefinitionRequest request)
     {
+        if(roleId==AdministratorRoleId)
+            throw new InvalidOperationException("The built-in Administrator role is required and cannot be edited or retired.");
         (string name,string? description,string[] permissions)=ValidateDefinition(request);
         using NpgsqlConnection connection=database.OpenConnection();
         using NpgsqlTransaction transaction=connection.BeginTransaction();
@@ -431,6 +446,25 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         return command.ExecuteScalar() is Guid;
     }
 
+    private void EnsureRequiredAdministratorRole()
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            insert into studio_global_operational_roles(id,name,description,is_active,created_at_utc,updated_at_utc)
+            values($1,$2,$3,true,now(),now())
+            on conflict(id) do update set
+              name=excluded.name,
+              description=excluded.description,
+              is_active=true,
+              updated_at_utc=now()
+            """;
+        command.Parameters.AddWithValue(AdministratorRoleId);
+        command.Parameters.AddWithValue(StudioRoleNames.Administrator);
+        command.Parameters.AddWithValue("Application security and unrestricted administration.");
+        command.ExecuteNonQuery();
+    }
+
     private void EnsurePermission(Guid roleId, string permission)
     {
         using NpgsqlConnection connection = database.OpenConnection();
@@ -501,7 +535,10 @@ public static class GlobalOperationalRoleEndpoints
         string[] administratorGroups = app.Configuration
             .GetSection("AuthenticationPlugin:Settings:AdministrativeGroups")
             .Get<string[]>() ?? [];
-        roles.EnsureSchema(administratorGroups);
+        string[] administratorUsers = app.Configuration
+            .GetSection("Authentication:AdministrativeUsers")
+            .Get<string[]>() ?? [];
+        roles.EnsureSchema(administratorGroups, administratorUsers);
 
         RouteGroupBuilder group = app.MapGroup("/api/security/global-roles").RequireAuthorization(new AuthorizeAttribute { AuthenticationSchemes=Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme, Roles = StudioRoleNames.Administrator });
         group.MapGet("/", () => Results.Ok(roles.GetRoles()));
