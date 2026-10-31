@@ -15,7 +15,7 @@
             const button=document.createElement('button');button.type='button';button.className='studio-admin-item';const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('class','studio-navigation-icon');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('fill','none');icon.setAttribute('stroke','currentColor');icon.setAttribute('stroke-width','1.6');icon.setAttribute('stroke-linecap','round');icon.setAttribute('stroke-linejoin','round');icon.setAttribute('aria-hidden','true');icon.setAttribute('focusable','false');const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#'+entry.icon);icon.append(use);const label=document.createElement('span');label.textContent=entry.label;button.append(icon,label);button.dataset.studioAdminView=entry.view;button.hidden=!entry.staff;
             button.onclick=()=>{menu.open=false;window.studioNavigate?.(entry.view);};body.append(button);
         }
-        const authorize=payload=>{const admin=(payload?.user||payload)?.isAdministrator===true;for(const button of body.children)button.hidden=!admin&&!entries.find(entry=>entry.view===button.dataset.studioAdminView).staff;};
+        const authorize=payload=>{const admin=(payload?.user||payload)?.isAdministrator===true;for(const button of body.children)button.hidden=window.StudioAccess?.pending()?button.dataset.studioAdminView!=='about':!admin&&!entries.find(entry=>entry.view===button.dataset.studioAdminView).staff;};
         Promise.resolve(window.studioSignedInUserReady||window.json?.('/api/auth/me')).then(authorize).catch(()=>{});
         menu.addEventListener('keydown',event=>{
             if(event.key==='Escape'){menu.open=false;menu.querySelector('summary').focus();}
@@ -42,4 +42,5 @@
     }
     window.StudioAdmin={entries,mountMenu,keyForm,bindKeyForm};
 })();
+
 
