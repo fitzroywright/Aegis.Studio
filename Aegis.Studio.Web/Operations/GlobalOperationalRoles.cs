@@ -34,6 +34,19 @@ public static class StudioPermissions
 
 public sealed class GlobalOperationalRoleStore : IAuthorizationStore
 {
+    private static readonly HashSet<string> SupportedPermissions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        PermissionAuthorizer.AllPermissions,
+        StudioPermissions.Access,
+        StudioPermissions.ViewAllJobs,
+        StudioPermissions.ReplyToClients,
+        StudioPermissions.NotifyJobMembers,
+        StudioPermissions.Billing,
+        StudioPermissions.ViewClientAttachments,
+        StudioPermissions.AddClientAttachments,
+        StudioPermissions.ManageSecurity,
+        StudioPermissions.DeleteMedia
+    };
     private static readonly Guid UserRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc002");
     private static readonly Guid FrontDeskRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc001");
     private static readonly Guid AdministratorRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc003");
@@ -204,6 +217,41 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
                 reader.GetBoolean(3)));
         }
         return roles;
+    }
+
+    public GlobalOperationalRole CreateRole(GlobalOperationalRoleDefinitionRequest request)
+    {
+        (string name,string? description,string[] permissions)=ValidateDefinition(request);
+        Guid id=Guid.NewGuid();
+        using NpgsqlConnection connection=database.OpenConnection();
+        using NpgsqlTransaction transaction=connection.BeginTransaction();
+        using (NpgsqlCommand command=connection.CreateCommand())
+        {
+            command.Transaction=transaction;
+            command.CommandText="insert into studio_global_operational_roles(id,name,description,is_active,created_at_utc,updated_at_utc) values($1,$2,$3,$4,now(),now())";
+            command.Parameters.AddWithValue(id);command.Parameters.AddWithValue(name);command.Parameters.AddWithValue((object?)description??DBNull.Value);command.Parameters.AddWithValue(request.IsActive);
+            command.ExecuteNonQuery();
+        }
+        ReplacePermissions(connection,transaction,id,permissions);
+        transaction.Commit();
+        return new GlobalOperationalRole(id,name,description,permissions,request.IsActive);
+    }
+
+    public GlobalOperationalRole UpdateRole(Guid roleId,GlobalOperationalRoleDefinitionRequest request)
+    {
+        (string name,string? description,string[] permissions)=ValidateDefinition(request);
+        using NpgsqlConnection connection=database.OpenConnection();
+        using NpgsqlTransaction transaction=connection.BeginTransaction();
+        using (NpgsqlCommand command=connection.CreateCommand())
+        {
+            command.Transaction=transaction;
+            command.CommandText="update studio_global_operational_roles set name=$2,description=$3,is_active=$4,updated_at_utc=now() where id=$1";
+            command.Parameters.AddWithValue(roleId);command.Parameters.AddWithValue(name);command.Parameters.AddWithValue((object?)description??DBNull.Value);command.Parameters.AddWithValue(request.IsActive);
+            if(command.ExecuteNonQuery()==0)throw new KeyNotFoundException("Access role was not found.");
+        }
+        ReplacePermissions(connection,transaction,roleId,permissions);
+        transaction.Commit();
+        return new GlobalOperationalRole(roleId,name,description,permissions,request.IsActive);
     }
 
     public IReadOnlyList<GlobalOperationalRoleMember> GetMembers(Guid roleId)
@@ -393,6 +441,31 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         command.ExecuteNonQuery();
     }
 
+    private static (string Name,string? Description,string[] Permissions) ValidateDefinition(GlobalOperationalRoleDefinitionRequest request)
+    {
+        string name=request.Name?.Trim()??string.Empty;
+        if(name.Length==0)throw new InvalidOperationException("Role name is required.");
+        if(name.Length>100)throw new InvalidOperationException("Role name cannot exceed 100 characters.");
+        string? description=string.IsNullOrWhiteSpace(request.Description)?null:request.Description.Trim();
+        if(description?.Length>500)throw new InvalidOperationException("Role description cannot exceed 500 characters.");
+        string[] permissions=(request.Permissions??Array.Empty<string>()).Select(x=>x?.Trim()??string.Empty).Where(x=>x.Length>0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        string[] unsupported=permissions.Where(x=>!SupportedPermissions.Contains(x)).ToArray();
+        if(unsupported.Length>0)throw new InvalidOperationException("Unsupported access permission: "+string.Join(", ",unsupported));
+        return (name,description,permissions);
+    }
+
+    private static void ReplacePermissions(NpgsqlConnection connection,NpgsqlTransaction transaction,Guid roleId,IReadOnlyCollection<string> permissions)
+    {
+        using (NpgsqlCommand clear=connection.CreateCommand())
+        {clear.Transaction=transaction;clear.CommandText="delete from studio_global_operational_role_permissions where role_id=$1";clear.Parameters.AddWithValue(roleId);clear.ExecuteNonQuery();}
+        foreach(string permission in permissions)
+        {
+            using NpgsqlCommand add=connection.CreateCommand();add.Transaction=transaction;
+            add.CommandText="insert into studio_global_operational_role_permissions(role_id,permission_key) values($1,$2)";
+            add.Parameters.AddWithValue(roleId);add.Parameters.AddWithValue(permission);add.ExecuteNonQuery();
+        }
+    }
+
     private IReadOnlyCollection<string> GetPermissionsForRole(Guid roleId)
     {
         using NpgsqlConnection connection = database.OpenConnection();
@@ -432,6 +505,8 @@ public static class GlobalOperationalRoleEndpoints
 
         RouteGroupBuilder group = app.MapGroup("/api/security/global-roles").RequireAuthorization(new AuthorizeAttribute { AuthenticationSchemes=Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme, Roles = StudioRoleNames.Administrator });
         group.MapGet("/", () => Results.Ok(roles.GetRoles()));
+        group.MapPost("/", (GlobalOperationalRoleDefinitionRequest request) => SaveDefinition(()=>roles.CreateRole(request)));
+        group.MapPut("/{roleId:guid}", (Guid roleId,GlobalOperationalRoleDefinitionRequest request) => SaveDefinition(()=>roles.UpdateRole(roleId,request)));
         group.MapGet("/{roleId:guid}/members", (Guid roleId) => Results.Ok(roles.GetMembers(roleId)));
         var accounts=app.Services.GetRequiredService<RelationalAccountStore>();
         string Actor(ClaimsPrincipal principal)=>principal.FindFirstValue(AccountSecurityHosting.AccountIdClaim)
@@ -463,6 +538,14 @@ public static class GlobalOperationalRoleEndpoints
             return Results.NoContent();
         });
 
+        static IResult SaveDefinition(Func<GlobalOperationalRole> save)
+        {
+            try{return Results.Ok(save());}
+            catch(KeyNotFoundException){return Results.NotFound();}
+            catch(InvalidOperationException exception){return Results.BadRequest(new {error=exception.Message});}
+            catch(PostgresException exception)when(exception.SqlState==PostgresErrorCodes.UniqueViolation){return Results.Conflict(new {error="An access role with this name already exists."});}
+        }
+
         app.MapGet("/api/security/global-role-me", (ClaimsPrincipal user) => Results.Ok(new
         {
             roles = roles.GetDirectRoleKeysAsync(GetUserName(user)).GetAwaiter().GetResult(),
@@ -480,6 +563,8 @@ public sealed record GlobalOperationalPermissions(bool ViewAllJobs,bool ReplyToC
 }
 
 public sealed record GlobalOperationalRole(Guid Id,string Name,string? Description,IReadOnlyCollection<string> Permissions,bool IsActive);
+public sealed record GlobalOperationalRoleDefinitionRequest(string Name,string? Description,IReadOnlyCollection<string>? Permissions,bool IsActive=true);
 public sealed record GlobalOperationalRoleMember(Guid RoleId,string UserName,string DisplayName,bool IsActive,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc);
 public sealed record GlobalOperationalRoleMemberRequest(string UserName,string? DisplayName,bool IsActive = true);
 public sealed record DirectoryGroupRoleMapping(string GroupName,Guid RoleId,string RoleName);
+

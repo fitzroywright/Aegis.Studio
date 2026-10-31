@@ -217,6 +217,11 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .staff-photo-actions { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:auto; padding-top:10px; }
 .staff-card-heading { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:6px 10px; }
 .staff-text-action { padding:0; border:0; background:transparent; color:var(--theme-link,#245ca0); text-decoration:underline; cursor:pointer; font-size:12px; }
+.staff-access-role-list,.staff-access-role-form { display:grid; gap:10px; }
+.staff-access-role-list { margin-top:10px; }
+.staff-access-role-form .permission-grid { grid-template-columns:repeat(2,minmax(0,1fr)); padding:10px; border:1px solid var(--theme-border,#d9e2e9); border-radius:4px; background:var(--theme-surface-muted,#f7f9fb); }
+.staff-access-role-form .staff-checkbox { display:flex; align-items:center; gap:8px; font-size:12px; }
+.staff-access-role-form .dialog-actions [data-row-status] { margin-right:auto; font-size:11px; }
 .staff-token-input { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--theme-border,#d9e2e9); border-radius:5px; }
 .staff-token-input:focus-within { outline:2px solid var(--theme-accent,#a5783d); outline-offset:1px; }
 .staff-token-input [data-tokens] { display:contents; }
@@ -246,6 +251,7 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .staff-editable-grid input[type=checkbox] { accent-color:#9c733c; }
 .staff-row-actions { display:flex; flex-wrap:wrap; align-items:center; gap:5px; }
 .staff-editable-grid [data-row-status] { display:block; font-size:11px; margin-top:3px; max-width:260px; }
+@media(max-width:700px){.staff-access-role-form .permission-grid { grid-template-columns:minmax(0,1fr); }}
 .staff-role-section { display:grid; gap:10px; }
 @media(max-width:800px) { .staff-master-detail:not([hidden]) { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(130px,.4fr) minmax(0,1fr); } .staff-global-role-columns,.staff-field-pair,.staff-card-grid { grid-template-columns:minmax(0,1fr); } .staff-grid-section>header { flex-wrap:wrap; } .staff-detail { padding:12px; } }
 
