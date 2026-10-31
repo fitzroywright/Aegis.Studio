@@ -36,6 +36,35 @@ Studio mock sign-in is password-free. The password field is hidden and a legacy
 `MockAuthentication:Password` value is ignored. Only the server allowlisted identity
 is accepted, and isolation, account approval and role restrictions still apply.
 
+
+## Administrative access bootstrap
+
+The built-in `Administrator` access role is required. Studio creates it on the
+first run and repairs it after startup or a demo/factory reset if it was retired
+or lost unrestricted access.
+
+Set `Authentication:AdministrativeUsers` to the approved Studio login aliases
+that must receive administrative access. The same setting applies to Active
+Directory and Microsoft Entra ID; use the alias stored on the person's Studio
+account. For example:
+
+```json
+{
+  "Authentication": {
+    "AdministrativeUsers": [
+      "DOMAIN\\studio.admin",
+      "studio.admin@example.com"
+    ]
+  }
+}
+```
+
+Configured entries are assigned idempotently on every startup and after a
+factory reset. They still need an approved Common.Security account and a valid
+AD or Entra identity binding before they can sign in. AD
+`AuthenticationPlugin:Settings:AdministrativeGroups` continue to grant the
+same role through verified directory-group membership.
+
 ## Manage demo staff through Staff & Roles
 
 When Studio is running in the explicitly isolated `Demo` environment with Mock

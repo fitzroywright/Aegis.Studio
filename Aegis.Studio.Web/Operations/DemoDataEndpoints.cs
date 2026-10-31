@@ -60,6 +60,9 @@ public static class DemoDataEndpoints
         DemoDataExpansion.PreparePhotos(report);
         DemoDataExpansion.PrepareStaffPhotos(report);
         MediaProductionEndpoints.EnsureWorkspaceCoverSchema(database);
+        var accessRoles = new GlobalOperationalRoleStore(database);
+        accessRoles.EnsureSchema();
+        accessRoles.EnsureAdministrator(login);
 
         // Phase 1: create the high-volume operational workload in small, durable batches.
         // Each batch owns only deterministic DEMO ids, so retries are safe and do not

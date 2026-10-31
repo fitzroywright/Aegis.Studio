@@ -52,6 +52,10 @@ internal static class StudioFactoryReset
             if (Directory.Exists(cache)) Directory.Delete(cache, recursive: true);
 
             var databaseResult = ConnectedWorkflowDemo.Reset(database);
+            var accessRoles = new GlobalOperationalRoleStore(database);
+            accessRoles.EnsureSchema(
+                configuration.GetSection("AuthenticationPlugin:Settings:AdministrativeGroups").Get<string[]>() ?? [],
+                configuration.GetSection("Authentication:AdministrativeUsers").Get<string[]>() ?? []);
             object? generated = null;
             if (regenerateAs is not null)
                 generated = Aegis.Studio.Web.Operations.DemoDataEndpoints.Seed(database, storage, regenerateAs);
