@@ -414,3 +414,20 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .studio-access-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 26px 0; }
 .studio-access-card .studio-access-help { font-size: 13px; opacity: .8; }
 .studio-access-section { min-height: 260px; padding: 28px; }
+
+
+/* Compact in-place role management, scoped to the management dialogs. */
+.staff-access-compact{display:grid;grid-template-columns:minmax(130px,170px) minmax(300px,1fr);gap:12px;max-width:780px}
+.staff-access-selector{display:flex;flex-direction:column;gap:4px;max-height:440px;overflow:auto;border-right:1px solid #ddd;padding-right:10px}
+.staff-access-selector button{text-align:left;padding:7px 9px}
+.staff-access-selector button[aria-pressed="true"]{font-weight:700;background:rgba(120,120,120,.12)}
+.staff-access-editor{min-width:0}
+.staff-access-editor .staff-entry{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.staff-access-editor .permission-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:10px 0}
+.staff-access-editor .permission-grid label{margin:0}
+.staff-access-editor form[hidden]{display:none}
+.staff-compact-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.staff-compact-role-grid input:not([type="checkbox"]){width:100%;min-width:85px;box-sizing:border-box;padding:5px 7px}
+.staff-compact-role-grid td,.staff-compact-role-grid th{padding:4px 7px}
+.staff-compact-role-grid small[role="status"]{display:block;font-size:11px}
+@media(max-width:620px){.staff-access-compact{grid-template-columns:1fr}.staff-access-selector{flex-direction:row;border-right:0;border-bottom:1px solid #ddd;padding:0 0 8px;max-height:none;overflow:auto}.staff-access-editor .staff-entry{grid-template-columns:1fr}}
