@@ -1709,7 +1709,8 @@ color:var(--studio-grid-header-text);}
   align-items: center;
   justify-content: flex-end;
   min-height: 0;
-  flex: 1;
+  flex: 1 1 auto;
+  height: 100%;
   padding: 22px;
   background: url('/assets/aegis-studio-login-background.png') center/cover no-repeat;
   border-radius: 8px;
