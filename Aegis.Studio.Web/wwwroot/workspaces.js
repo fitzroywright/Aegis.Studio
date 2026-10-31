@@ -398,10 +398,10 @@ function openStaffEditor(index, force=false) {
     const enableDemo=form.querySelector('[data-enable-demo]');if(enableDemo)enableDemo.onclick=async()=>{
         const status=form.querySelector('[data-editor-status]');
         if(state.dirty){status.textContent='Save or cancel your changes before enabling demo sign-in.';return;}
-        if(state.saving)return;state.saving=true;enableDemo.disabled=true;status.textContent='Enabling demo sign-in…';
+        if(state.saving)return;state.saving=true;const controls=[...form.querySelectorAll('input,select,button')].map(element=>({element,disabled:element.disabled}));controls.forEach(({element})=>element.disabled=true);status.textContent='Enabling demo sign-in…';
         try{await json('/api/admin/security/demo-accounts/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:employee.userName,displayName:employee.displayName||employee.userName,accountId:account.id})});state.saving=false;await refreshStudioEmployees();}
         catch(error){status.textContent=error.message||'Could not enable demo sign-in. Try again.';}
-        finally{state.saving=false;if(enableDemo.isConnected)enableDemo.disabled=false;}
+        finally{state.saving=false;controls.forEach(({element,disabled})=>{if(element.isConnected)element.disabled=disabled;});}
     };
     const enroll=form.querySelector('[data-enroll]');if(enroll)enroll.onclick=()=>{openStaffEditor(null);const input=document.getElementById('employeeUserName');if(!input)return;input.value=employee.userName;input.readOnly=true;document.getElementById('employeeDisplayName').value=employee.displayName||employee.userName;document.getElementById('employeeEmail').value=employee.emailAddress||'';document.getElementById('employeeAssignable').value=String(employee.isAssignable);};
     const register=form.querySelector('[data-register-photographer]');if(register)register.onclick=()=>{if(!state.dirty)registerStudioPhotographer(employee);else form.querySelector('[data-editor-status]').textContent='Save or cancel your changes before registering a photographer.';};
