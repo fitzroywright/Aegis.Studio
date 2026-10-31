@@ -16,7 +16,7 @@ public sealed class StaffPhotoTests
         try
         {
             await using var source=NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(connection){SearchPath=schema}.ConnectionString);
-            var database=new StudioDatabase(source);await database.InitializeAsync();await new StudioFeatureDatabase(source).InitializeAsync();
+            var database=new StudioDatabase(source);await database.InitializeAsync();await new StudioFeatureDatabase(source).InitializeAsync();new GlobalOperationalRoleStore(database).EnsureSchema();
             var employees=new StudioEmployeeDirectoryStore(database);employees.EnsureSchema();
             employees.Save(new("jason","Jason Brown","jason@example.test"));
             byte[] directory=[0xff,0xd8,0xff,0xd9],studio=[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a];
