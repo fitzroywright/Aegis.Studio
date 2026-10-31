@@ -464,3 +464,15 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .staff-access-compact .dialog-actions{margin-top:2px;display:flex;align-items:center;justify-content:flex-end;gap:10px}
 .staff-access-compact .dialog-actions button{border-radius:7px;padding:7px 16px}
 @media(max-width:650px){.studio-dialog-body:has(> .staff-access-compact){width:min(100%,calc(100vw - 32px))}.staff-access-compact{grid-template-columns:minmax(0,1fr)}.staff-access-compact .staff-access-selector{flex-direction:row;max-height:none;overflow:auto;white-space:nowrap;border-right:0;border-bottom:1px solid var(--theme-border,#d9e2e9);padding:0 0 8px}.staff-access-compact .staff-access-role-form .permission-grid{grid-template-columns:1fr}}
+
+
+/* Role dialogs size to their contents, not the full-height staff editor. */
+dialog.staff-role-management-dialog{height:fit-content;min-height:0;max-height:calc(100dvh - 48px);width:min(760px,calc(100vw - 32px));max-width:760px;overflow:hidden;box-sizing:border-box}
+dialog.staff-role-management-dialog .studio-dialog-body{height:auto;min-height:0;max-height:calc(100dvh - 120px);overflow:auto;box-sizing:border-box;padding-bottom:12px}
+dialog.staff-role-management-dialog [data-job-role-admin]{height:auto;min-height:0}
+dialog.staff-role-management-dialog [data-job-role-admin] .staff-grid-scroll{max-height:min(56vh,510px)}
+dialog.staff-role-management-dialog .staff-compact-role-grid th{color:var(--theme-text,#25364a);background:var(--theme-surface-muted,#f1f5f9);opacity:1}
+dialog.staff-role-management-dialog .staff-compact-role-grid thead{position:sticky;top:0;z-index:1}
+dialog.staff-role-management-dialog .staff-compact-footer{padding-top:8px}
+dialog.staff-role-management-dialog .staff-access-compact{min-height:0;height:auto;align-content:start}
+dialog.staff-role-management-dialog .staff-access-editor{min-height:0;height:auto}
