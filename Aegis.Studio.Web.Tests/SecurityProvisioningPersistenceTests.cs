@@ -15,6 +15,32 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class SecurityProvisioningPersistenceTests
 {
     [StudioPostgresFact]
+    public async Task AdministratorRoleIsRepairedAndConfiguredDirectoryUsersAreAdministrators()
+    {
+        string connection=Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES")!,schema="studio_required_admin_"+Guid.NewGuid().ToString("N");
+        await using var admin=new NpgsqlConnection(connection);await admin.OpenAsync();
+        await using(var create=new NpgsqlCommand($"CREATE SCHEMA {schema}",admin))await create.ExecuteNonQueryAsync();
+        try
+        {
+            await using var source=NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(connection){SearchPath=schema}.ConnectionString);
+            var database=new StudioDatabase(source);var store=new GlobalOperationalRoleStore(database);
+            store.EnsureSchema([], ["domain\\studio-admin","entra-admin@example.test"]);
+            var role=Assert.Single(store.GetRoles(),x=>x.Name==StudioRoleNames.Administrator);
+            Assert.True(role.IsActive);Assert.Contains("*",role.Permissions);
+            Assert.Equal(2,store.GetMembers(role.Id).Count(x=>x.IsActive));
+
+            await using(var databaseConnection=await source.OpenConnectionAsync())
+            await using(var damage=new NpgsqlCommand("update studio_global_operational_roles set is_active=false where id=$1; delete from studio_global_operational_role_permissions where role_id=$1",databaseConnection))
+            {damage.Parameters.AddWithValue(role.Id);await damage.ExecuteNonQueryAsync();}
+            store.EnsureSchema();
+            role=Assert.Single(store.GetRoles(),x=>x.Name==StudioRoleNames.Administrator);
+            Assert.True(role.IsActive);Assert.Contains("*",role.Permissions);
+            Assert.Throws<InvalidOperationException>(()=>store.UpdateRole(role.Id,new GlobalOperationalRoleDefinitionRequest("Retired Administrator",null,[],false)));
+        }
+        finally{await using var drop=new NpgsqlCommand($"DROP SCHEMA {schema} CASCADE",admin);await drop.ExecuteNonQueryAsync();}
+    }
+
+    [StudioPostgresFact]
     public async Task GlobalAccessRolesCanBeCreatedAndEditedWithoutLosingAssignments()
     {
         string connection=Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES")!,schema="studio_access_roles_"+Guid.NewGuid().ToString("N");
