@@ -8,6 +8,8 @@ namespace Aegis.Studio.Web.Operations;
 /// <summary>Adds graph scenarios to the existing comprehensive demo; leaves its genuine media intact.</summary>
 internal static class DemoJobWorkflowGraphs
 {
+    private sealed record DemoProduct(string Code,string Name,string Category,decimal Price,decimal Cost,string Description,Dictionary<string,string[]> Options,bool RequiresProduction=true);
+
     internal static string TemplateName(string title)
     {
         if (title.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||title.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return "Wedding Photography";
@@ -44,6 +46,7 @@ internal static class DemoJobWorkflowGraphs
         var printOrder=WorkOrder("Printing and Quality Control","Print","Printing");
         Execute(c,tx,"update studio_pos_catalog set requires_production=true,work_order_template_id=$2 where id=$1",retouch,retouchOrder);
         Execute(c,tx,"update studio_pos_catalog set requires_production=true,work_order_template_id=$2 where id=$1",print,printOrder);
+        SeedRetailProducts(c,tx,printOrder);
         using (var q = Command(c, tx, "select exists(select 1 from studio_state where key='demo-job-workflow-graphs-v1')")) if ((bool)q.ExecuteScalar()!) return;
         var conditional = WorkflowGraphExamples.Graduation(retouch, print); var parallel = WorkflowGraphExamples.Parallel(); var linear = WorkflowGraphExamples.Linear();
         var names = new[] { "Graduation Photography", "Wedding Photography", "Corporate Headshots", "ID Photography", "Portrait Photography", "Photo Printing", "Photo Restoration", "Image Editing" };
@@ -81,5 +84,51 @@ internal static class DemoJobWorkflowGraphs
         }
         Execute(c, tx, "insert into studio_state(key,value,updated_at_utc) values('demo-job-workflow-graphs-v1','seeded',now()) on conflict do nothing");
     }
+
+    private static void SeedRetailProducts(NpgsqlConnection c,NpgsqlTransaction tx,Guid printOrder)
+    {
+        DemoProduct[] products =
+        [
+            new("DEMO-PRINT-4X6","4×6 Photographic Print","Prints",250m,70m,"Professional photographic print on archival paper.",new(){{"Finish",["Glossy","Matte"]}}),
+            new("DEMO-PRINT-5X7","5×7 Photographic Print","Prints",450m,120m,"Professional photographic print for albums, desks and gifts.",new(){{"Finish",["Glossy","Matte"]}}),
+            new("DEMO-PRINT-8X10","8×10 Portrait Print","Prints",1200m,300m,"Classic portrait enlargement on archival photographic paper.",new(){{"Finish",["Glossy","Matte","Lustre"]}}),
+            new("DEMO-PRINT-11X14","11×14 Portrait Print","Prints",2500m,650m,"Large portrait enlargement suitable for framing.",new(){{"Finish",["Matte","Lustre"]}}),
+            new("DEMO-PRINT-16X20","16×20 Portrait Print","Prints",4800m,1300m,"Display-size portrait enlargement with colour correction.",new(){{"Finish",["Matte","Lustre"]}}),
+            new("DEMO-POSTER-20X30","20×30 Photographic Poster","Prints",7500m,2200m,"Large-format photographic poster for events and displays.",new(){{"Finish",["Matte","Glossy"]}}),
+            new("DEMO-CANVAS-12X18","12×18 Gallery-Wrap Canvas","Wall Art",9500m,3500m,"Ready-to-hang canvas with a gallery-wrapped edge.",new(){{"Edge",["Image wrap","Black","White"]}}),
+            new("DEMO-CANVAS-20X30","20×30 Gallery-Wrap Canvas","Wall Art",18000m,7000m,"Large ready-to-hang canvas wall portrait.",new(){{"Edge",["Image wrap","Black","White"]}}),
+            new("DEMO-FRAME-8X10","Framed 8×10 Portrait","Wall Art",5500m,2000m,"Finished 8×10 portrait supplied in a tabletop or wall frame.",new(){{"Frame",["Black","White","Natural wood"]},{"Mount",["None","White","Cream"]}}),
+            new("DEMO-FRAME-11X14","Framed 11×14 Portrait","Wall Art",8500m,3200m,"Finished 11×14 wall portrait with frame and optional mount.",new(){{"Frame",["Black","White","Natural wood"]},{"Mount",["White","Cream"]}}),
+            new("DEMO-BOOK-8X8","8×8 Hardcover Photo Book","Albums",18000m,7500m,"Twenty-page hardcover photo book with professionally designed spreads.",new(){{"Cover",["Black","White","Photo cover"]},{"Extra pages",["None","10 pages","20 pages"]}}),
+            new("DEMO-ALBUM-12X12","12×12 Premium Wedding Album","Albums",45000m,20000m,"Premium lay-flat wedding album with twenty designed pages.",new(){{"Cover",["Leatherette","Linen","Photo cover"]},{"Colour",["Black","White","Burgundy"]}}),
+            new("DEMO-GRAD-PACK","Graduation Portrait Package","Packages",6500m,1800m,"One 8×10, two 5×7 and eight wallet-size graduation prints.",new(){{"Finish",["Glossy","Matte"]}}),
+            new("DEMO-ID-SET","Passport and ID Photo Set","Packages",1500m,200m,"Set of four compliant passport or identification photographs.",new(){{"Standard",["Jamaica passport","US visa","Canadian visa","Custom ID"]}}),
+            new("DEMO-DIGITAL-ONE","Full-Resolution Digital Image","Digital",1200m,50m,"One retouched high-resolution image delivered electronically.",new(),false),
+            new("DEMO-DIGITAL-GALLERY","Full-Resolution Digital Gallery","Digital",15000m,500m,"Downloadable collection of the final retouched photographs.",new(),false),
+            new("DEMO-USB","Studio USB Presentation Drive","Keepsakes",2500m,900m,"Branded USB drive prepared with the client's delivered images.",new(){{"Capacity",["16 GB","32 GB"]}}),
+            new("DEMO-CARDS-20","Twenty Photo Greeting Cards","Cards & Stationery",8000m,3000m,"Set of twenty folded photo cards with envelopes.",new(){{"Occasion",["Thank you","Christmas","Birthday","Custom"]},{"Finish",["Matte","Glossy"]}}),
+            new("DEMO-MEMORIAL-50","Fifty Memorial Programmes","Cards & Stationery",15000m,6000m,"Fifty professionally designed and printed memorial programmes.",new(){{"Pages",["4 pages","8 pages"]},{"Finish",["Matte","Glossy"]}}),
+            new("DEMO-LAMINATE","Photograph Lamination","Finishing",500m,120m,"Protective lamination for one photograph up to 8×10.",new(){{"Finish",["Gloss","Matte"]}})
+        ];
+        for(int index=0;index<products.Length;index++)
+        {
+            DemoProduct product=products[index];
+            using var find=Command(c,tx,"select id from studio_pos_catalog where code=$1",product.Code);
+            Guid id=find.ExecuteScalar() is Guid existing?existing:DemoDataExpansion.Id(52,index+1);
+            Execute(c,tx,"""
+                insert into studio_pos_catalog
+                  (id,code,name,category,unit_price,is_active,sort_order,updated_at_utc,description,estimated_cost,tax_rate,options,requires_production,work_order_template_id)
+                values($1,$2,$3,$4,$5,true,$6,now(),$7,$8,15,$9::jsonb,$10,$11)
+                on conflict(id) do update set
+                  code=excluded.code,name=excluded.name,category=excluded.category,unit_price=excluded.unit_price,
+                  is_active=true,sort_order=excluded.sort_order,updated_at_utc=now(),description=excluded.description,
+                  estimated_cost=excluded.estimated_cost,tax_rate=excluded.tax_rate,options=excluded.options,
+                  requires_production=excluded.requires_production,work_order_template_id=excluded.work_order_template_id
+                """,id,product.Code,product.Name,product.Category,product.Price,100+index,product.Description,
+                product.Cost,JsonSerializer.Serialize(product.Options,Json),product.RequiresProduction,
+                product.RequiresProduction?printOrder:DBNull.Value);
+        }
+    }
+
 }
 
