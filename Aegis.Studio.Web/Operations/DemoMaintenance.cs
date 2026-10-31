@@ -21,7 +21,7 @@ public static class DemoMaintenance
         var connection = database.OpenConnection();
         try
         {
-            using var transaction = connection.BeginTransaction();
+            var transaction = connection.BeginTransaction();
             using var command = new NpgsqlCommand("select pg_try_advisory_xact_lock(hashtextextended('studio-demo-maintenance:'||current_schema(),0))", connection, transaction);
             if (!(bool)command.ExecuteScalar()!)
                 throw new InvalidOperationException("Studio is busy or a demo reset is already running. Wait for it to finish before starting another.");
