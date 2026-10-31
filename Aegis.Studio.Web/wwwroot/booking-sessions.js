@@ -17,7 +17,8 @@ window.StudioBookingSessions=(()=>{
             field('save').disabled=state.saving||!state.loaded[state.tab]||!state.dirty[state.tab];
             const detailSave=field('editor').querySelector('[type=submit]');if(detailSave)detailSave.disabled=field('save').disabled;
             field('add').disabled=state.saving||!state.loaded[state.tab];field('add').textContent=state.tab==='sessions'?'＋ Add service':'＋ Add opening window';
-            for(const name of ['search','category','location','filter'])field(name).hidden=state.tab!=='sessions';
+            // Column filters live inside the sessions table and are absent on Opening Hours.
+            // Their visibility follows the table; do not access removed toolbar controls.
             root.querySelectorAll('[data-booking-tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.bookingTab===state.tab)));
             field('count').textContent=state.tab==='sessions'?state.sessions.length+' services · '+state.sessions.filter(row=>row.isActive&&row.isPublished).length+' bookable online':state.hours.length+' opening windows';
             options.onSummary?.({hours:state.hours,hoursLoaded:state.loaded.hours,dirtyHours:state.dirty.hours,dirtySessions:state.dirty.sessions,revision:state.revision});
