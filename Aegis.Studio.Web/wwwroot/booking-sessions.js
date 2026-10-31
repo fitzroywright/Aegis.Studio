@@ -47,7 +47,7 @@ window.StudioBookingSessions=(()=>{
                 const displayTime=value=>{if(!value)return 'Closed';const m=/^(\d{2}):(\d{2})/.exec(value);if(!m)return value;const h=Number(m[1]);return String(h%12||12).padStart(2,'0')+':'+m[2]+' '+(h<12?'AM':'PM');};
                 field('grid').innerHTML=`<div class="booking-hours-location-bar"><label>Location <select data-hours-location>${locations.map(([value,name])=>`<option value="${esc(value)}" ${code===value?'selected':''}>${esc(name)}</option>`).join('')}</select></label><button type="button" class="action" data-add-location>＋ Add location</button></div><div class="booking-hours-table-wrap"><table class="booking-hours-week-table"><thead><tr><th>Day</th><th>Opens</th><th>Closes</th><th>Slot interval</th><th>Status</th></tr></thead><tbody>${days.map((day,index)=>{const entries=rows.filter(x=>Number(x.row.dayOfWeek)===index).sort((a,b)=>a.row.opensAt.localeCompare(b.row.opensAt));const first=entries[0];return `<tr data-hour-day="${index}" tabindex="0" aria-selected="${first?.index===state.selectedHour}"><td><span class="booking-day-check ${first?'is-open':''}">${first?'✓':''}</span><strong>${day}</strong></td><td>${first?displayTime(first.row.opensAt):'Closed'}</td><td>${first?displayTime(first.row.closesAt):'Closed'}</td><td>${first?esc(first.row.slotStepMinutes)+' min':'—'}</td><td><span class="booking-status-dot ${first?'is-active':''}"></span>${first?'Open':'Closed'}${entries.length>1?' · '+entries.length+' windows':''}</td></tr>`}).join('')}</tbody></table></div>`;
                 const current=state.hours[state.selectedHour];
-                if(!current||current.locationCode!==code)state.selectedHour=rows[0]?.index??-1;
+                if(!current||current.locationCode!==code)state.selectedHour=rows.find(x=>Number(x.row.dayOfWeek)===(state.hourDay??0))?.index??-1;
                 const selectedHour=state.hours[state.selectedHour],editor=field('editor');
                 editor.hidden=false;
                 const selectedDay=selectedHour?Number(selectedHour.dayOfWeek):(state.hourDay??0);
@@ -140,7 +140,7 @@ window.StudioBookingSessions=(()=>{
         field('add').onclick=()=>{
             try{if(state.tab==='sessions')readDetails();}catch(error){status(error.message);return;}
             if(state.tab==='sessions'){state.search='';state.category='';state.location='';state.filter='';for(const name of ['search','category','location','filter'])field(name).value='';state.sessions.push({id:crypto.randomUUID(),name:'',description:'',durationMinutes:60,setupBufferMinutes:0,cleanupBufferMinutes:0,price:'0',deposit:'0',priceMinor:0,depositMinor:0,currency:'JMD',locations:['BK'],resourceRequirements:{Photographer:1},isActive:true,isPublished:false,defaultWorkspaceId:null,category:''});state.selected=state.sessions.at(-1).id;state.detailBaseline=null;}
-            else{state.hours.push({locationCode:'BK',dayOfWeek:1,opensAt:'09:00',closesAt:'17:00',slotStepMinutes:30});state.selectedHour=state.hours.length-1;}
+            else{state.hours.push({locationCode:state.hourLocation,dayOfWeek:state.hourDay??1,opensAt:'09:00',closesAt:'17:00',slotStepMinutes:30});state.selectedHour=state.hours.length-1;}
             dirty();paintGrid();const row=field('grid').querySelector('tbody tr:last-child');row?.querySelector('input,select')?.focus();row?.scrollIntoView?.({block:'nearest'});
         };
         field('grid').addEventListener('input',event=>{
