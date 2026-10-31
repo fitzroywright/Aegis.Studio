@@ -57,7 +57,7 @@ public sealed class PublicBookingPublicationTests
         var handler=new BookingSiteHandler();
         IConfiguration configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>
         {
-            [DemoIntegrationIsolation.ConfigurationKey]="true",
+            [ExternalIntegrationIsolation.ConfigurationKey]="true",
             ["PublicSite:BaseUrl"]="https://api.example.test/",
             ["PublicSite:IntegrationToken"]=new string('s',40)
         }).Build();
