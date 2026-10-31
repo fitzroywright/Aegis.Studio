@@ -278,7 +278,8 @@ function renderStaffAccessPermissionChoices(selected=[]){
 }
 
 function renderStaffAccessPermissionManager(roles){
-    return `<section class="staff-editor"><h2>Create access role</h2><p>Access roles control what a staff member can see and change throughout Studio.</p><form class="staff-access-role-form" data-create-access-role><div class="staff-entry"><label>Name<input name="name" maxlength="100" required></label><label>Description<input name="description" maxlength="500"></label></div>${renderStaffAccessPermissionChoices(['studio.access'])}<label class="staff-checkbox"><input name="isActive" type="checkbox" checked><span>Available for assignment</span></label><div class="dialog-actions"><span data-row-status role="status"></span><button type="submit" class="primary">Create role</button></div></form></section><section class="staff-grid-section"><header><h2>Existing access roles</h2><span>Edit a role or retire it by clearing Available for assignment.</span></header><div class="staff-access-role-list">${roles.map(role=>`<form class="staff-editor staff-access-role-form" data-access-role="${esc(role.id)}"><div class="staff-entry"><label>Name<input name="name" maxlength="100" required value="${esc(role.name)}"></label><label>Description<input name="description" maxlength="500" value="${esc(role.description||'')}"></label></div>${renderStaffAccessPermissionChoices(role.permissions)}<label class="staff-checkbox"><input name="isActive" type="checkbox" ${role.isActive!==false?'checked':''}><span>Available for assignment</span></label><div class="dialog-actions"><span data-row-status role="status"></span><button type="submit">Save role</button></div></form>`).join('')||'<p class="muted">No access roles have been created.</p>'}</div></section>`;
+    const forms=roles.map(role=>`<form class="staff-access-role-form" data-access-role="${esc(role.id)}" hidden><div class="staff-entry"><label>Name<input name="name" maxlength="100" required value="${esc(role.name)}"></label><label>Description<input name="description" maxlength="500" value="${esc(role.description||'')}"></label></div>${renderStaffAccessPermissionChoices(role.permissions)}<label class="staff-checkbox"><input name="isActive" type="checkbox" ${role.isActive!==false?'checked':''}><span>Available for assignment</span></label><div class="dialog-actions"><span data-row-status role="status"></span><button type="submit" class="primary">Save role</button></div></form>`).join('');
+    return `<section class="staff-access-compact"><div class="staff-access-selector"><button type="button" data-select-access-role="new">+ New role</button>${roles.map(role=>`<button type="button" data-select-access-role="${esc(role.id)}">${esc(role.name)}</button>`).join('')}</div><div class="staff-access-editor"><form class="staff-access-role-form" data-create-access-role hidden><div class="staff-entry"><label>Name<input name="name" maxlength="100" required></label><label>Description<input name="description" maxlength="500"></label></div>${renderStaffAccessPermissionChoices(['studio.access'])}<label class="staff-checkbox"><input name="isActive" type="checkbox" checked><span>Available for assignment</span></label><div class="dialog-actions"><span data-row-status role="status"></span><button type="submit" class="primary">Create role</button></div></form>${forms}</div></section>`;
 }
 
 async function openStaffAccessPermissions(){
@@ -290,6 +291,9 @@ async function openStaffAccessPermissions(){
         try{
             const roles=await json('/api/security/global-roles/');if(!dialog.isConnected)return;
             host.innerHTML=renderStaffAccessPermissionManager(roles);
+            const selectRole=id=>{host.querySelectorAll('.staff-access-role-form').forEach(form=>form.hidden=(id==='new'?form.dataset.createAccessRole===undefined:form.dataset.accessRole!==id));host.querySelectorAll('[data-select-access-role]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.selectAccessRole===id)));};
+            host.querySelectorAll('[data-select-access-role]').forEach(button=>button.onclick=()=>selectRole(button.dataset.selectAccessRole));
+            selectRole(roles[0]?.id||'new');
             host.querySelectorAll('.staff-access-role-form').forEach(form=>form.onsubmit=async event=>{
                 event.preventDefault();if(!form.reportValidity()||form.dataset.saving)return;
                 const status=form.querySelector('[data-row-status]'),button=form.querySelector('[type=submit]'),id=form.dataset.accessRole;
@@ -330,25 +334,30 @@ function mountStaffTokenEditor(holder,options,values,onchange,disabled=false){
     holder.refreshTokens=draw;draw();
 }
 
-async function renderJobRoleAdministration(current=()=>true,holder=genericView.querySelector('[data-job-role-admin]')) {if(!holder||!current())return;
-    holder.innerHTML='<h2>Job Roles</h2><p role="status">Loading Job Roles…</p>';
-    try {
+async function renderJobRoleAdministration(current=()=>true,holder=genericView.querySelector('[data-job-role-admin]')) {
+    if(!holder||!current())return;
+    holder.innerHTML='<p role="status">Loading Job Roles…</p>';
+    try{
         const roles=await json('/api/admin/job-roles');if(!holder.isConnected||!current())return;
-        holder.innerHTML=`<h2>Job Roles</h2><p>Manage roles such as Editor and Retoucher, then assign them from a person’s Staff details. These roles are shared with scheduling.</p><div class="staff-grid-scroll"><table class="staff-editable-grid"><caption class="sr-only">Job Role definitions</caption><thead><tr><th>Job Role</th><th>Code</th><th>Can be primary</th><th>Status</th><th>Action</th></tr></thead><tbody>${roles.map((role,i)=>`<tr><td>${esc(role.displayName)}</td><td>${esc(role.code)}</td><td>${role.canBePrimary?'Yes':'No'}</td><td>${role.isActive===false?'Inactive':'Active'}</td><td><button type="button" data-edit-job-role="${i}">Edit</button></td></tr>`).join('')||'<tr><td colspan="5">No Job Roles defined.</td></tr>'}</tbody></table></div><form class="staff-person-form" data-job-role-form><h3 data-role-heading>Add Job Role</h3><div class="staff-field-pair"><label>Code<input name="code" required maxlength="80" autocomplete="off"></label><label>Name<input name="displayName" required maxlength="200"></label></div><label class="staff-checkbox"><input name="canBePrimary" type="checkbox"><span>Can be the primary person on a job</span></label><label class="staff-checkbox"><input name="isActive" type="checkbox" checked><span>Active</span></label><p data-job-role-status role="status"></p><div class="staff-detail-actions"><button type="reset">New role</button><button type="submit" class="primary">Save Job Role</button></div></form>`;
-        const form=holder.querySelector('form'),status=form.querySelector('[data-job-role-status]');
-        holder.querySelectorAll('[data-edit-job-role]').forEach(button=>button.onclick=()=>{const role=roles[Number(button.dataset.editJobRole)];form.elements.code.value=role.code;form.elements.code.readOnly=true;form.elements.displayName.value=role.displayName;form.elements.canBePrimary.checked=role.canBePrimary;form.elements.isActive.checked=role.isActive!==false;form.querySelector('[data-role-heading]').textContent='Edit Job Role';status.textContent='';form.elements.displayName.focus();});
-        form.onreset=()=>{form.elements.code.readOnly=false;form.querySelector('[data-role-heading]').textContent='Add Job Role';status.textContent='';};
-        form.onsubmit=async event=>{
-            event.preventDefault();if(!form.reportValidity())return;
-            const payload={code:form.elements.code.value.trim().toUpperCase(),displayName:form.elements.displayName.value.trim(),canBePrimary:form.elements.canBePrimary.checked,isActive:form.elements.isActive.checked};
-            if(!payload.code||!payload.displayName){status.textContent='Code and name are required.';return;}
-            if(!form.elements.code.readOnly&&roles.some(role=>role.code.toUpperCase()===payload.code)){status.textContent='This code already exists. Edit the existing Job Role.';return;}
-            const controls=[...form.querySelectorAll('input,button')];controls.forEach(control=>control.disabled=true);status.textContent='Saving…';
-            try{await json('/api/admin/job-roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});await renderJobRoleAdministration(current,holder);}
-            catch(error){status.textContent=error.message||'Could not save Job Role.';}
-            finally{controls.forEach(control=>control.disabled=false);}
-        };
-    }catch(error){if(!holder.isConnected||!current())return;holder.innerHTML='<h2>Job Roles</h2><p role="alert"></p><button type="button">Retry loading Job Roles</button>';holder.querySelector('p').textContent=error.message;holder.querySelector('button').onclick=()=>renderJobRoleAdministration(current,holder);}
+        const row=(role,i)=>`<tr data-role-row="${i}"><td><input name="displayName" aria-label="Role name" required maxlength="200" value="${esc(role.displayName||'')}"></td><td><input name="code" aria-label="Role code" required maxlength="80" value="${esc(role.code||'')}" ${role.code?'readonly':''}></td><td><input name="canBePrimary" aria-label="Can be primary" type="checkbox" ${role.canBePrimary?'checked':''}></td><td><input name="isActive" aria-label="Active" type="checkbox" ${role.isActive!==false?'checked':''}></td><td><button type="button" data-save-role>Save</button><small data-job-role-status role="status"></small></td></tr>`;
+        holder.innerHTML=`<div class="staff-compact-heading"><strong>Job Roles</strong><button type="button" data-add-job-role>+ Add role</button></div><div class="staff-grid-scroll"><table class="staff-editable-grid staff-compact-role-grid"><thead><tr><th>Name</th><th>Code</th><th>Primary</th><th>Active</th><th></th></tr></thead><tbody>${roles.map(row).join('')}</tbody></table></div>`;
+        const tbody=holder.querySelector('tbody');
+        holder.querySelector('[data-add-job-role]').onclick=()=>{if(tbody.querySelector('[data-role-row="new"]'))return;tbody.insertAdjacentHTML('afterbegin',row({displayName:'',code:'',canBePrimary:false,isActive:true},'new'));wire(tbody.firstElementChild);tbody.querySelector('[data-role-row="new"] input[name="displayName"]').focus();};
+        function wire(tr){
+            tr.querySelector('[data-save-role]').onclick=async()=>{
+                if(tr.dataset.saving)return;
+                const get=name=>tr.querySelector('[name="'+name+'"]');
+                const payload={displayName:get('displayName').value.trim(),code:get('code').value.trim().toUpperCase(),canBePrimary:get('canBePrimary').checked,isActive:get('isActive').checked};
+                const status=tr.querySelector('[data-job-role-status]');
+                if(!payload.displayName||!payload.code){status.textContent='Name and code required';return;}
+                if(tr.dataset.roleRow==='new'&&roles.some(r=>r.code.toUpperCase()===payload.code)){status.textContent='Code already exists';return;}
+                tr.dataset.saving='true';tr.querySelector('[data-save-role]').disabled=true;status.textContent='Saving…';
+                try{await json('/api/admin/job-roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});await renderJobRoleAdministration(current,holder);}
+                catch(error){status.textContent=error.message||'Save failed';tr.querySelector('[data-save-role]').disabled=false;delete tr.dataset.saving;}
+            };
+        }
+        tbody.querySelectorAll('[data-role-row]').forEach(wire);
+    }catch(error){if(!holder.isConnected||!current())return;holder.innerHTML='<p role="alert"></p><button type="button">Retry</button>';holder.querySelector('p').textContent=error.message||'Could not load roles';holder.querySelector('button').onclick=()=>renderJobRoleAdministration(current,holder);}
 }
 
 async function refreshStudioEmployees(current=()=>true) {
