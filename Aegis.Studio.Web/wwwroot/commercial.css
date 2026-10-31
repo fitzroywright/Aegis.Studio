@@ -1,3 +1,36 @@
 .commercial-grid{min-height:0;flex:1;overflow:auto;border:1px solid #bba589;border-radius:8px;background:var(--studio-card-bg,#fffdf8)}.commercial-grid tr[data-item]{cursor:pointer}.commercial-grid small,.commercial-order small{display:block}.commercial-grid th{position:sticky;top:0;background:var(--studio-grid-header-bg)}.commercial-management{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.commercial-management p{padding:8px}.commercial-management button{margin:8px}.commercial-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:75vh;overflow:auto;padding:8px;min-width:min(700px,80vw)}.commercial-form label{display:flex;flex-direction:column;gap:4px;font-size:12px}.commercial-form input,.commercial-form select,.commercial-form textarea{padding:6px;border:1px solid #bba589;border-radius:6px;font:inherit}.commercial-form input[type=checkbox]{align-self:start}.commercial-form fieldset,.commercial-form footer{grid-column:1/-1;border-radius:8px;border:1px solid #bba589}.commercial-bundle{max-height:180px;overflow:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.commercial-step{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px;border-bottom:1px solid #bba589}.commercial-step fieldset{display:flex;flex-wrap:wrap;gap:8px}.commercial-blocker{color:#a12d1e}.commercial-queue-tools,.commercial-pager{display:flex;align-items:center;gap:12px}.commercial-order{max-height:75vh;overflow:auto;max-width:85vw}.commercial-order input{max-width:150px}.commercial-search{max-width:350px}.commercial-steps{padding:6px}.commercial-page .fd-card-link{font-weight:700}.commercial-order .pos-grid{font-size:12px}
 
 
+
+
+/* Products and Services: stable two-column catalog and detail workspace. */
+.catalog-page .booking-sessions{display:flex;flex-direction:column;min-height:0;gap:9px}
+.catalog-page .booking-catalog-workspace{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(380px,1fr);gap:14px;align-items:start;min-height:0}
+.catalog-page .booking-catalog-workspace>.booking-grid-scroll{min-width:0;max-height:min(66vh,650px);overflow:auto;border:1px solid var(--theme-border,#dce3eb);border-radius:9px;background:#fff}
+.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){display:block;min-width:0;max-height:min(70vh,690px);overflow:auto;margin:0;padding:14px;border:1px solid var(--theme-border,#dce3eb);border-radius:10px;background:#fff}
+.catalog-page .booking-editor-heading{display:flex;align-items:center;padding:2px 2px 12px;border-bottom:1px solid var(--theme-border,#dce3eb);margin-bottom:12px}
+.catalog-page .booking-editor-heading strong{display:block;font-size:18px;line-height:1.3}
+.catalog-page .booking-editor-heading small{display:block;color:var(--theme-muted,#66758b);margin-top:3px}
+.catalog-page .booking-detail-form{display:grid;gap:11px}
+.catalog-page .booking-editor-section-title{font-size:12px;font-weight:700;padding:7px 10px;border-radius:7px;background:var(--theme-surface-muted,#f1f5f9);color:var(--theme-text,#243447)}
+.catalog-page .booking-editor-basics{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.7fr);gap:9px}
+.catalog-page .booking-editor-pricing{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.catalog-page .booking-editor-basics label,.catalog-page .booking-editor-pricing label{display:grid;gap:4px;font-size:12px;color:var(--theme-muted,#526477)}
+.catalog-page .booking-editor-basics input,.catalog-page .booking-editor-pricing input{width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--theme-border,#dce3eb);border-radius:6px}
+.catalog-page .booking-editor-locations{display:flex;align-items:center;flex-wrap:wrap;gap:9px 15px;font-size:12px}
+.catalog-page .booking-editor-locations label{display:flex;align-items:center;gap:5px}
+.catalog-page .booking-detail-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.catalog-page .booking-detail-fields textarea{width:100%;box-sizing:border-box}
+.catalog-page .booking-detail-form footer{position:sticky;bottom:0;background:#fff;padding:10px 0 0;border-top:1px solid var(--theme-border,#dce3eb);display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+.catalog-page .booking-detail-form footer small{flex:1 1 100%;color:var(--theme-muted,#66758b)}
+.catalog-page .booking-session-grid{font-size:12px;min-width:740px}
+.catalog-page .booking-session-grid th{position:sticky;top:0;z-index:1;background:var(--theme-surface-muted,#f1f5f9);color:var(--theme-text,#243447)}
+.catalog-page .booking-session-grid tbody tr{cursor:pointer}
+.catalog-page .booking-session-grid tbody tr[aria-selected="true"]{background:var(--theme-surface-muted,#f9f4ec);box-shadow:inset 3px 0 #b78336}
+.catalog-page .booking-session-grid td,.catalog-page .booking-session-grid th{padding:8px 7px}
+.catalog-page .booking-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.catalog-page .booking-toolbar [data-booking-count]{margin-left:auto}
+.catalog-page .booking-help{margin:0;font-size:11px}
+.catalog-page .booking-feedback:empty{display:none}
+@media(max-width:1150px){.catalog-page .booking-catalog-workspace{grid-template-columns:minmax(0,1fr)}.catalog-page .booking-catalog-workspace>.booking-grid-scroll{max-height:360px}.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){max-height:none}}
+@media(max-width:620px){.catalog-page .booking-editor-basics,.catalog-page .booking-editor-pricing{grid-template-columns:1fr 1fr}.catalog-page .booking-session-grid{min-width:700px}}
