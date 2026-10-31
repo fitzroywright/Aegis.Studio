@@ -135,6 +135,7 @@ public static class StudioSignIn
     {
         var provisioning = services.GetRequiredService<Common.Security.Services.AccountProvisioningService>();
         var account = provisioning.Provision(identity, AccountPopulation.Staff).Account;
+        SyncDirectoryProfile(identity,profile,services);
         if (account.Status is SecurityAccountStatus.Disabled or SecurityAccountStatus.Suspended) return null;
         List<Claim> claims = [new(ClaimTypes.NameIdentifier, account.LoginName), new(ClaimTypes.Name, account.DisplayName), new("login_name", account.LoginName)];
         claims.AddRange(AccountSecurityHosting.SessionClaims(account, identity));
@@ -151,6 +152,24 @@ public static class StudioSignIn
             claims.AddRange(decision.EffectiveRoles.Select(r => new Claim(ClaimTypes.Role, r)));
         }
         return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+    }
+
+    private static void SyncDirectoryProfile(VerifiedIdentity identity,ApplicationUserInfo? profile,IServiceProvider services)
+    {
+        try
+        {
+            StudioEmployeeDirectoryStore employees=services.GetRequiredService<StudioEmployeeDirectoryStore>();
+            if(!employees.GetAll().Any(x=>x.UserName.Equals(identity.LoginName,StringComparison.OrdinalIgnoreCase)))
+                employees.Save(new(identity.LoginName,profile?.DisplayName??identity.DisplayName,profile?.Mail??identity.VerifiedEmail,
+                    true,false,identity.ProviderKind.ToString(),identity.Key.SubjectId));
+            if(profile?.Photo is {Length:>0} photo&&photo.Length<=StaffPhotoValidator.MaximumBytes&&StaffPhotoValidator.DetectContentType(photo) is { } contentType)
+                employees.SavePhoto(identity.LoginName,identity.ProviderKind.ToString(),contentType,null,photo);
+        }
+        catch(Exception error)
+        {
+            services.GetService<ILoggerFactory>()?.CreateLogger("StudioStaffPhotoSync")
+                .LogWarning(error,"Could not synchronize the directory profile for {UserName}.",identity.LoginName);
+        }
     }
 }
 
