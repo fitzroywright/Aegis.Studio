@@ -1,3 +1,5 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -139,6 +141,39 @@ public static class StudioPublicBookingCatalogEndpoints
     }
 }
 
+internal sealed class PublicBookingSiteClient : IDisposable
+{
+    private readonly HttpClient http;
+
+    internal PublicBookingSiteClient(IConfiguration configuration,HttpMessageHandler? handler=null)
+    {
+        var root=new Uri(configuration["PublicSite:BaseUrl"]??throw new InvalidOperationException("Configure PublicSite:BaseUrl."));
+        if(root.Scheme!="https"||!string.IsNullOrEmpty(root.UserInfo)||root.AbsolutePath!="/"||!string.IsNullOrEmpty(root.Query)||!string.IsNullOrEmpty(root.Fragment))
+            throw new InvalidOperationException("PublicSite:BaseUrl must be an HTTPS origin.");
+        string secret=configuration["PublicSite:IntegrationToken"]??"";
+        if(secret.Length<32)throw new InvalidOperationException("Configure a scoped public site integration token.");
+        http=new HttpClient(handler??new HttpClientHandler{AllowAutoRedirect=false}){BaseAddress=root,Timeout=TimeSpan.FromSeconds(45)};
+        http.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",secret);
+    }
+
+    internal Task<JsonElement> PutCatalog(object data,string idempotencyKey,CancellationToken ct)
+        => Put("/api/v1/admin/booking/catalog",data,idempotencyKey,ct);
+
+    internal Task<JsonElement> PutAvailability(object data,string idempotencyKey,CancellationToken ct)
+        => Put("/api/v1/admin/booking/availability",data,idempotencyKey,ct);
+
+    private async Task<JsonElement> Put(string path,object data,string idempotencyKey,CancellationToken ct)
+    {
+        using var request=new HttpRequestMessage(HttpMethod.Put,path){Content=JsonContent.Create(data)};
+        request.Headers.Add("Idempotency-Key",idempotencyKey);
+        using var response=await http.SendAsync(request,ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken:ct);
+    }
+
+    public void Dispose()=>http.Dispose();
+}
+
 public sealed class StudioPublicBookingCatalogPublisher(StudioPublicBookingCatalogStore store,StudioDatabase database,ScheduleStore schedule,IConfiguration configuration,ILogger<StudioPublicBookingCatalogPublisher> logger):BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -151,18 +186,18 @@ public sealed class StudioPublicBookingCatalogPublisher(StudioPublicBookingCatal
             try
             {
                 var catalog=store.Get(true);
-                using var site=new PublicSiteClient(configuration);
+                using var site=new PublicBookingSiteClient(configuration);
                 if(catalog.Revision!=published||apiRevision==0)
                 {
                     var body=new{sessionTypes=catalog.SessionTypes.Select(x=>new{id=x.Id,name=x.Name,description=x.Description,durationMinutes=x.DurationMinutes,setupBufferMinutes=x.SetupBufferMinutes,cleanupBufferMinutes=x.CleanupBufferMinutes,priceMinor=x.PriceMinor,depositMinor=x.DepositMinor,currency=x.Currency,locations=x.Locations,resourceRequirements=x.ResourceRequirements,active=x.IsActive})};
-                    var result=await site.PutJson("/api/v1/admin/booking/catalog",body,$"studio-catalog-{catalog.Revision}",ct);apiRevision=result.GetProperty("revision").GetInt64();published=catalog.Revision;
+                    var result=await site.PutCatalog(body,$"studio-catalog-{catalog.Revision}",ct);apiRevision=result.GetProperty("revision").GetInt64();published=catalog.Revision;
                 }
                 var slots=StudioPublicBookingAvailabilityBuilder.Build(catalog,store.GetHours(),schedule,photographers,apiRevision,DateTimeOffset.UtcNow);
                 var availability=new{slots};var hash=Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(availability,new JsonSerializerOptions(JsonSerializerDefaults.Web)))).ToLowerInvariant();
-                await site.PutJson("/api/v1/admin/booking/availability",availability,"availability-"+hash,ct);
+                await site.PutAvailability(availability,"availability-"+hash,ct);
             }
             catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}
-            catch(Exception ex){logger.LogError("Studio public booking catalog publication will retry. ErrorType={ErrorType}",ex.GetType().Name);}
+            catch(Exception ex){logger.LogError(ex,"Studio public booking catalog publication will retry.");}
             try{await Task.Delay(TimeSpan.FromSeconds(60),ct);}catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}
         }
     }

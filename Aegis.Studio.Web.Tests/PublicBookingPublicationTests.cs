@@ -1,4 +1,9 @@
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using Aegis.Studio.Web.Bookings;
+using Aegis.Studio.Web.Operations;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace Aegis.Studio.Web.Tests;
@@ -46,4 +51,55 @@ public sealed class PublicBookingPublicationTests
         Assert.Throws<InvalidOperationException>(()=>store.SetPublication("portrait",new(true,store.Get().Revision)));
         Assert.Throws<KeyNotFoundException>(()=>store.SetPublication("missing",new(true,store.Get().Revision)));
     }
+    [Fact]
+    public async Task ConfiguredBookingPublisherCanReachOnlyBookingEndpointsInIsolatedDemo()
+    {
+        var handler=new BookingSiteHandler();
+        IConfiguration configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>
+        {
+            [DemoIntegrationIsolation.ConfigurationKey]="true",
+            ["PublicSite:BaseUrl"]="https://api.example.test/",
+            ["PublicSite:IntegrationToken"]=new string('s',40)
+        }).Build();
+
+        using var site=new PublicBookingSiteClient(configuration,handler);
+        JsonElement catalog=await site.PutCatalog(new{sessionTypes=Array.Empty<object>()},"studio-catalog-7",default);
+        JsonElement availability=await site.PutAvailability(new{slots=Array.Empty<object>()},"availability-test",default);
+
+        Assert.Equal(9,catalog.GetProperty("revision").GetInt32());
+        Assert.Equal(9,availability.GetProperty("revision").GetInt32());
+        Assert.Equal(
+        [
+            ("/api/v1/admin/booking/catalog","studio-catalog-7"),
+            ("/api/v1/admin/booking/availability","availability-test")
+        ],handler.Requests.Select(x=>(x.Path,x.IdempotencyKey)).ToArray());
+        Assert.All(handler.Requests,request=>
+        {
+            Assert.Equal(HttpMethod.Put,request.Method);
+            Assert.Equal("Bearer",request.AuthenticationScheme);
+            Assert.Equal(40,request.TokenLength);
+        });
+    }
+
+    private sealed record BookingSiteRequest(HttpMethod Method,string Path,string IdempotencyKey,string? AuthenticationScheme,int TokenLength);
+
+    private sealed class BookingSiteHandler : HttpMessageHandler
+    {
+        internal List<BookingSiteRequest> Requests {get;}=[];
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken)
+        {
+            Requests.Add(new(
+                request.Method,
+                request.RequestUri!.AbsolutePath,
+                request.Headers.GetValues("Idempotency-Key").Single(),
+                request.Headers.Authorization?.Scheme,
+                request.Headers.Authorization?.Parameter?.Length??0));
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content=new StringContent("{\"revision\":9}",Encoding.UTF8,"application/json")
+            });
+        }
+    }
+
 }

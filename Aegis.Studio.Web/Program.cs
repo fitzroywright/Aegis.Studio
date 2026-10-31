@@ -263,7 +263,7 @@ if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.Web
 if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GalleryPushWorker>();
 if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GallerySelectionWorker>();
 builder.Services.AddSingleton<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogStore>();
-if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogPublisher>();
+builder.Services.AddHostedService<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogPublisher>();
 if (!isolatedDemo) builder.Services.AddHostedService<NotificationDeliveryWorker>();
 builder.Services.AddSingleton<WorkflowStore>();
 if (!isolatedDemo) builder.Services.AddHostedService<Aegis.Studio.Web.PublicApi.PublicWebhookWorker>();
