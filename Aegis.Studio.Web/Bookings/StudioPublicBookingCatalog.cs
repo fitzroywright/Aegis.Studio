@@ -26,6 +26,7 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
     }
     public PublicBookingCatalog Get(bool publishedOnly=false)
     {
+        EnsureSchema();
         using var c=database.OpenConnection();long revision;
         using(var q=new NpgsqlCommand("select revision from studio_public_booking_catalog_state where id=1",c))revision=(long)q.ExecuteScalar()!;
         using var list=new NpgsqlCommand("select payload::text from studio_public_booking_session_types order by lower(payload->>'name')",c);
@@ -35,6 +36,7 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
     }
     public PublicBookingCatalog Save(IReadOnlyList<PublicBookingSessionType> items,long? expectedRevision=null)
     {
+        EnsureSchema();
         Validate(items);using var c=database.OpenConnection();using var tx=c.BeginTransaction();
         foreach(var item in items.Where(x=>x.DefaultWorkspaceId.HasValue))
         {
@@ -53,10 +55,12 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
     }
     public IReadOnlyList<PublicBookingHours> GetHours()
     {
+        EnsureSchema();
         using var c=database.OpenConnection();using var q=new NpgsqlCommand("select payload::text from studio_public_booking_hours order by location_code,day_of_week,opens_at",c);using var r=q.ExecuteReader();var values=new List<PublicBookingHours>();while(r.Read())values.Add(JsonSerializer.Deserialize<PublicBookingHours>(r.GetString(0),JsonOptions)!);return values;
     }
     public object SetPublication(string id,PublicBookingPublicationRequest request)
     {
+        EnsureSchema();
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
         using var guard=new NpgsqlCommand("select revision from studio_public_booking_catalog_state where id=1 for update",c,tx);
         long current=(long)guard.ExecuteScalar()!;
@@ -74,6 +78,7 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
     }
     public long SaveHours(IReadOnlyList<PublicBookingHours> hours,long? expectedRevision=null)
     {
+        EnsureSchema();
         var keys=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if(hours.Count>56)throw new ArgumentException("Configure up to four opening windows per location and weekday.");
         foreach(var x in hours){if(x.LocationCode is not ("BK" or "BE")||x.DayOfWeek is <0 or >6||!TimeOnly.TryParse(x.OpensAt,out var opens)||!TimeOnly.TryParse(x.ClosesAt,out var closes)||closes<=opens||x.SlotStepMinutes is <5 or >240||!keys.Add(x.LocationCode+":"+x.DayOfWeek+":"+opens.ToString("HH:mm")))throw new ArgumentException("Hours need unique opening and closing ranges in Jamaica time for each Studio location and weekday.");}
