@@ -9415,3 +9415,15 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 @media(max-width:800px) { .company-dashboard { height:auto; grid-template-rows:auto; } .cd-main,.cd-bottom { grid-template-columns:minmax(0,1fr); } .cd-donut { max-height:none; width:140px; } .cd-week-chart { min-height:180px; } .cd-bottom .cd-card { overflow-x:auto; } .cd-card table { min-width:460px; } }
 @media(max-width:650px) { .cd-heading { align-items:stretch; } .cd-heading>div:first-child { flex-basis:100%; } .cd-card { padding:8px; } }
 
+
+.api-key-dialog{--studio-dialog-width:min(430px,calc(100vw - 28px));--studio-dialog-body-padding:12px}
+.api-key-form{display:grid;gap:8px;font-size:12px}
+.api-key-form p{margin:0;line-height:1.4}
+.api-key-purpose{padding:8px 9px;border-left:3px solid #78ad9d;background:#edf7f3}
+.api-key-how{padding:8px 9px;border-left:3px solid #8aaaca;background:#eef5fb}
+.api-key-form code{font-size:11px}
+.api-key-form label{display:grid;gap:4px;font-weight:600}
+.api-key-form input,.api-key-form textarea{box-sizing:border-box;width:100%;padding:6px;border:1px solid #bba589;border-radius:5px;font:inherit;font-weight:400}
+.api-key-form textarea{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px}
+.api-key-actions{display:flex;gap:6px;flex-wrap:wrap}
+.api-key-warning{color:#70421e;font-size:11px}
