@@ -110,6 +110,49 @@ internal static partial class DemoDataExpansion
         }
     }
 
+    private static string[] LocalStaffPhotos()
+    {
+        string directory=Path.Combine(photoLibraryRoot,"staff");
+        return Directory.Exists(directory)
+            ? Directory.EnumerateFiles(directory)
+                .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
+                .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray()
+            : [];
+    }
+
+    internal static void PrepareStaffPhotos(Action<DemoSeedProgress>? report)
+    {
+        string directory=Path.Combine(photoLibraryRoot,"staff");
+        string[] files=LocalStaffPhotos();
+        if(files.Length<4)
+            throw new InvalidOperationException($"The local staff photo library must contain at least four unique usable images at '{directory}'. Staff photos are kept separate from job/gallery photos and are never borrowed from a job category.");
+        HashSet<string> hashes=[];
+        for(int index=0;index<files.Length;index++)
+        {
+            report?.Invoke(new(2,"Preparing staff photographs",index,files.Length,$"Validating staff photo {index+1}/{files.Length}."));
+            try
+            {
+                byte[] raw=File.ReadAllBytes(files[index]);
+                string hash=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(raw));
+                if(!hashes.Add(hash)) throw new InvalidDataException($"Duplicate staff photo content: '{files[index]}'.");
+                using var image=StudioImageProcessor.DecodeOriented(new MemoryStream(raw));
+                if(image.Width<=0||image.Height<=0)throw new InvalidDataException("Image dimensions are invalid.");
+            }
+            catch(Exception error) when(error is IOException or ArgumentException or InvalidOperationException or InvalidDataException)
+            {
+                throw new InvalidDataException($"Staff photo failed validation: '{files[index]}'.",error);
+            }
+        }
+    }
+
+    internal static (byte[] Content,string ContentType,string FileName) ReadStaffPhoto(string file)
+    {
+        byte[] raw=File.ReadAllBytes(file);
+        using var decoded=StudioImageProcessor.DecodeOriented(new MemoryStream(raw));
+        using var resized=StudioImageProcessor.ResizeMax(decoded,1200);
+        return (StudioImageProcessor.EncodeJpeg(resized,92),"image/jpeg",Path.GetFileNameWithoutExtension(file)+".jpg");
+    }
+
     private static byte[] PhotoBytes(string url, int variant, string? searchTerm)
     {
         if(TryLocalDemoPhoto(searchTerm,variant,out var bytes,out var input))

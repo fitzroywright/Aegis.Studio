@@ -57,6 +57,7 @@ public static class DemoDataEndpoints
             if ((bool)check.ExecuteScalar()!) throw new InvalidOperationException("Clear the demo dataset before recreating it. In-place demo repair is not supported.");
 
         DemoDataExpansion.PreparePhotos(report);
+        DemoDataExpansion.PrepareStaffPhotos(report);
 
         // Phase 1: create the high-volume operational workload in small, durable batches.
         // Each batch owns only deterministic DEMO ids, so retries are safe and do not
@@ -104,6 +105,7 @@ public static class DemoDataEndpoints
         report?.Invoke(new(30, "Presentation records", 0, 0, "Linking wedding people, tasks and announcements."));
         bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
         bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage, report);
+        SeedDistinctStaffPhotos(database, report);
         DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
         DemoJobWorkflowGraphs.Seed(connection,transaction,login);
         report?.Invoke(new(96, "Committing rich demo", 0, 0, "Saving historical workflow and media data."));
@@ -118,6 +120,28 @@ public static class DemoDataEndpoints
                 : expanded
                     ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days. Legacy demo media also expanded."
                     : $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days; existing rich demo data is already up to date.";
+    }
+
+    private static void SeedDistinctStaffPhotos(StudioDatabase database, Action<DemoSeedProgress>? report)
+    {
+        var employees=new StudioEmployeeDirectoryStore(database);
+        employees.EnsureSchema();
+        string root=Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS")
+            ?? "/var/lib/aegis-studio/demo-photos";
+        string[] files=Directory.EnumerateFiles(Path.Combine(root,"staff"))
+            .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
+            .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray();
+        var staff=employees.GetAll().Where(person=>person.UserName.StartsWith("demo.",StringComparison.OrdinalIgnoreCase)).OrderBy(person=>person.UserName,StringComparer.OrdinalIgnoreCase).ToArray();
+        if(files.Length<staff.Length)throw new InvalidOperationException($"The staff photo library contains {files.Length} unique images but the demo has {staff.Length} staff users.");
+        var used=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for(int index=0;index<staff.Length;index++)
+        {
+            string file=files[index];
+            if(!used.Add(file))throw new InvalidOperationException($"Staff photo '{file}' was selected more than once.");
+            var photo=DemoDataExpansion.ReadStaffPhoto(file);
+            employees.SavePhoto(staff[index].UserName,"DemoStaff",photo.ContentType,photo.FileName,photo.Content);
+            report?.Invoke(new(95,"Linking staff profiles",index+1,staff.Length,$"Assigned a unique profile photo to {staff[index].DisplayName}."));
+        }
     }
 
     private static void CreateDemoWorkspaces(NpgsqlConnection connection, NpgsqlTransaction transaction, string login)

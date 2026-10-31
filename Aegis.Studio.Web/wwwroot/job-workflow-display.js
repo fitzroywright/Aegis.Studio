@@ -33,7 +33,7 @@
   };
   return {taskState,stageState};
  }
- function shortStageLabel(label){const words=String(label??'').trim().split(/[\s/]+/).filter(Boolean);return words.length?words[words.length-1]:'';}
+ function shortStageLabel(label){const value=String(label??'').trim(),normalized=value.toLowerCase().replace(/[\u2013\u2014]/g,'-');if(/job\s+template/.test(normalized))return 'Job';if(/work\s+order\s+template/.test(normalized)||/work\s+order/.test(normalized))return 'Work';if(/workflow\s+automation/.test(normalized)||/automation/.test(normalized))return 'Automate';const words=value.split(/[\s/]+/).filter(Boolean);return words.length?words[words.length-1]:'';}
  function icon(state){return state==='Completed'||state==='Skipped'?'✓':state==='InProgress'?'●':state==='Blocked'?'!':'›';}
  function render(host,view){
   const graph=view?.graph;if(!host||!graph?.nodes)return;
