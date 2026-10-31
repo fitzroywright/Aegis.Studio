@@ -9,7 +9,7 @@ window.StudioBookingSessions=(()=>{
         const root=host.querySelector('.booking-sessions');if(!root)return;
         const live=()=>current()&&root.isConnected;
         const field=name=>root.querySelector('[data-booking-'+name+']');
-        const state={tab:'sessions',sessions:[],hours:[],workspaces:[],resourceTypes:['Photographer'],loaded:{sessions:false,hours:false},dirty:{sessions:false,hours:false},errors:{},search:'',category:'',location:'',filter:'',selected:null,detailBaseline:null,saving:false,revision:null};
+        const state={tab:'sessions',sessions:[],hours:[],workspaces:[],resourceTypes:['Photographer'],loaded:{sessions:false,hours:false},dirty:{sessions:false,hours:false},errors:{},search:'',category:'',location:'',filter:'',selected:null,detailBaseline:null,selectedHour:0,saving:false,revision:null};
         let loadRevision=0;const persisted=new Map();
         const status=message=>{if(live())field('status').textContent=message;};
         const dirty=()=>{state.dirty[state.tab]=true;controls();status('Unsaved changes');};
@@ -40,9 +40,16 @@ window.StudioBookingSessions=(()=>{
                 else paintDetails();
                 field('save').hidden=!field('editor').hidden;
             }else{
-                field('save').hidden=false;
-                field('editor').hidden=true;
-                field('grid').innerHTML=`<table class="booking-grid booking-hours-grid"><caption class="sr-only">Editable opening hours in Jamaica time</caption><thead><tr><th scope="col">Location</th><th scope="col">Day</th><th scope="col">Opens</th><th scope="col">Closes</th><th scope="col">Slot interval · min</th><th scope="col">Action</th></tr></thead><tbody>${state.hours.map((row,index)=>`<tr data-booking-hour="${index}"><td><select data-field="locationCode" aria-label="Opening location">${locations.map(([code,label])=>`<option value="${code}" ${row.locationCode===code?'selected':''}>${label}</option>`).join('')}</select></td><td><select data-field="dayOfWeek" aria-label="Opening day">${days.map((label,value)=>`<option value="${value}" ${Number(row.dayOfWeek)===value?'selected':''}>${label}</option>`).join('')}</select></td><td><input data-field="opensAt" type="time" value="${esc(row.opensAt)}" aria-label="Opening time" required></td><td><input data-field="closesAt" type="time" value="${esc(row.closesAt)}" aria-label="Closing time" required></td><td>${number('slotStepMinutes',row.slotStepMinutes,'Slot interval in minutes',5,240)}</td><td><button type="button" class="booking-remove" data-booking-remove>Remove</button></td></tr>`).join('')||'<tr><td colspan="6" class="booking-empty">No opening hours configured. Add an opening window for each working day.</td></tr>'}</tbody></table>`;
+                field('save').hidden=true;
+                field('grid').innerHTML=`<div class="booking-hours-location-groups">${locations.map(([code,label])=>`<section class="booking-hours-location"><h3>${esc(label)}</h3>${state.hours.map((row,index)=>({row,index})).filter(x=>x.row.locationCode===code).sort((a,b)=>Number(a.row.dayOfWeek)-Number(b.row.dayOfWeek)||a.row.opensAt.localeCompare(b.row.opensAt)).map(({row,index})=>`<button type="button" class="booking-hour-choice" data-hour-select="${index}" aria-pressed="${state.selectedHour===index}"><strong>${days[Number(row.dayOfWeek)]||'Day'}</strong><span>${esc(row.opensAt)}–${esc(row.closesAt)}</span><small>${esc(row.slotStepMinutes)} min slots</small></button>`).join('')||'<p>No opening windows</p>'}</section>`).join('')}</div>`;
+                if(state.selectedHour>=state.hours.length)state.selectedHour=Math.max(0,state.hours.length-1);
+                const selectedHour=state.hours[state.selectedHour],editor=field('editor');
+                editor.hidden=!selectedHour;
+                if(selectedHour)editor.innerHTML=`<header class="booking-editor-heading"><div><strong>Opening window</strong><small>Jamaica time · edit the selected day</small></div></header><form class="booking-hour-detail-form"><label>Location<select name="locationCode">${locations.map(([code,label])=>`<option value="${code}" ${selectedHour.locationCode===code?'selected':''}>${label}</option>`).join('')}</select></label><label>Day<select name="dayOfWeek">${days.map((label,index)=>`<option value="${index}" ${Number(selectedHour.dayOfWeek)===index?'selected':''}>${label}</option>`).join('')}</select></label><label>Opens<input type="time" name="opensAt" value="${esc(selectedHour.opensAt)}" required></label><label>Closes<input type="time" name="closesAt" value="${esc(selectedHour.closesAt)}" required></label><label>Slot interval (minutes)<input type="number" name="slotStepMinutes" min="5" max="240" step="1" value="${esc(selectedHour.slotStepMinutes)}" required></label><div class="booking-hour-actions"><button type="button" class="action" data-hour-remove>Remove window</button><button type="submit" class="primary" ${state.dirty.hours?'':'disabled'}>Save changes</button></div></form>`;
+                editor.querySelector('form')?.addEventListener('change',event=>{const control=event.target;if(!control.name)return;selectedHour[control.name]=control.value;dirty();paintGrid();});
+                editor.querySelector('form')?.addEventListener('submit',event=>{event.preventDefault();field('save').click();});
+                editor.querySelector('[data-hour-remove]')?.addEventListener('click',()=>{if(!confirm('Remove this opening window? The removal takes effect when you save changes.'))return;state.hours.splice(state.selectedHour,1);dirty();paintGrid();});
+                field('grid').querySelectorAll('[data-hour-select]').forEach(button=>button.onclick=()=>{state.selectedHour=Number(button.dataset.hourSelect);paintGrid();});;
                 field('footer').textContent=state.hours.length+' opening windows · America/Jamaica';
             }
         }
@@ -119,7 +126,7 @@ window.StudioBookingSessions=(()=>{
         field('add').onclick=()=>{
             try{if(state.tab==='sessions')readDetails();}catch(error){status(error.message);return;}
             if(state.tab==='sessions'){state.search='';state.category='';state.location='';state.filter='';for(const name of ['search','category','location','filter'])field(name).value='';state.sessions.push({id:crypto.randomUUID(),name:'',description:'',durationMinutes:60,setupBufferMinutes:0,cleanupBufferMinutes:0,price:'0',deposit:'0',priceMinor:0,depositMinor:0,currency:'JMD',locations:['BK'],resourceRequirements:{Photographer:1},isActive:true,isPublished:false,defaultWorkspaceId:null,category:''});state.selected=state.sessions.at(-1).id;state.detailBaseline=null;}
-            else state.hours.push({locationCode:'BK',dayOfWeek:1,opensAt:'09:00',closesAt:'17:00',slotStepMinutes:30});
+            else{state.hours.push({locationCode:'BK',dayOfWeek:1,opensAt:'09:00',closesAt:'17:00',slotStepMinutes:30});state.selectedHour=state.hours.length-1;}
             dirty();paintGrid();const row=field('grid').querySelector('tbody tr:last-child');row?.querySelector('input,select')?.focus();row?.scrollIntoView?.({block:'nearest'});
         };
         field('grid').addEventListener('input',event=>{
