@@ -23,5 +23,5 @@ test('account provisioning retry preserves the pending account after a profile s
  if(url==='/api/photographers'||url==='/api/security/global-roles/')return [];throw Error('Unexpected API '+url);};
  await w.refreshStudioEmployees();w.openStaffEditor(null);w.document.getElementById('employeeUserName').value='local.operator';w.document.getElementById('employeeAuthSource').value='LocalDatabase';w.document.getElementById('employeeLocalPassword').value='new-local-password';
  await w.saveStudioEmployee();assert.equal(creates,1);assert.match(w.document.getElementById('employeeAccountStatus').textContent,/Profile save unavailable/);assert.equal(w.document.getElementById('employeeLocalPassword').value,'');
- await w.saveStudioEmployee();assert.equal(creates,1);assert.equal(profileAttempts,2);assert.match(w.document.querySelector('[data-staff-approvals]').textContent,/awaiting approval/);assert.equal(w.document.querySelector('.staff-person-form input[readonly]').value,'Local account');
+ await w.saveStudioEmployee();assert.equal(creates,1);assert.equal(profileAttempts,2);assert.match(w.document.querySelector('[data-staff-approvals]').textContent,/awaiting approval/);assert.equal(w.document.querySelector('.staff-person-form').elements.signInMethod.value,'Local account');
 });

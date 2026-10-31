@@ -24,7 +24,7 @@ async function setup(t,{accounts=true,roleFailure=false,demo=false,provider="Moc
  return {w,employee,writes,selectSam,dom};
 }
 test('staff page has one editor, searchable rows, role tokens and collapsed technical controls',async t=>{
- const {w,selectSam}=await setup(t);selectSam();assert.equal(w.document.querySelectorAll('.staff-person-form').length,1);assert.equal(w.document.getElementById('rolesPanel'),null);assert.equal(w.document.querySelector('.staff-advanced').open,false);assert.equal(w.document.querySelector('.staff-person-form input[readonly]').value,'Active Directory');assert.equal(w.document.querySelectorAll('.staff-card-grid>.staff-detail-card').length,4);
+ const {w,selectSam}=await setup(t);const form=selectSam();assert.equal(w.document.querySelectorAll('.staff-person-form').length,1);assert.equal(w.document.getElementById('rolesPanel'),null);assert.equal(w.document.querySelector('.staff-advanced').open,false);assert.equal(form.elements.userName.value,'domain/user');assert.equal(form.elements.userName.readOnly,true);assert.equal(form.elements.signInMethod.value,'Active Directory');assert.equal(w.document.querySelectorAll('.staff-card-grid>.staff-detail-card').length,4);
  w.filterStudioStaff('sam@example');assert.equal(w.document.querySelectorAll('[data-staff-index]').length,1);w.filterStudioStaff('nobody');assert.match(w.document.getElementById('studioEmployeeList').textContent,/No matching/);
  assert.equal(w.document.querySelector('[data-manage-job-roles]').textContent,'Manage Job Roles');
 });
@@ -49,8 +49,10 @@ test('partial role failures retain edits and retry completes without approving a
  assert.match(form.querySelector('[data-editor-status]').textContent,/Role unavailable/);assert.equal(form.elements.displayName.value,'Draft');assert.equal(writes.filter(x=>x.url.endsWith('/status')).length,0);assert.equal(form.querySelector('[type=submit]').disabled,false);
  await form.onsubmit({preventDefault(){}});assert.equal(writes.filter(x=>x.url.endsWith('/status')).length,1);assert.equal(form.querySelector('[data-editor-status]').textContent,'Saved');
 });
-test('directory staff without an enrolled account cannot receive global roles and can start sign-in setup',async t=>{
- const {w,selectSam}=await setup(t,{accounts:false});const form=selectSam();assert.equal(form.querySelector('[data-token-kind=access] input').disabled,true);form.querySelector('[data-enroll]').click();assert.equal(w.document.getElementById('employeeUserName').value,'domain/user');assert.equal(w.document.getElementById('employeeUserName').readOnly,true);assert.equal(w.document.getElementById('employeeEmail').value,'sam@example.test');
+test('directory staff can receive access permissions before starting sign-in setup',async t=>{
+ const {w,writes,selectSam}=await setup(t,{accounts:false});let form=selectSam(),input=form.querySelector('[data-token-kind=access] input');assert.equal(input.disabled,false);input.focus();form.querySelector('[data-add-token="0"]').click();await form.onsubmit({preventDefault(){}});
+ const membership=writes.find(x=>x.url==='/api/security/global-roles/front/members/domain%2Fuser');assert.equal(membership.body.isActive,true);
+ form=w.document.querySelector('.staff-person-form');form.querySelector('[data-enroll]').click();assert.equal(w.document.getElementById('employeeUserName').value,'domain/user');assert.equal(w.document.getElementById('employeeUserName').readOnly,true);assert.equal(w.document.getElementById('employeeEmail').value,'sam@example.test');
 });
 test('new staff form only requires a password for local authentication and preserves creation API',async t=>{
  const {w,writes}=await setup(t);w.openStaffEditor(null);const d=w.document;d.getElementById('employeeUserName').value='new.user';d.getElementById('employeeDisplayName').value='New User';
@@ -116,7 +118,7 @@ test('existing account enrollment uses its explicit account ID and displays the 
  const {w,writes,selectSam}=await setup(t,{demo:true});const form=selectSam();
  await form.querySelector('[data-enable-demo]').onclick();
  assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/admin/security/demo-accounts/');assert.equal(writes[0].body.accountId,'account');
- assert.equal(w.document.querySelector('.staff-person-form input[readonly]').value,'Demo');
+ assert.equal(w.document.querySelector('.staff-person-form').elements.signInMethod.value,'Demo');
  assert.equal(w.document.querySelector('[data-enable-demo]'),null);
  assert.equal(w.document.querySelector('.staff-person-form').elements.accountStatus.value,'PendingAccess');
 });
