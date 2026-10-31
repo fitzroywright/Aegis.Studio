@@ -4,7 +4,7 @@
         {view:'templates',icon:'i-jobs',label:'Templates'},
         {view:'staff-roles',icon:'i-people',label:'Staff and Roles'},
         {view:'workspace-management',icon:'i-grid',label:'Workspaces',staff:true},
-        {view:'about',icon:'i-info',label:'About'}
+        {view:'about',icon:'i-info',label:'About',staff:true}
     ];
     function mountMenu(host){
         const menu=document.createElement('details');
@@ -42,3 +42,4 @@
     }
     window.StudioAdmin={entries,mountMenu,keyForm,bindKeyForm};
 })();
+

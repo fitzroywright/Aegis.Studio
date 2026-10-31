@@ -239,24 +239,29 @@
         const me=await json('/api/auth/me').catch(()=>null);
         if(!current())return;
         const isAdministrator=me?.user?.isAdministrator===true||me?.isAdministrator===true;
-        if(!isAdministrator){
+        if(view==='about'&&!me){
+            genericView.innerHTML=StudioPage.html({title,showHeader:false,content:'<section class="admin-card"><h2>Sign in required</h2><p>Sign in to view Studio information and support.</p></section>'});StudioPage.bind(genericView,current);return;
+        }
+        if(view!=='about'&&!isAdministrator){
             genericView.innerHTML=StudioPage.html({title,showHeader:false,content:'<section class="admin-card"><h2>Administrator access required</h2><p>Your account does not have permission to administer Studio.</p></section>'});StudioPage.bind(genericView,current);
             return;
         }
 
-        workspaceAccessCache=await json('/api/workspace-access').catch(()=>[]);
-        studioRolesCache=await json('/api/security/roles').catch(()=>[]);
+        if(view!=='about'){
+            workspaceAccessCache=await json('/api/workspace-access').catch(()=>[]);
+            studioRolesCache=await json('/api/security/roles').catch(()=>[]);
+        }
         if(!current())return;
 
 
         let content='';
         switch(view){
-            case 'about': content=`<section class="studio-about-card studio-about" aria-label="Thinking Machines support"><div class="studio-about-card-body"><picture class="studio-about-logo-player"><source media="(prefers-reduced-motion: reduce)" srcset="/thinking-machines-letterhead.png"><img class="studio-about-logo" src="/thinking-machines-about-once.gif" onerror="this.onerror=null;this.src='/thinking-machines-letterhead.png'" alt="Thinking Machines — metallic thinker and pixel-built lettering" width="1086" height="362"></picture><dl class="studio-about-details"><div><dt>Support</dt><dd><a href="mailto:it@thinkingmachines.ltd">it@thinkingmachines.ltd</a></dd></div><div><dt>Studio</dt><dd>Bryan’s Photo Studios</dd></div><div><dt>Time zone</dt><dd>America/Jamaica</dd></div><div><dt>Installation</dt><dd>${esc(window.location.origin)}</dd></div></dl><div class="studio-about-key-actions"><button type="button" class="action studio-about-key" data-about-api-key>Generate API Key</button><button type="button" class="action" data-service-audit>Recent Operational Audit</button></div></div></section>
+            case 'about': content=`<section class="studio-about-card studio-about" aria-label="Thinking Machines support"><div class="studio-about-card-body"><picture class="studio-about-logo-player"><source media="(prefers-reduced-motion: reduce)" srcset="/thinking-machines-letterhead.png"><img class="studio-about-logo" src="/thinking-machines-about-once.gif" onerror="this.onerror=null;this.src='/thinking-machines-letterhead.png'" alt="Thinking Machines — metallic thinker and pixel-built lettering" width="1086" height="362"></picture><dl class="studio-about-details"><div><dt>Support</dt><dd><a href="mailto:it@thinkingmachines.ltd">it@thinkingmachines.ltd</a></dd></div><div><dt>Studio</dt><dd>Bryan’s Photo Studios</dd></div><div><dt>Time zone</dt><dd>America/Jamaica</dd></div><div><dt>Installation</dt><dd>${esc(window.location.origin)}</dd></div></dl>${isAdministrator?'<div class="studio-about-key-actions"><button type="button" class="action studio-about-key" data-about-api-key>Generate API Key</button><button type="button" class="action" data-service-audit>Recent Operational Audit</button></div>':''}</div></section>${isAdministrator?`
                 <section class="studio-about-card" data-service-status><header class="studio-about-card-heading"><h2>Service health</h2><div class="studio-about-card-tools"><button class="action" data-refresh-service-status>Refresh</button></div></header><div class="studio-about-card-body" data-service-status-body>Loading…</div></section>
-                <section class="studio-about-card studio-about-demo" id="studioDemoLoader"><div class="studio-about-demo-main"><div class="studio-about-demo-copy"><h2>Demo Data</h2><p class="studio-about-demo-warning">Reset clears business records and files.<span class="studio-about-demo-line">Staff accounts, configuration and Unassigned are preserved.</span></p></div><div class="studio-about-demo-actions"><button class="action" type="button" data-demo-remove>Remove demo data</button><button class="primary" type="button" data-load-demo>Clear and recreate</button></div></div><div class="studio-about-card-body"><progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress><p class="admin-demo-status" data-demo-status role="status" aria-live="polite"></p><small data-demo-elapsed hidden></small></div></section>`;break;
+                <section class="studio-about-card studio-about-demo" id="studioDemoLoader"><div class="studio-about-demo-main"><div class="studio-about-demo-copy"><h2>Demo Data</h2><p class="studio-about-demo-warning">Reset clears business records and files.<span class="studio-about-demo-line">Staff accounts, configuration and Unassigned are preserved.</span></p></div><div class="studio-about-demo-actions"><button class="action" type="button" data-demo-remove>Remove demo data</button><button class="primary" type="button" data-load-demo>Clear and recreate</button></div></div><div class="studio-about-card-body"><progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress><p class="admin-demo-status" data-demo-status role="status" aria-live="polite"></p><small data-demo-elapsed hidden></small></div></section>`:''}`;break;
             case 'staff-roles': content=renderEmployeeDirectorySection();break;
         }
-        genericView.innerHTML=StudioPage.html({title,showHeader:false,scroll:view!=='about',summary:view==='about'?'<p>Product information, support, service health and administrator demo tools.</p>':'',content:view==='about'?`<div class="studio-about-scene"><div class="studio-about-panel"><div class="studio-about-grid">${content}</div></div></div>`:`<div class="admin-generated-sections">${content}</div>`});
+        genericView.innerHTML=StudioPage.html({title,showHeader:false,scroll:view!=='about',summary:view==='about'?'<p>Product information, support, service health and administrator demo tools.</p>':'',content:view==='about'?`<div class="studio-about-scene"><div class="studio-about-panel"><div class="${isAdministrator?'studio-about-grid':'studio-about-info'}">${content}</div></div></div>`:`<div class="admin-generated-sections">${content}</div>`});
         StudioPage.bind(genericView,current);
 
         if(!current())return;
@@ -268,7 +273,7 @@
             genericView.querySelector('[data-service-audit]').onclick=async()=>{const dialog=studioDialog('Recent operational audit','<p>Loading…</p>');try{const rows=await json('/api/admin/operations/audit?count=100');dialog.querySelector('.studio-dialog-body').textContent=JSON.stringify(rows,null,2);}catch(e){dialog.querySelector('.studio-dialog-body').textContent=e.message;}};
             readStatus();
         }
-        if(view==='about')genericView.querySelector('[data-about-api-key]').onclick=()=>{
+        if(view==='about'&&isAdministrator)genericView.querySelector('[data-about-api-key]').onclick=()=>{
             if(!current())return;
             const dialog=studioDialog('Generate API Key',window.StudioAdmin.keyForm());
             window.StudioAdmin.bindKeyForm(dialog);

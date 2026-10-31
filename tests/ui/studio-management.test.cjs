@@ -28,9 +28,28 @@ test('About contains product, support, service health and demo tools; Staff and 
  }
  for(const [old,canonical] of [['admin','about'],['studio-management','about'],['demo-data','about'],['staff-admin','staff-roles'],['roles-admin','staff-roles']]){await w.studioNavigate(old);assert.equal(w.document.body.dataset.studioView,canonical);assert.match(w.location.hash,new RegExp('studio='+canonical));}
 });
-test('the consolidated management page retains its administrator access check',async t=>{
- const {w}=setup(t,false);await w.studioNavigate('studio-management');
+test('Staff and Roles retains its administrator access check',async t=>{
+ const {w}=setup(t,false);await w.studioNavigate('staff-roles');
  assert.match(w.document.getElementById('genericView').textContent,/Administrator access required/);assert.equal(w.document.querySelector('[data-demo-remove]'),null);
+});
+test('ordinary signed-in staff can open About without privileged controls or API reads',async t=>{
+ const {w}=setup(t,false);const read=w.json,calls=[];w.json=async(url,options)=>{calls.push(url);return read(url,options);};
+ await w.studioNavigate('about');
+ assert.match(w.document.querySelector('.studio-about').textContent,/it@thinkingmachines.ltd.*Bryan’s Photo Studios/s);
+ assert.equal(w.document.querySelector('.st-page').getAttribute('aria-label'),'About');
+ assert.equal(w.document.querySelector('[data-about-api-key],[data-api-key-generate],[data-service-audit],[data-service-status],#studioDemoLoader'),null);
+ assert.equal(calls.some(url=>url.startsWith('/api/admin/')||url==='/api/security/roles'||url==='/api/workspace-access'),false);
+});
+test('legacy About aliases show staff information without opening administrative tools',async t=>{
+ const {w}=setup(t,false);
+ for(const view of ['studio-management','demo-data','api-site-key']){
+  await w.studioNavigate(view);assert.equal(w.document.body.dataset.studioView,'about');assert.ok(w.document.querySelector('.studio-about'));
+  assert.equal(w.document.querySelector('[data-about-api-key],[data-service-audit],[data-demo-remove],[data-load-demo]'),null);
+ }
+});
+test('About fails closed when the signed-in user cannot be loaded',async t=>{
+ const {w}=setup(t,false);w.json=async()=>{throw Error('Session expired');};await w.studioNavigate('about');
+ assert.match(w.document.getElementById('genericView').textContent,/Sign in required/);assert.equal(w.document.querySelector('.studio-about,[data-about-api-key]'),null);
 });
 test('the avatar menu contains one Preferences action and no separate Administration entry',t=>{
  const {w}=setup(t);const labels=[...w.document.querySelectorAll('.user-menu-popover button')].map(b=>b.textContent);
@@ -39,7 +58,7 @@ test('the avatar menu contains one Preferences action and no separate Administra
 
 
 test('every extracted admin route denies non-administrators before rendering controls',async t=>{
- const {w}=setup(t,false);for(const view of ['demo-data','staff-admin','roles-admin','workflows-admin','api-site-key']){
+ const {w}=setup(t,false);for(const view of ['staff-admin','roles-admin','workflows-admin']){
   await w.studioNavigate(view);assert.match(w.document.getElementById('genericView').textContent,/Administrator access required/);assert.equal(w.document.querySelector('[data-about-api-key],[data-api-key-generate],[data-demo-remove],#publicBookingCatalog'),null);
  }
 });
@@ -59,4 +78,5 @@ test('About retains demo removal confirmation and does not mutate data on cancel
  w.prompt=()=>null;const button=w.document.querySelector('[data-demo-remove]');await button.onclick();assert.equal(writes.length,0);
  w.prompt=()=>'REMOVE STUDIO DEMO DATA';await button.onclick();assert.equal(writes.length,1);assert.equal(writes[0].url,'/api/admin/connected-workflow/demo-data/remove');assert.equal(JSON.parse(writes[0].options.body).confirmation,'REMOVE STUDIO DEMO DATA');assert.equal(button.disabled,false);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Demo removed/);
 });
+
 
