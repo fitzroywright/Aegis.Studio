@@ -19,7 +19,10 @@ public sealed class PhotographerStore
         command.CommandText = """
             select user_name,display_name,employment_type,is_active,skills,default_equipment_notes,schedule_resource_id,created_at_utc,updated_at_utc
             from studio_photographers
-            where $1 or is_active
+            where $1 or (is_active and exists(
+                select 1 from studio_worker_roles r join studio_workers w on w.user_name=r.user_name
+                join studio_worker_types t on t.code=r.role_code
+                where r.user_name=studio_photographers.user_name and r.role_code='PHOTOGRAPHER' and r.is_active and w.is_active and t.is_active))
             order by display_name,user_name
             """;
         command.Parameters.AddWithValue(includeInactive);
@@ -63,6 +66,13 @@ public sealed class PhotographerStore
         command.Parameters.AddWithValue(userName); command.Parameters.AddWithValue(displayName); command.Parameters.AddWithValue(employmentType); command.Parameters.AddWithValue(request.IsActive);
         command.Parameters.AddWithValue(skills); command.Parameters.AddWithValue((object?)Clean(request.DefaultEquipmentNotes) ?? DBNull.Value); command.Parameters.AddWithValue(scheduleResourceId);
         command.ExecuteNonQuery();
+        using(var worker = new NpgsqlCommand("""
+            insert into studio_workers(user_name,display_name,worker_type_code,is_active)
+            values($1,$2,'PHOTOGRAPHER',$3) on conflict(user_name) do update set display_name=excluded.display_name,updated_at_utc=now()
+            """,connection,transaction))
+        {worker.Parameters.AddWithValue(userName);worker.Parameters.AddWithValue(displayName);worker.Parameters.AddWithValue(request.IsActive);worker.ExecuteNonQuery();}
+        using(var role = new NpgsqlCommand("insert into studio_worker_roles(user_name,role_code,is_active) values($1,'PHOTOGRAPHER',$2) on conflict(user_name,role_code) do update set is_active=excluded.is_active,updated_at_utc=now()",connection,transaction))
+        {role.Parameters.AddWithValue(userName);role.Parameters.AddWithValue(request.IsActive);role.ExecuteNonQuery();}
         transaction.Commit();
         return Get(userName)!;
     }
@@ -144,7 +154,7 @@ public sealed class PhotographerStore
         return Convert.ToInt64(command.ExecuteScalar()) == 0;
     }
 
-    private static Guid EnsureStaffResource(NpgsqlConnection connection, NpgsqlTransaction transaction, string userName, string displayName)
+    internal static Guid EnsureStaffResource(NpgsqlConnection connection, NpgsqlTransaction transaction, string userName, string displayName)
     {
         using NpgsqlCommand find = connection.CreateCommand(); find.Transaction = transaction;
         find.CommandText = "select id from studio_schedule_resources where resource_type='Staff' and lower(notes)=lower($1) limit 1";

@@ -31,8 +31,7 @@ public static class ScheduleEndpoints
                 var person=new WorkerCalendarPerson(userName,displayName,role,roleNames.GetValueOrDefault(role,role),active,resource);
                 roster[key]=person;return person;
             }
-            foreach(var worker in directory.GetWorkers(includeInactive:true))Register(worker.UserName,worker.DisplayName,worker.JobRoleCode,worker.IsActive);
-            foreach(var photo in photographers.Values)Register(photo.UserName,photo.DisplayName,"PHOTOGRAPHER",photo.IsActive);
+            foreach(var worker in directory.GetRoleMemberships(includeInactive:true))Register(worker.UserName,worker.DisplayName,worker.JobRoleCode,worker.IsActive);
             var entries=new List<object>(visible);
             var assignedResources=visible.SelectMany(e=>e.ResourceIds).Select(id=>id.ToString("D")).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var jobIds=visible.Where(e=>e.JobId.HasValue).Select(e=>e.JobId!.Value).ToHashSet();

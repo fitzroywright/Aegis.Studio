@@ -90,7 +90,7 @@ test('workspace settings hook focuses the same displayed name with no expanded e
 });
 test('Staff and Roles is the single destination for creating and editing reusable job and workspace roles',async t=>{
  const {w,navigation}=setup(t);await w.StudioWorkspaceManagement.render();assert.equal(w.document.querySelector('#roleScope,#securityRoleList'),null);
- w.genericView.innerHTML=w.renderEmployeeDirectorySection();const scope=w.document.querySelector('#roleScope');assert.deepEqual([...scope.options].map(option=>option.value),['Job','Workspace']);
+ w.genericView.innerHTML=w.renderEmployeeDirectorySection();w.openStaffPermissionTemplates();const scope=w.document.querySelector('#roleScope');assert.deepEqual([...scope.options].map(option=>option.value),['Job','Workspace']);
  const rows=w.document.querySelectorAll('[data-role-row]');assert.equal(rows.length,2);assert.match(w.document.querySelector('#securityRoleList').textContent,/Workspace.*Job/s);
  w.document.querySelector('#roleName').value='Workspace editor';scope.value='Workspace';const original=w.json;w.json=async(url,options)=>options?.method==='POST'?{}:original(url,options);await w.createStudioRole();assert.equal(navigation.at(-1).view,'staff-roles');
 });
@@ -100,5 +100,3 @@ test('individual member permissions use a popup with the existing permission val
  w.json=async(url,options)=>{if(options?.method==='PUT'){calls.push({url,options});return {};}if(url==='/api/workspaces/w/members')return [{userName:'lisa',displayName:'Lisa',isActive:true,permissions:{accessWorkspace:true,view:true}}];return original(url,options);};
  await w.StudioWorkspaceManagement.render();await w.editWorkspaceMember('w','lisa','Lisa');const form=w.document.querySelector('dialog:not([id]) form');assert.ok(form);assert.equal(form.elements.namedItem('view').checked,true);assert.equal(form.elements.namedItem('editWorkspace').checked,false);form.elements.namedItem('replyRequester').checked=true;await form.onsubmit({preventDefault(){}});const write=calls.find(call=>call.options?.method==='PUT');assert.equal(write.url,'/api/workspaces/w/members/lisa');const payload=JSON.parse(write.options.body);assert.equal(payload.permissions.replyRequester,true);assert.equal(payload.permissions.view,true);assert.equal(payload.permissions.editWorkspace,false);assert.ok(w.document.querySelector('dialog #workspaceMemberPanel'));
 });
-
-
