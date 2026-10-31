@@ -1,14 +1,14 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{JSDOM}=require('jsdom');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-async function setup(t,{accounts=true,roleFailure=false,demo=false,provider="Mock"}={}){
+async function setup(t,{accounts=true,roleFailure=false,demo=false,provider="Mock",photoSource=null}={}){
  const dom=new JSDOM('<div id="genericView"></div>',{url:'https://studio.test',runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());
  w.genericView=w.document.getElementById('genericView');w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));w.confirm=()=>true;
- const employee={userName:'domain/user',displayName:'Sam Lee',emailAddress:'sam@example.test',isActive:true,isAssignable:true,source:'Directory',externalId:'immutable',skills:['Portraits'],workDayUserName:'sam-day',lastSyncedAtUtc:'2026-10-27T12:00:00Z'};
+ const employee={userName:'domain/user',displayName:'Sam Lee',emailAddress:'sam@example.test',isActive:true,isAssignable:true,source:'Directory',externalId:'immutable',skills:['Portraits'],workDayUserName:'sam-day',lastSyncedAtUtc:'2026-10-27T12:00:00Z',photoSource,photoUrl:photoSource?'/api/studio-employees/domain%2Fuser/photo?v=1':null};
  const account={id:'account',loginName:employee.userName,displayName:employee.displayName,providerKind:'ActiveDirectory',status:'PendingAccess'};
  const roles=[{id:'front',name:'Front Desk',description:'Reception',isActive:true},{id:'inactive',name:'Old role',isActive:false}];
  const writes=[];let fail=roleFailure;
  w.json=async(url,options)=>{if(!options&&(url==='/api/admin/job-roles'||url==='/api/admin/workers'))return [];
-  if(options){writes.push({url,method:options.method,body:options.body?JSON.parse(options.body):null});if(url==='/api/admin/security/demo-accounts/'&&JSON.parse(options.body).accountId)account.identities=[{providerKind:'Mock',key:{providerId:'mock',scopeId:'Aegis.Studio',subjectId:'persisted-subject'}}];if(fail&&url.includes('/members/')){fail=false;throw Error('Role unavailable');}return {id:'created'};}
+  if(options){const body=options.body instanceof w.FormData?options.body:options.body?JSON.parse(options.body):null;writes.push({url,method:options.method,body});if(url==='/api/admin/security/demo-accounts/'&&body.accountId)account.identities=[{providerKind:'Mock',key:{providerId:'mock',scopeId:'Aegis.Studio',subjectId:'persisted-subject'}}];if(fail&&url.includes('/members/')){fail=false;throw Error('Role unavailable');}return {id:'created'};}
   if(url.includes('studio-employees'))return [{...employee}, {userName:'second',displayName:'Anna Clarke',isActive:true,isAssignable:false,skills:[]}];
   if(url==='/api/auth/options')return {defaultSource:provider,demoAccountsEnabled:demo};
   if(url==='/api/photographers')return [];
@@ -24,9 +24,17 @@ async function setup(t,{accounts=true,roleFailure=false,demo=false,provider="Moc
  return {w,employee,writes,selectSam,dom};
 }
 test('staff page has one editor, searchable rows, role tokens and collapsed technical controls',async t=>{
- const {w,selectSam}=await setup(t);selectSam();assert.equal(w.document.querySelectorAll('.staff-person-form').length,1);assert.equal(w.document.getElementById('rolesPanel'),null);assert.equal(w.document.querySelector('.staff-advanced').open,false);assert.equal(w.document.querySelector('.staff-person-form input[readonly]').value,'Active Directory');
+ const {w,selectSam}=await setup(t);selectSam();assert.equal(w.document.querySelectorAll('.staff-person-form').length,1);assert.equal(w.document.getElementById('rolesPanel'),null);assert.equal(w.document.querySelector('.staff-advanced').open,false);assert.equal(w.document.querySelector('.staff-person-form input[readonly]').value,'Active Directory');assert.equal(w.document.querySelectorAll('.staff-card-grid>.staff-detail-card').length,4);
  w.filterStudioStaff('sam@example');assert.equal(w.document.querySelectorAll('[data-staff-index]').length,1);w.filterStudioStaff('nobody');assert.match(w.document.getElementById('studioEmployeeList').textContent,/No matching/);
  assert.equal(w.document.querySelector('[data-manage-job-roles]').textContent,'Manage Job Roles');
+});
+test('staff photo card prefers directory photos and supports a Studio override and removal',async t=>{
+ const directory=await setup(t,{photoSource:'ActiveDirectory'}),form=directory.selectSam(),card=form.querySelector('.staff-photo-card');
+ assert.match(card.textContent,/Source: Active Directory/);assert.equal(card.querySelector('[data-remove-photo]'),null);assert.equal(card.querySelector('img').getAttribute('src'),'/api/studio-employees/domain%2Fuser/photo?v=1');
+ const input=card.querySelector('[data-staff-photo-file]'),file=new directory.w.File([new Uint8Array([0xff,0xd8,0xff,0xd9])],'sam.jpg',{type:'image/jpeg'});Object.defineProperty(input,'files',{value:[file],configurable:true});await input.onchange();
+ const upload=directory.writes.find(x=>x.url.endsWith('/photo'));assert.equal(upload.method,'POST');assert.equal(upload.body.get('file').name,'sam.jpg');
+ const managed=await setup(t,{photoSource:'Studio'}),managedForm=managed.selectSam();await managedForm.querySelector('[data-remove-photo]').onclick();
+ const removal=managed.writes.find(x=>x.url.endsWith('/photo'));assert.equal(removal.method,'DELETE');
 });
 test('staff save preserves fresh directory and WorkDay metadata and encodes identity paths',async t=>{
  const {w,writes,employee,selectSam}=await setup(t);const form=selectSam();form.elements.displayName.value='Updated name';await w.saveStaffDetails({...employee,securityAccount:{id:'account',status:'PendingAccess'}},form);
