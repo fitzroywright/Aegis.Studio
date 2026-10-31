@@ -139,6 +139,11 @@ public class FullDemoRegenerationTests
             Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_employees e where e.user_name like 'demo.%' and e.is_active and not exists(select 1 from studio_global_operational_role_members m join studio_global_operational_roles r on r.id=m.role_id join studio_global_operational_role_permissions p on p.role_id=r.id where m.user_name=e.user_name and m.is_active and r.is_active)"));
             Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_workspaces w where w.system_key is distinct from 'unassigned' and not exists(select 1 from studio_workspace_covers c where c.workspace_id=w.id and octet_length(c.image_data)>0)"));
             Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_workspace_covers c join studio_workspaces w on w.id=c.workspace_id where w.system_key='unassigned'"));
+            Assert.Equal(13,Scalar(ctx.Connection,"select count(*)::int from studio_public_booking_hours"));
+            Assert.Equal(2,Scalar(ctx.Connection,"select count(distinct location_code)::int from studio_public_booking_hours"));
+            Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_public_booking_hours where location_code='BK' and day_of_week=0 and opens_at='10:00'::time and payload->>'closesAt'='15:00'"));
+            Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_public_booking_hours where location_code='BE' and day_of_week=6 and opens_at='09:00'::time and payload->>'closesAt'='16:00'"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_public_booking_hours where payload->>'slotStepMinutes'<>'30'"));
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_job_subjects where job_id='de000000-0000-4000-0041-000000000201' and name='Emily Carter'"))>0);
         }
         finally{Environment.SetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS",previousPhotoRoot);if(Directory.Exists(photoRoot))Directory.Delete(photoRoot,true);}

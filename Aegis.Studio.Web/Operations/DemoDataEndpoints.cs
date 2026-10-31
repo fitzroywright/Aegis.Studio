@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Media;
+using Aegis.Studio.Web.Bookings;
 using Microsoft.AspNetCore.Authorization;
 using Npgsql;
 using Common.Storage;
@@ -118,6 +119,7 @@ public static class DemoDataEndpoints
         DemoJobPhotoPopulation.Seed(database,storage,login,report);
         DemoDatasetFinalizer.Complete(database,storage,login,report);
         SeedDistinctStaffPhotos(database,report);
+        SeedOpeningHours(database,report);
 
         return fullStudioExpanded
             ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days across all six workspaces, plus the full Studio media demonstration."
@@ -126,6 +128,31 @@ public static class DemoDataEndpoints
                 : expanded
                     ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days. Legacy demo media also expanded."
                     : $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days; existing rich demo data is already up to date.";
+    }
+
+    private static void SeedOpeningHours(StudioDatabase database, Action<DemoSeedProgress>? report)
+    {
+        var catalog=new StudioPublicBookingCatalogStore(database);
+        catalog.EnsureSchema();
+        PublicBookingHours[] hours =
+        [
+            new("BK",0,"10:00","15:00",30),
+            new("BK",1,"09:00","17:00",30),
+            new("BK",2,"09:00","17:00",30),
+            new("BK",3,"09:00","17:00",30),
+            new("BK",4,"09:00","17:00",30),
+            new("BK",5,"09:00","17:00",30),
+            new("BK",6,"09:00","17:00",30),
+            new("BE",1,"09:00","17:00",30),
+            new("BE",2,"09:00","17:00",30),
+            new("BE",3,"09:00","17:00",30),
+            new("BE",4,"09:00","17:00",30),
+            new("BE",5,"09:00","17:00",30),
+            new("BE",6,"09:00","16:00",30)
+        ];
+        catalog.SaveHours(hours);
+        report?.Invoke(new(99,"Setting opening hours",hours.Length,hours.Length,
+            "Configured Jamaica-time opening hours for Kings Plaza and East Queen Street."));
     }
 
     private static readonly (string Category,int Variant)[] WorkspaceCoverSources =
