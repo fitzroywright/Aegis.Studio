@@ -266,7 +266,11 @@ function renderEmployeeDirectorySection() {
     </section>`;
 }
 
-function openStaffPermissionTemplates(){return studioDialog('Permission templates',renderStudioRoleEditor()+renderStudioRoleGrid());}
+function openStaffPermissionTemplates(){
+    if(staffDirectoryState?.saving||staffDirectoryState?.loading)return;
+    if(staffDirectoryState?.dirty){genericView.querySelector('[data-editor-status]').textContent='Save or cancel your changes before managing permission templates.';return;}
+    return studioDialog('Permission templates',renderStudioRoleEditor()+renderStudioRoleGrid());
+}
 
 function mountStaffTokenEditor(holder,options,values,onchange,disabled=false){
     holder.tokenValues=new Set(values);
