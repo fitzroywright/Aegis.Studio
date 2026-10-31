@@ -110,6 +110,11 @@ public class FullDemoRegenerationTests
             Assert.Equal(Scalar(ctx.Connection,"select count(*)::int from studio_jobs"),Scalar(ctx.Connection,"select count(*)::int from studio_job_template_instances"));
             Assert.Equal(2,Scalar(ctx.Connection,"select count(*)::int from studio_commercial_templates where kind='WorkOrder'"));
             Assert.Equal(2,Scalar(ctx.Connection,"select count(*)::int from studio_pos_catalog where code like 'GRAPH-%' and requires_production and work_order_template_id is not null"));
+            Assert.Equal(20,Scalar(ctx.Connection,"select count(*)::int from studio_pos_catalog where code like 'DEMO-%'"));
+            Assert.Equal(8,Scalar(ctx.Connection,"select count(distinct category)::int from studio_pos_catalog where code like 'DEMO-%'"));
+            Assert.Equal(18,Scalar(ctx.Connection,"select count(*)::int from studio_pos_catalog where code like 'DEMO-%' and requires_production and work_order_template_id is not null"));
+            Assert.Equal(2,Scalar(ctx.Connection,"select count(*)::int from studio_pos_catalog where code like 'DEMO-%' and not requires_production and work_order_template_id is null"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_pos_catalog where code like 'DEMO-%' and (unit_price<=0 or estimated_cost<0 or tax_rate<>15 or description='')"));
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_jobs"))>=126);
             Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_jobs j where (select count(*) from studio_media_assets m where m.job_id=j.id)<1"));
             int assetCount=Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_media_assets"));
