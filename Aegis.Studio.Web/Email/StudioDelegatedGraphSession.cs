@@ -16,7 +16,7 @@ public sealed class StudioDelegatedGraphSession(IConfiguration configuration, IC
     private readonly SemaphoreSlim gate = new(1, 1);
     private long generation;
     public long Generation => Interlocked.Read(ref generation);
-    public bool Enabled => !Aegis.Studio.Web.Operations.DemoIntegrationIsolation.Enabled(configuration) && configuration.GetValue<bool>(Prefix + "Enabled");
+    public bool Enabled => !Aegis.Studio.Web.Operations.ExternalIntegrationIsolation.Enabled(configuration) && configuration.GetValue<bool>(Prefix + "Enabled");
     private string CachePath => Path.Combine(configuration[Prefix + "CacheDirectory"] ?? "/var/lib/aegis/studio/outbound-oauth", "session.enc");
     private string Hub => StudioGraphMailbox.Resolve(configuration);
     private string Tenant

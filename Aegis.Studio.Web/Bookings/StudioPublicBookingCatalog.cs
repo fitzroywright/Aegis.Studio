@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using Aegis.Studio.Web.Intake;
+using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Production;
 using Aegis.Studio.Web.Scheduling;
@@ -147,6 +147,7 @@ internal sealed class PublicBookingSiteClient : IDisposable
 
     internal PublicBookingSiteClient(IConfiguration configuration,HttpMessageHandler? handler=null)
     {
+        ExternalIntegrationIsolation.RequireExternalIntegrations(configuration);
         var root=new Uri(configuration["PublicSite:BaseUrl"]??throw new InvalidOperationException("Configure PublicSite:BaseUrl."));
         if(root.Scheme!="https"||!string.IsNullOrEmpty(root.UserInfo)||root.AbsolutePath!="/"||!string.IsNullOrEmpty(root.Query)||!string.IsNullOrEmpty(root.Fragment))
             throw new InvalidOperationException("PublicSite:BaseUrl must be an HTTPS origin.");
