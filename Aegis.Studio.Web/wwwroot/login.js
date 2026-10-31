@@ -31,7 +31,7 @@ document.getElementById('togglePassword').addEventListener('click', () => {
         document.getElementById('recoveryToggle').hidden = provider !== 'LocalDatabase';
         if (mock && authenticationOptions.defaultUserName) userName.value = authenticationOptions.defaultUserName;
         signInButton.disabled = false;
-        if (new URLSearchParams(location.search).has('pending')) error.textContent = 'Pending Access. Your administrator must approve access and assign a role.';
+        if (new URLSearchParams(location.search).has('pending')) location.replace('/#studio=access-pending');
     } catch (failure) { error.textContent = failure.message; }
 })();
 
@@ -56,7 +56,8 @@ loginForm.addEventListener('submit', async event => {
         if (!response.ok) throw Error(result.error || 'Sign-in could not be completed.');
         password.value = '';
         if (result.accountState === 'PendingAccess') {
-            error.textContent = 'Your account is created and is Pending Access. An administrator must approve access and assign a role.';
+            sessionStorage.removeItem('studio-announcements-login');
+            location.replace('/#studio=access-pending');
             return;
         }
         sessionStorage.removeItem('studio-announcements-login'); location.replace('/');
@@ -80,3 +81,4 @@ recoveryForm.addEventListener('submit', async event => {
     } catch (failure) { error.textContent = failure.message; }
     finally { button.disabled = false; }
 });
+

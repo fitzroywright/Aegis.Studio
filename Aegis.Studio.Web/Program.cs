@@ -337,7 +337,7 @@ app.Use(async (context, next) =>
 app.UseMiddleware<StorageFailureMiddleware>();
 app.UseMiddleware<TodayStartupTimingMiddleware>();
 app.UseAuthentication();
-app.UseCommonAccountEnforcement("/login", "/login.html", "/login.js", "/api/auth/me", "/api/auth/logout", "/assets/bryan-studios-logo.png", "/assets/aegis-studio-login-background.png");
+app.UseCommonAccountEnforcement("/login", StudioAccessPresentation.PendingPaths(app.Environment.WebRootPath));
 app.UseRateLimiter();
 app.UseMiddleware<WorkDayDeviceTokenMiddleware>();
 app.Use(async (context, next) => { bool document = context.Request.Path == "/" || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase); if (document && context.User.Identity?.IsAuthenticated != true) { context.Response.Redirect("/login"); return; } await next(); });

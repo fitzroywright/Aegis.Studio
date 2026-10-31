@@ -6,17 +6,17 @@ async function fixture(t,options){
  const w=dom.window,requests=[],navigation=[];
  w.navigateForTest=url=>navigation.push(url);
  w.fetch=async(url,request)=>{requests.push({url,request});return {ok:true,status:200,json:async()=>url.endsWith('/options')?options:{accountState:'PendingAccess'}};};
- w.eval(fs.readFileSync(path.join(root,'login.js'),'utf8').replace("location.assign('/api/auth/entra')","window.navigateForTest('/api/auth/entra')"));await settle();
+ w.eval(fs.readFileSync(path.join(root,'login.js'),'utf8').replaceAll("location.replace('/#studio=access-pending')","window.navigateForTest('/#studio=access-pending')").replace("location.assign('/api/auth/entra')","window.navigateForTest('/api/auth/entra')"));await settle();
  return {w,d:w.document,requests,navigation,submit:async()=>{w.document.getElementById('loginForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();}};
 }
 for(const provider of ['ActiveDirectory','LocalDatabase']) test(provider+' uses one credential form without a provider choice',async t=>{
- const {d,requests,submit}=await fixture(t,{defaultSource:provider});
+ const {d,requests,submit,navigation}=await fixture(t,{defaultSource:provider});
  assert.equal(d.querySelector('select,#entraSignIn,#environment'),null);assert.doesNotMatch(d.body.textContent,/Sign-in method|Sign in with Microsoft|demonstration/);
  assert.equal(d.getElementById('password').required,true);assert.equal(d.getElementById('userNameLabel').hidden,false);
  assert.equal(d.getElementById('recoveryToggle').hidden,provider!=='LocalDatabase');
  d.getElementById('userName').value='operator';d.getElementById('password').value='secret';await submit();
  assert.deepEqual(JSON.parse(requests.at(-1).request.body),{userName:'operator',password:'secret'});
- assert.match(d.getElementById('error').textContent,/Pending Access/);assert.equal(d.getElementById('password').value,'');
+ assert.deepEqual(navigation,['/#studio=access-pending']);assert.equal(d.getElementById('password').value,'');
 });
 test('Entra uses the single Sign in button and never posts credentials',async t=>{
  const {d,requests,navigation,submit}=await fixture(t,{defaultSource:'EntraId'});
@@ -35,3 +35,4 @@ test('an unknown configured provider leaves sign-in disabled',async t=>{
  const {d,requests,submit}=await fixture(t,{defaultSource:'unknown'});
  assert.equal(d.getElementById('signInButton').disabled,true);assert.match(d.getElementById('error').textContent,/not configured/);await submit();assert.equal(requests.length,1);
 });
+
