@@ -276,6 +276,7 @@
         if(view==='about'&&isAdministrator)genericView.querySelector('[data-about-api-key]').onclick=()=>{
             if(!current())return;
             const dialog=studioDialog('Generate API Key',window.StudioAdmin.keyForm());
+            dialog.classList.add('api-key-dialog');
             window.StudioAdmin.bindKeyForm(dialog);
             const observer=new MutationObserver(()=>{if(!current()||!dialog.isConnected){dialog.close();observer.disconnect();}});
             observer.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});observer.observe(genericView,{childList:true});
