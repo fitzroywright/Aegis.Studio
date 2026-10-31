@@ -217,3 +217,36 @@
 .catalog-page .booking-catalog-workspace>.booking-details:not([hidden]),.catalog-page .catalog-product-editor{height:100%;max-height:100%;min-height:0;overflow:auto}
 .catalog-page .booking-grid-footer{flex-shrink:0}
 @media(max-width:1100px){.catalog-page .booking-catalog-workspace,.catalog-page .catalog-product-workspace,.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace{overflow:auto;align-content:start}.catalog-page .booking-catalog-workspace>.booking-grid-scroll,.catalog-page .catalog-product-workspace>.commercial-grid{height:auto;max-height:300px}.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]),.catalog-page .catalog-product-editor,.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-details:not([hidden]){height:auto;max-height:none;overflow:visible}}
+
+
+/* Service editor: compact grouped cards and a permanently visible action strip. */
+.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){display:flex;flex-direction:column;overflow:hidden;padding:14px;gap:0}
+.catalog-page .booking-details .booking-editor-heading{flex:0 0 auto;padding:0 0 10px;margin:0 0 10px}
+.catalog-page .booking-details .booking-detail-form{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;gap:0}
+.catalog-page .booking-detail-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:1px 4px 10px 1px}
+.catalog-page .booking-detail-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
+.catalog-page .booking-detail-card{min-width:0;border:1px solid var(--studio-grid-border,#dce4ec);border-radius:9px;padding:10px;background:var(--studio-card-bg,#fff)}
+.catalog-page .booking-detail-basic{margin-bottom:10px}
+.catalog-page .booking-detail-card .booking-editor-section-title{margin:-10px -10px 10px;padding:9px 10px;border-radius:8px 8px 0 0;font-size:12px}
+.catalog-page .booking-detail-card label{font-size:11px}
+.catalog-page .booking-detail-card input,.catalog-page .booking-detail-card select,.catalog-page .booking-detail-card textarea{min-width:0;max-width:100%;box-sizing:border-box}
+.catalog-page .booking-detail-card textarea{width:100%;min-height:48px;resize:vertical}
+.catalog-page .booking-detail-card .booking-editor-pricing{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.catalog-page .booking-detail-card .booking-editor-pricing label{font-size:10px}
+.catalog-page .booking-detail-card .booking-editor-pricing input{padding:7px 5px}
+.catalog-page .booking-detail-card .booking-buffer-field>div{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.catalog-page .booking-detail-card .booking-buffer-field input{width:100%}
+.catalog-page .booking-detail-card .booking-resources{border:0;padding:0;margin:0}
+.catalog-page .booking-detail-card .booking-resources summary{font-size:11px}
+.catalog-page .booking-detail-card .booking-resources [data-resource-rows]{max-height:120px;overflow:auto}
+.catalog-page .booking-detail-card .booking-editor-locations{display:flex;gap:6px 10px;flex-wrap:wrap}
+.catalog-page .booking-detail-card .booking-editor-locations>strong{display:none}
+.catalog-page .booking-detail-card .booking-online-indicator{display:flex;align-items:center;gap:8px;font-size:12px}
+.catalog-page .booking-detail-card .booking-online-indicator input{width:auto}
+.catalog-page .booking-detail-card>small{display:block;margin-top:6px;font-size:10px;color:var(--theme-muted,#667383)}
+.catalog-page .booking-detail-form>footer{position:static;flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:9px;padding:11px 0 0;margin:0;border-top:1px solid var(--studio-grid-border,#dce4ec);background:var(--studio-card-bg,#fff)}
+.catalog-page .booking-detail-form>footer small{display:none}
+.catalog-page .booking-detail-form>footer [role="alert"]{flex:1;min-width:0;font-size:11px;color:#a12d1e}
+.catalog-page .booking-detail-form>footer button{white-space:nowrap}
+@media(max-width:1250px){.catalog-page .booking-detail-card-grid{grid-template-columns:1fr}}
+@media(max-width:1100px){.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){overflow:hidden;max-height:600px}.catalog-page .booking-detail-scroll{overflow:auto}}
