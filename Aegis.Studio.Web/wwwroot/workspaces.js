@@ -285,7 +285,7 @@ function renderStaffAccessPermissionManager(roles){
 async function openStaffAccessPermissions(){
     if(staffDirectoryState?.saving||staffDirectoryState?.loading)return;
     if(staffDirectoryState?.dirty){genericView.querySelector('[data-editor-status]').textContent='Save or cancel your changes before managing access permissions.';return;}
-    const dialog=studioDialog('Manage Access Permissions','<p role="status">Loading access roles…</p>'),host=dialog.querySelector('.studio-dialog-body');let changed=false;
+    const dialog=studioDialog('Manage Access Permissions','<p role="status">Loading access roles…</p>'),host=dialog.querySelector('.studio-dialog-body');let changed=false;dialog.classList.add('staff-role-management-dialog');
     const payload=form=>({name:form.elements.name.value.trim(),description:form.elements.description.value.trim()||null,permissions:[...form.querySelectorAll('[data-access-permission]:checked')].map(input=>input.value),isActive:form.elements.isActive.checked});
     const load=async()=>{
         try{
@@ -485,7 +485,7 @@ function openStaffEditor(index, force=false) {
     mountStaffTokenEditor(form.querySelector('[data-token-kind=access]'),state.roles.map((role,i)=>({id:String(i),label:role.name,disabled:role.isActive===false})),state.roles.map((role,i)=>staffGlobalMembership(employee,i)?String(i):null).filter(x=>x!==null),()=>state.dirty=true);
     form.querySelector('[data-manage-job-roles]').onclick=async()=>{
         if(state.dirty){form.querySelector('[data-editor-status]').textContent='Save or cancel your changes before managing Job Roles.';return;}
-        const d=studioDialog('Manage Job Roles','<section data-job-role-admin></section>');
+        const d=studioDialog('Manage Job Roles','<section data-job-role-admin></section>');d.classList.add('staff-role-management-dialog');
         await renderJobRoleAdministration(()=>d.isConnected,d.querySelector('[data-job-role-admin]'));
         d.addEventListener('close',()=>refreshStudioEmployees(),{once:true});
     };
