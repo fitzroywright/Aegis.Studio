@@ -117,7 +117,7 @@ always supplies this guard. PostgreSQL addresses are normalized without network
 masks, and a real PostgreSQL regression covers that comparison.
 
 The complete pinned solution passes 486 Web and 3 Domain tests locally, without
-failures/skips, including the Demo-isolation and database-identity regressions.
+failures/skips, including the external-integration isolation and database-identity regressions.
 The connected restored-database rehearsal verifies both real administrator
 applies before startup and rejection of a deliberately different database before
 security-table/account writes. Service-manager calls are simulated on the Mac;
