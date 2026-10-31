@@ -52,12 +52,12 @@ public sealed class PublicBookingPublicationTests
         Assert.Throws<KeyNotFoundException>(()=>store.SetPublication("missing",new(true,store.Get().Revision)));
     }
     [Fact]
-    public async Task ConfiguredBookingPublisherCanReachOnlyBookingEndpointsInIsolatedDemo()
+    public async Task ConfiguredBookingPublisherCanReachOnlyBookingEndpointsInDemo()
     {
         var handler=new BookingSiteHandler();
         IConfiguration configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>
         {
-            [ExternalIntegrationIsolation.ConfigurationKey]="true",
+            [ExternalIntegrationIsolation.ConfigurationKey]="false",
             ["PublicSite:BaseUrl"]="https://api.example.test/",
             ["PublicSite:IntegrationToken"]=new string('s',40)
         }).Build();
@@ -79,6 +79,21 @@ public sealed class PublicBookingPublicationTests
             Assert.Equal("Bearer",request.AuthenticationScheme);
             Assert.Equal(40,request.TokenLength);
         });
+    }
+
+    [Fact]
+    public void EmergencyIsolationBlocksBookingPublisherBeforeTransportRuns()
+    {
+        var handler=new BookingSiteHandler();
+        IConfiguration configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>
+        {
+            [ExternalIntegrationIsolation.ConfigurationKey]="true",
+            ["PublicSite:BaseUrl"]="https://api.example.test/",
+            ["PublicSite:IntegrationToken"]=new string('s',40)
+        }).Build();
+
+        Assert.Throws<InvalidOperationException>(()=>new PublicBookingSiteClient(configuration,handler));
+        Assert.Empty(handler.Requests);
     }
 
     private sealed record BookingSiteRequest(HttpMethod Method,string Path,string IdempotencyKey,string? AuthenticationScheme,int TokenLength);
