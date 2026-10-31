@@ -203,3 +203,17 @@
 .catalog-page .booking-hour-actions button{padding:10px 18px;border-radius:7px}
 @media(max-width:1100px){.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace{grid-template-columns:1fr}.catalog-page .booking-hours-location-bar select{width:min(380px,50vw)}}
 @media(max-width:600px){.catalog-page .booking-hours-location-bar{flex-wrap:wrap}.catalog-page .booking-hours-time-fields{grid-template-columns:1fr}.catalog-page .booking-hours-week-table th,.catalog-page .booking-hours-week-table td{padding:10px 8px;font-size:12px}}
+
+
+/* Keep catalog panels inside the shell-owned content viewport.
+   Scroll within the catalog, never beneath the fixed shell footer. */
+.catalog-page .catalog-panel{min-height:0;overflow:hidden}
+.catalog-page .booking-sessions{min-height:0;overflow:hidden}
+.catalog-page .booking-catalog-workspace,.catalog-page .catalog-product-workspace{min-height:0;min-width:0;flex:1;overflow:hidden;align-items:stretch}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace{min-height:0;flex:1;align-items:stretch;overflow:hidden}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-grid-scroll{min-height:0;max-height:100%;overflow:auto}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-details:not([hidden]){min-height:0;height:100%;max-height:100%;overflow:auto}
+.catalog-page .booking-catalog-workspace>.booking-grid-scroll,.catalog-page .catalog-product-workspace>.commercial-grid{height:100%;max-height:100%;min-height:0;overflow:auto}
+.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]),.catalog-page .catalog-product-editor{height:100%;max-height:100%;min-height:0;overflow:auto}
+.catalog-page .booking-grid-footer{flex-shrink:0}
+@media(max-width:1100px){.catalog-page .booking-catalog-workspace,.catalog-page .catalog-product-workspace,.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace{overflow:auto;align-content:start}.catalog-page .booking-catalog-workspace>.booking-grid-scroll,.catalog-page .catalog-product-workspace>.commercial-grid{height:auto;max-height:300px}.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]),.catalog-page .catalog-product-editor,.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-details:not([hidden]){height:auto;max-height:none;overflow:visible}}
