@@ -34,3 +34,33 @@
 .catalog-page .booking-feedback:empty{display:none}
 @media(max-width:1150px){.catalog-page .booking-catalog-workspace{grid-template-columns:minmax(0,1fr)}.catalog-page .booking-catalog-workspace>.booking-grid-scroll{max-height:360px}.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){max-height:none}}
 @media(max-width:620px){.catalog-page .booking-editor-basics,.catalog-page .booking-editor-pricing{grid-template-columns:1fr 1fr}.catalog-page .booking-session-grid{min-width:700px}}
+
+
+/* Shared split-pane catalog treatment for Products and Opening Hours. */
+.catalog-page .catalog-product-workspace{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(380px,1fr);gap:14px;align-items:start;min-height:0}
+.catalog-page .catalog-product-workspace>.commercial-grid{max-height:min(65vh,630px);overflow:auto;min-width:0;border:1px solid var(--theme-border,#dce3eb);border-radius:9px;background:#fff}
+.catalog-page .catalog-product-workspace .pos-grid{width:100%;font-size:12px}
+.catalog-page .catalog-product-workspace .pos-grid th{position:sticky;top:0;background:var(--theme-surface-muted,#f1f5f9);color:var(--theme-text,#243447)}
+.catalog-page .catalog-product-workspace .pos-grid td,.catalog-page .catalog-product-workspace .pos-grid th{padding:10px 9px}
+.catalog-page .catalog-product-workspace .pos-grid tr[aria-selected="true"]{background:#faf4ea;box-shadow:inset 3px 0 #b78336}
+.catalog-page .catalog-product-editor{min-width:0;max-height:min(70vh,680px);overflow:auto;padding:14px;border:1px solid var(--theme-border,#dce3eb);border-radius:10px;background:#fff}
+.catalog-page .catalog-product-editor-heading{display:flex;flex-direction:column;gap:3px;padding-bottom:12px;border-bottom:1px solid var(--theme-border,#dce3eb);margin-bottom:10px}
+.catalog-page .catalog-product-editor-heading strong{font-size:18px}
+.catalog-page .catalog-product-editor-heading small{color:var(--theme-muted,#66758b)}
+.catalog-page .catalog-product-editor .commercial-form{min-width:0;max-height:none;overflow:visible;padding:0;grid-template-columns:repeat(2,minmax(0,1fr))}
+.catalog-page .catalog-product-editor .commercial-form label{min-width:0}
+.catalog-page .catalog-product-editor .commercial-form input,.catalog-page .catalog-product-editor .commercial-form select,.catalog-page .catalog-product-editor .commercial-form textarea{width:100%;box-sizing:border-box;min-width:0}
+.catalog-page .catalog-product-editor .commercial-form footer{position:sticky;bottom:0;background:#fff;padding:10px 0;border:0;border-top:1px solid var(--theme-border,#dce3eb)}
+.catalog-page .booking-sessions:has(.booking-hours-location-groups) .booking-catalog-workspace{grid-template-columns:minmax(0,1fr) minmax(350px,.75fr)}
+.catalog-page .booking-hours-location-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:12px}
+.catalog-page .booking-hours-location{border:1px solid var(--theme-border,#dce3eb);border-radius:9px;padding:10px;background:#fff}
+.catalog-page .booking-hours-location h3{font-size:14px;margin:0 0 9px}
+.catalog-page .booking-hour-choice{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:9px;padding:10px;border:0;border-bottom:1px solid var(--theme-border,#e3e9ef);background:#fff;text-align:left;cursor:pointer}
+.catalog-page .booking-hour-choice[aria-pressed="true"]{background:#faf4ea;box-shadow:inset 3px 0 #b78336}
+.catalog-page .booking-hour-choice small{color:var(--theme-muted,#66758b)}
+.catalog-page .booking-hour-detail-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.catalog-page .booking-hour-detail-form label{display:grid;gap:5px;font-size:12px;font-weight:600}
+.catalog-page .booking-hour-detail-form input,.catalog-page .booking-hour-detail-form select{min-width:0;width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--theme-border,#dce3eb);border-radius:6px}
+.catalog-page .booking-hour-actions{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px;padding-top:12px;border-top:1px solid var(--theme-border,#dce3eb)}
+@media(max-width:1150px){.catalog-page .catalog-product-workspace,.catalog-page .booking-sessions:has(.booking-hours-location-groups) .booking-catalog-workspace{grid-template-columns:1fr}.catalog-page .catalog-product-workspace>.commercial-grid{max-height:360px}.catalog-page .catalog-product-editor{max-height:none}}
+@media(max-width:620px){.catalog-page .booking-hours-location-groups{grid-template-columns:1fr}.catalog-page .booking-hour-detail-form{grid-template-columns:1fr}}
