@@ -171,3 +171,35 @@
 .catalog-page .booking-hour-actions{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px;padding-top:12px;border-top:1px solid var(--studio-grid-border,#dce4ec)}
 @media(max-width:1100px){.catalog-page .booking-catalog-workspace,.catalog-page .catalog-product-workspace,.catalog-page .booking-sessions:has(.booking-hours-location-groups) .booking-catalog-workspace{grid-template-columns:minmax(0,1fr)}.catalog-page .booking-catalog-workspace>.booking-grid-scroll,.catalog-page .catalog-product-workspace>.commercial-grid{height:350px;max-height:350px}.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]),.catalog-page .catalog-product-editor{height:auto;max-height:none}}
 @media(max-width:620px){.catalog-page .booking-hours-location-groups{grid-template-columns:1fr}.catalog-page .booking-editor-basics,.catalog-page .booking-editor-pricing,.catalog-page .booking-hour-detail-form{grid-template-columns:1fr}}
+
+
+/* Opening Hours specification: one location, seven-day grid, right detail editor. */
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(440px,.9fr);gap:18px;align-items:start}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-grid-scroll{height:auto;max-height:none;min-height:0;overflow:visible;border:0;background:transparent}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-details:not([hidden]){height:auto;max-height:none;min-height:0;overflow:visible;border:1px solid var(--studio-grid-border,#dce4ec);border-radius:12px;padding:18px}
+.catalog-page .booking-hours-location-bar{display:flex;align-items:center;gap:16px;margin:0 0 16px}
+.catalog-page .booking-hours-location-bar label{display:flex;align-items:center;gap:12px;font-size:13px;font-weight:600}
+.catalog-page .booking-hours-location-bar select{width:min(380px,35vw);padding:10px 14px;border:1px solid var(--studio-control-border,#cbd5df);border-radius:7px;background:var(--studio-card-bg,#fff);font-size:14px}
+.catalog-page .booking-hours-location-bar button{padding:10px 15px;border-radius:7px}
+.catalog-page .booking-hours-table-wrap{overflow:auto;border:1px solid var(--studio-grid-border,#dce4ec);border-radius:10px}
+.catalog-page .booking-hours-week-table{border-collapse:collapse;width:100%;font-size:14px}
+.catalog-page .booking-hours-week-table th{background:var(--catalog-header-surface,#f0f4f7);padding:14px 16px;text-align:left;font-size:12px;color:var(--theme-text,#172d4a)}
+.catalog-page .booking-hours-week-table td{padding:15px 16px;border-top:1px solid var(--studio-grid-border,#dce4ec)}
+.catalog-page .booking-hours-week-table tr{cursor:pointer}
+.catalog-page .booking-hours-week-table tr[aria-selected="true"]{background:#faf0dd}
+.catalog-page .booking-hours-week-table td:first-child{white-space:nowrap}
+.catalog-page .booking-day-check{display:inline-grid;place-items:center;width:20px;height:20px;margin-right:14px;border:1px solid #a9b7c7;border-radius:4px;color:#fff}
+.catalog-page .booking-day-check.is-open{background:#236eaf;border-color:#236eaf}
+.catalog-page .booking-hours-week-table .booking-status-dot{display:inline-block;margin-right:7px}
+.catalog-page .booking-hour-badge{border-radius:7px;background:#e1f3e6;color:#175a34;font-size:12px;font-weight:700;padding:6px 11px}
+.catalog-page .booking-hour-detail-form{display:grid;grid-template-columns:minmax(0,1fr);gap:15px}
+.catalog-page .booking-hours-time-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.catalog-page .booking-hour-detail-form label{display:grid;gap:6px;font-size:13px;font-weight:600}
+.catalog-page .booking-hour-detail-form input,.catalog-page .booking-hour-detail-form select{width:100%;box-sizing:border-box;padding:11px;border:1px solid var(--studio-control-border,#cbd5df);border-radius:7px}
+.catalog-page .booking-hour-options{display:grid;gap:8px;border:1px solid var(--studio-grid-border,#dce4ec);border-radius:9px;padding:14px}
+.catalog-page .booking-hour-options small{color:var(--theme-muted,#667383)}
+.catalog-page .booking-hour-window-actions{display:flex;gap:10px;flex-wrap:wrap}
+.catalog-page .booking-hour-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:15px;border-top:1px solid var(--studio-grid-border,#dce4ec)}
+.catalog-page .booking-hour-actions button{padding:10px 18px;border-radius:7px}
+@media(max-width:1100px){.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace{grid-template-columns:1fr}.catalog-page .booking-hours-location-bar select{width:min(380px,50vw)}}
+@media(max-width:600px){.catalog-page .booking-hours-location-bar{flex-wrap:wrap}.catalog-page .booking-hours-time-fields{grid-template-columns:1fr}.catalog-page .booking-hours-week-table th,.catalog-page .booking-hours-week-table td{padding:10px 8px;font-size:12px}}
