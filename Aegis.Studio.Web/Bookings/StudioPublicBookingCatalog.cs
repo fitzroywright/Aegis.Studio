@@ -105,7 +105,7 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
         foreach(var x in hours){using var q=new NpgsqlCommand("insert into studio_public_booking_hours(location_code,day_of_week,opens_at,payload) values($1,$2,$3,$4::jsonb)",c,tx);q.Parameters.AddWithValue(x.LocationCode);q.Parameters.AddWithValue(x.DayOfWeek);q.Parameters.AddWithValue(TimeOnly.Parse(x.OpensAt));q.Parameters.AddWithValue(JsonSerializer.Serialize(x,JsonOptions));q.ExecuteNonQuery();}
         using var bump=new NpgsqlCommand("update studio_public_booking_catalog_state set revision=revision+1 where id=1 returning revision",c,tx);long revision=(long)bump.ExecuteScalar()!;tx.Commit();return revision;
     }
-    static void Validate(IReadOnlyList<PublicBookingSessionType> items)
+    void Validate(IReadOnlyList<PublicBookingSessionType> items)
     {
         if(items.Count>200)throw new ArgumentException("A maximum of 200 public session types is supported.");
         var ids=new HashSet<string>(StringComparer.OrdinalIgnoreCase);var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -116,7 +116,7 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
             if(string.IsNullOrWhiteSpace(x.Name)||x.Name.Trim().Length>160||!names.Add(x.Name.Trim()))throw new ArgumentException("Session names must be unique and are limited to 160 characters.");
             if((x.Category?.Length??0)>80)throw new ArgumentException("Session categories are limited to 80 characters.");
             if(x.Description?.Length>1000||x.DurationMinutes is <15 or >1440||x.SetupBufferMinutes is <0 or >480||x.CleanupBufferMinutes is <0 or >480||x.PriceMinor<0||x.DepositMinor<0||x.DepositMinor>x.PriceMinor||x.Currency!="JMD")throw new ArgumentException("Set a JMD price and deposit, a valid duration, and buffers of no more than eight hours.");
-            if(x.Locations is null||x.Locations.Count==0||x.Locations.Any(l=>!GetLocations().Any(loc=>loc.Code==l))||x.Locations.Distinct().Count()!=x.Locations.Count)throw new ArgumentException("Choose Kings Plaza (BK), East Queen Street (BE), or both.");
+            if(x.Locations is null||x.Locations.Count==0||x.Locations.Any(l=>!GetLocations().Any(loc=>loc.Code==l))||x.Locations.Distinct().Count()!=x.Locations.Count)throw new ArgumentException("Choose one or more configured locations.");
             if(x.ResourceRequirements is null||x.ResourceRequirements.Any(p=>!Regex.IsMatch(p.Key,@"^[A-Za-z0-9._-]{1,80}$")||p.Value is <0 or >20))throw new ArgumentException("Resource rules must use active Studio resource types and whole-number counts.");
         }
     }
