@@ -100,6 +100,11 @@ window.StudioClients=(()=>{
                     host.querySelectorAll('[data-c-publish]').forEach(b=>b.onclick=()=>publishOptions(state.gallery.find(x=>x.job.id===b.dataset.cPublish)));
                     host.querySelectorAll('[data-c-media]').forEach(b=>b.onclick=()=>mediaPreview(state.gallery.find(x=>x.job.id===b.dataset.cMedia)));
                 }else if(tab==='finance'){
+                    const permissions=await Promise.all(linked.map(j=>json('/api/jobs/'+j.id+'/access')));
+                    if(!current())return;
+                    if(permissions.some(value=>(value.permissions||value).viewFinancials===false)){
+                        window.StudioAccess.render(host,{kind:'section',title:'this financial statement',description:'Your role does not allow you to view financial data for every job in this statement. You can continue working with the client information available to you.'});return;
+                    }
                     if(!state.finance)state.finance=await mapJobs(async j=>{const [invoices,balance]=await Promise.allSettled([loadArray('/api/jobs/'+j.id+'/invoices'),json('/api/jobs/'+j.id+'/finance-release')]);return {job:j,invoices:invoices.status==='fulfilled'?invoices.value:null,balance:balance.status==='fulfilled'?balance.value.decision?.balance:null,error:invoices.status==='rejected'?invoices.reason.message:null};});
                     if(!current())return;
                     const ledger=linked.flatMap(j=>(j.financialEvents||[]).map(e=>({...e,jobId:j.id,jobTitle:j.title}))).sort((a,b)=>new Date(a.createdAt||a.createdAtUtc)-new Date(b.createdAt||b.createdAtUtc));
@@ -115,7 +120,7 @@ window.StudioClients=(()=>{
                 if(!current())return;
                 host.querySelectorAll('tr[data-c-job]').forEach(row=>row.onkeydown=e=>{if(e.target===row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();row.click();}});
                 host.querySelectorAll('[data-c-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.cJob).catch(e=>alert(e.message)));
-            }catch(e){if(current()){host.innerHTML='<p class="client-empty" role="alert">'+esc(e.message)+'</p><button class="action" data-c-retry-tab>Retry</button>';host.querySelector('[data-c-retry-tab]').onclick=()=>{state.gallery=null;state.finance=null;state.activity=null;showTab();};}}
+            }catch(e){if(current()){if(e?.status===403){window.StudioAccess.render(host,{kind:'section',title:tab==='finance'?'financial data':'this section'});return;}host.innerHTML='<p class="client-empty" role="alert">'+esc(e.message)+'</p><button class="action" data-c-retry-tab>Retry</button>';host.querySelector('[data-c-retry-tab]').onclick=()=>{state.gallery=null;state.finance=null;state.activity=null;showTab();};}}
         }
         async function mapJobs(fn){
             const output=new Array(linked.length);let next=0;
@@ -188,6 +193,7 @@ window.StudioClients=(()=>{
     }
     return {render,newClient(){return activeActions.newClient?.();},newBooking(){return activeActions.newBooking?.();},invalidate(){++revision;activeActions={};closeGalleryLink();}};
 })();
+
 
 
 
