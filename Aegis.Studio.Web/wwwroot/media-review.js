@@ -70,7 +70,7 @@
   const options=(values,selected)=>values.map(([value,label])=>`<option value="${esc(value)}" ${String(value)===String(selected)?'selected':''}>${esc(label)}</option>`).join('');
   function remember(){window.studioMediaContext={jobId:state.job,sessionId:state.session,collection:state.collection,subjectId:state.subject};}
   function renderInbox(){
-   if(!alive())return;
+   if(!alive()||!state.inboxAllowed)return;
    const items=state.inboxItems.filter(item=>!item.matchedJobId);
    q('[data-inbox-count]').textContent=`${items.length} waiting to match`;
    q('[data-inbox-selected]').textContent=`${state.inboxSelected.size} selected`;
@@ -240,7 +240,7 @@
     q('[data-queue]').querySelectorAll('[data-inbox-retry]').forEach(button=>button.onclick=run(async()=>{const retry=state.inboxRetryFiles.find(item=>item.uploadId===button.dataset.inboxRetry);if(retry)await uploadToInbox([retry.file],true);}));
     await loadInbox();
     const failed=outcomes.filter(item=>!item.ok).length;
-    q('[data-progress]').textContent=failed?`${files.length-failed} of ${files.length} stored · ${failed} failed. Retry is available on each failed inbox item.`:`${files.length} photo${files.length===1?'':'s'} stored in Media Inbox. Match them to a job whenever you are ready.`;
+    q('[data-progress]').textContent=failed?`${files.length-failed} of ${files.length} stored · ${failed} failed. Use Retry upload beside each failed file.`:`${files.length} photo${files.length===1?'':'s'} stored in Media Inbox. Match them to a job whenever you are ready.`;
    }finally{transfer.pendingFiles.splice(0,transfer.pendingFiles.length);state.inboxUploading=false;showDestination();}
   }
   async function matchInboxSelection(){
