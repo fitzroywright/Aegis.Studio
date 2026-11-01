@@ -435,3 +435,8 @@
 .catalog-page .booking-detail-layout>.booking-section-timing label{grid-template-columns:minmax(0,1fr) 82px}
 .catalog-page .booking-detail-layout>.booking-section-routing select{width:100%;min-width:0}
 .catalog-page .booking-detail-layout>.booking-detail-description textarea{min-height:115px}
+
+/* Services detail alignment: locations left, resources right, timing aligned with textarea. */
+.catalog-page .booking-detail-content.booking-detail-layout{grid-template-areas:"description timing" "routing pricing" "locations resources";}
+.catalog-page .booking-detail-layout>.booking-section-timing{padding-top:18px}
+@media(max-width:1100px){.catalog-page .booking-detail-content.booking-detail-layout{grid-template-areas:"description" "timing" "routing" "pricing" "locations" "resources"} .catalog-page .booking-detail-layout>.booking-section-timing{padding-top:0}}
