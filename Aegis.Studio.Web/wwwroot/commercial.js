@@ -44,7 +44,7 @@ async function showCommercialCatalog(options={}){
             bookings.innerHTML=window.StudioBookingSessions.html({embedded:true});
             const settingsRequest=Promise.resolve();
             const toolbar=bookings.querySelector('.booking-toolbar');
-            if(toolbar){page.querySelector('[data-catalog-tools]').append(toolbar);toolbar.querySelector('[data-booking-count]').hidden=true;toolbar.querySelector('[data-booking-add]').hidden=true;}
+            if(toolbar){page.querySelector('[data-catalog-tools]').append(toolbar);toolbar.querySelector('[data-booking-count]').hidden=true;toolbar.querySelector('[data-booking-add]').hidden=true;toolbar.querySelector('[data-booking-reload]').hidden=true;}
             bookingController=await window.StudioBookingSessions.mount(bookings,live,{onSummary:value=>{summary=value;paintSummary();},embedded:true});
             await settingsRequest;if(!live())return;
             bookingController?.selectTab(active==='hours'?'hours':'sessions');if(active!=='products'){add.disabled=false;add.hidden=false;}
