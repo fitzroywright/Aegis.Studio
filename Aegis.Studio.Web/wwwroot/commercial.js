@@ -17,15 +17,15 @@ async function showCommercialCatalog(options={}){
     function paintSummary(){
         if(!live())return;
         const count=page.querySelector('[data-catalog-count]');
-        if(active==='products')count.textContent=commercialItems?.length?commercialItems.length+' products':'';
-        else if(summary)count.textContent=active==='hours'?summary.hours.length+' opening windows':bookingController?.count?.()||'';
+        if(active==='products')count.textContent=Array.isArray(commercialItems)?commercialItems.length+' products':'';
+        else if(summary)count.textContent=active==='hours'?summary.hours.length+' opening windows':page.querySelector('[data-booking-count]')?.textContent||'';
     }
     add.onclick=()=>active==='products'?editCommercialItem():bookingController?.add();
     async function loadProducts(){
         products.innerHTML='<p role="status">Loading catalog...</p>';
         try{
             const [items,templates]=await Promise.all([json('/api/admin/pos/catalog/'),json('/api/admin/commercial/templates/WorkOrder')]);if(!live())return;
-            commercialItems=items;commercialTemplates=templates;
+            commercialItems=items;commercialTemplates=templates;paintSummary();
             const categories=[...new Set(items.map(item=>item.category).filter(Boolean))].sort();
             products.innerHTML=`<div class="catalog-product-toolbar"><span data-product-count></span></div><div class="catalog-product-workspace"><div class="commercial-grid"><table class="pos-grid"><thead><tr><th><label class="catalog-column-filter"><span>Product</span><input class="commercial-search" type="search" placeholder="Search products…" aria-label="Search products"></label></th><th><label class="catalog-column-filter"><span>Category</span><select data-product-category aria-label="Filter product category"><option value="">All categories</option>${categories.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('')}</select></label></th><th>Price · JMD</th><th><label class="catalog-column-filter"><span>Status</span><select data-product-status aria-label="Filter product status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label></th></tr></thead><tbody>${items.map(p=>`<tr data-item="${esc(p.id)}" tabindex="0"><td><strong>${esc(p.name)}</strong><small>${esc(p.code)} · ${esc(p.description||'')}</small></td><td>${esc(p.category)}</td><td>${money(p.unitPrice)}</td><td><span class="catalog-product-status">${p.isActive?'Active':'Inactive'}</span></td></tr>`).join('')}</tbody></table><p class="booking-empty" data-products-empty hidden>No products match your filters.</p></div><section class="catalog-product-editor" data-product-editor aria-label="Selected product details"></section></div><footer class="booking-grid-footer">Select a product to edit pricing, tax, options, package components and production template.</footer>`;
             products.querySelectorAll('[data-item]').forEach(row=>{row.onclick=()=>selectProduct(row.dataset.item);row.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();row.click();}};});
