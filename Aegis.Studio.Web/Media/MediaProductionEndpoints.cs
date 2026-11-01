@@ -28,6 +28,63 @@ public static class MediaProductionEndpoints
         StudioDatabase database=app.Services.GetRequiredService<StudioDatabase>();
         MediaProductionStore.Migrate(database);
         EnsureWorkspaceCoverSchema(database);
+        app.MapGet("/api/media/inbox",(ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>
+        {
+            if(!CanUseMediaInbox(user,access,db))return Results.Forbid();
+            bool reviewAll=CanReviewMediaInbox(user,db);string actor=Name(user);
+            return Results.Ok(new{items=new MediaInboxStore(db,storage).List(actor,reviewAll),canReviewAll=reviewAll});
+        }).RequireAuthorization();
+        app.MapPost("/api/media/inbox/uploads",async(HttpRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage,CancellationToken token)=>
+        {
+            if(!CanUseMediaInbox(user,access,db))return Results.Forbid();
+            if(!request.HasFormContentType)return Results.BadRequest(new{error="Select a photo to add to the Media Inbox."});
+            var form=await request.ReadFormAsync(token);
+            if(form.Files.Count!=1||!Guid.TryParse(form["uploadId"],out var id))return Results.BadRequest(new{error="Send one photo and its stable upload ID."});
+            try{return Results.Ok(await new MediaInboxStore(db,storage).StoreAsync(id,form.Files[0],Name(user),token));}
+            catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}
+            catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}
+        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(101_000_000)).DisableAntiforgery().RequireAuthorization();
+        app.MapGet("/api/media/inbox/{id:guid}/content",async(Guid id,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage,CancellationToken token)=>
+        {
+            if(!CanUseMediaInbox(user,access,db))return Results.Forbid();
+            bool reviewAll=CanReviewMediaInbox(user,db);var inbox=new MediaInboxStore(db,storage);var item=inbox.Get(id,Name(user),reviewAll);
+            if(item is null||item.MatchedJobId.HasValue)return Results.NotFound();
+            try{return Results.Stream(await inbox.OpenReadAsync(id,Name(user),reviewAll,token),item.ContentType,item.FileName,enableRangeProcessing:true);}
+            catch(KeyNotFoundException){return Results.NotFound();}
+        }).RequireAuthorization();
+        app.MapPost("/api/media/inbox/{id:guid}/match",async(Guid id,MediaInboxMatch request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage,CancellationToken token)=>
+        {
+            if(!access.HasPermission(user,request.JobId,"ManageProduction"))return Results.Forbid();
+            bool reviewAll=CanReviewMediaInbox(user,db);string actor=Name(user);var inbox=new MediaInboxStore(db,storage);
+            var item=inbox.Get(id,actor,reviewAll);if(item is null)return Results.NotFound();
+            if(item.MatchedJobId.HasValue)return item.MatchedJobId==request.JobId?Results.Ok(item):Results.Conflict(new{error="This photo is already matched to another job."});
+            try
+            {
+                using var source=await inbox.OpenReadAsync(id,actor,reviewAll,token);
+                var file=new FormFile(source,0,item.SizeBytes,"file",item.FileName){Headers=new HeaderDictionary(),ContentType=item.ContentType};
+                var receipts=new MediaUploadReceipts(db,Store(db,storage));
+                var declaration=new UploadBatchDeclaration(item.BatchId,request.SessionId,[new(id,item.FileName,item.SizeBytes)],request.Collection??"Unclassified",request.SubjectId,Note:"Matched from Media Inbox");
+                bool canManage=access.HasPermission(user,request.JobId,"ManageProduction");
+                receipts.Create(request.JobId,declaration,actor,canManage);
+                var received=System.Text.Json.JsonSerializer.SerializeToElement(receipts.Receive(request.JobId,id,file,actor),new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+                if(received.GetProperty("unmatched").GetBoolean())return Results.Conflict(new{error="This photo could not be matched to a job media asset."});
+                var version=received.GetProperty("id").GetGuid();
+                inbox.MarkMatched(id,request.JobId,version,actor,reviewAll);
+                return Results.Ok(new{itemId=id,jobId=request.JobId,versionId=version});
+            }
+            catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}
+            catch(KeyNotFoundException){return Results.NotFound();}
+            catch(UnauthorizedAccessException){return Results.Forbid();}
+            catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}
+        }).DisableAntiforgery().RequireAuthorization();
+        app.MapDelete("/api/media/inbox/{id:guid}",async(Guid id,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage,CancellationToken token)=>
+        {
+            if(!CanUseMediaInbox(user,access,db))return Results.Forbid();
+            bool reviewAll=CanReviewMediaInbox(user,db);
+            try{await new MediaInboxStore(db,storage).DeleteAsync(id,Name(user),reviewAll,token);return Results.NoContent();}
+            catch(KeyNotFoundException){return Results.NotFound();}
+            catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}
+        }).RequireAuthorization();
         app.MapGet("/api/today/media",(Guid? jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db)=>
         {
             var allowed=access.GetAccessibleJobIds(user,requireAttachments:true).Where(id=>!jobId.HasValue||id==jobId.Value).ToArray();
@@ -152,6 +209,11 @@ public static class MediaProductionEndpoints
             using var c=db.OpenConnection();using var cmd=new NpgsqlCommand("update studio_workspaces set icon_name=$2,accent_color=$3 where id=$1",c);cmd.Parameters.AddWithValue(workspaceId);cmd.Parameters.AddWithValue(request.Icon);cmd.Parameters.AddWithValue(request.Color!);cmd.ExecuteNonQuery();return Results.NoContent();
         }).RequireAuthorization();
     }
+    private static bool CanReviewMediaInbox(ClaimsPrincipal user,StudioDatabase db)
+        =>user.IsInRole("Administrator")||new GlobalOperationalRoleStore(db).HasRole(user,StudioRoleNames.ProductionManager);
+    private static bool CanUseMediaInbox(ClaimsPrincipal user,JobAccessService access,StudioDatabase db)
+        =>user.IsInRole("Administrator")||new GlobalOperationalRoleStore(db).HasRole(user,StudioRoleNames.ProductionManager)
+          ||access.GetAccessibleJobIds(user,requireAttachments:true).Any(id=>access.HasPermission(user,id,"ManageProduction"));
     private static MediaProductionStore Store(StudioDatabase db,IFileStorage storage)=>new(db,new StudioVersionStore(db,storage));
     private static string Name(ClaimsPrincipal user)=>user.FindFirstValue("login_name")??user.Identity?.Name??throw new UnauthorizedAccessException();
     private static IResult DeleteMediaWrite(Guid job,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,Func<IResult> action)
