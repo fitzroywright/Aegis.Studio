@@ -214,6 +214,7 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                 {
                     string cursor=WorkflowStore.Scalar(c,null,"select cursor from studio_website_cursor where source=$1",source) as string??"";
                     var feed=await site.Get("/api/v1/changes?cursor="+Uri.EscapeDataString(cursor),ct);
+                    bool cycleSucceeded=true;
                     var feedItems=feed.GetProperty("items").EnumerateArray().ToArray();
                     var recovered=new List<JsonElement>();
                     if(!string.IsNullOrEmpty(cursor)&&DateTimeOffset.UtcNow>=nextReconciliation)
@@ -254,12 +255,13 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                             }
                             catch(Exception ex)when(ex is not OperationCanceledException)
                             {
+                                cycleSucceeded=false;
                                 logger.LogError("Gallery access request held for retry. RequestId={RequestId} ErrorType={ErrorType}",request.GetProperty("id"),ex.GetType().Name);
                             }
                         }
                     }
                     catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
-                    catch(Exception ex){logger.LogWarning("Gallery access request polling failed; existing intake polling will continue. ErrorType={ErrorType}",ex.GetType().Name);}
+                    catch(Exception ex){cycleSucceeded=false;logger.LogWarning("Gallery access request polling failed; existing intake polling will continue. ErrorType={ErrorType}",ex.GetType().Name);}
                     var retries=new List<JsonElement>();
                     using(var q=WorkflowStore.Command(c,null,"select payload::text from studio_website_import_errors where source=$1 and payload is not null order by updated_at_utc limit 25",source))using(var r=q.ExecuteReader())while(r.Read())retries.Add(JsonSerializer.Deserialize<JsonElement>(r.GetString(0)));
                     var batch=retries.Concat(feedItems).Concat(recovered).GroupBy(p=>p.GetProperty("id").GetGuid()).Select(g=>g.OrderByDescending(p=>p.GetProperty("revision").GetInt64()).First()).ToArray();
@@ -277,6 +279,7 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                       catch(Exception ex)when(ex is not OperationCanceledException)
                       {
                         WorkflowStore.Sql(c,null,"insert into studio_website_import_errors(source,external_id,revision,error_type,payload) values($1,$2,$3,$4,$5::jsonb) on conflict(source,external_id) do update set revision=$3,error_type=$4,payload=$5::jsonb,updated_at_utc=now()",source,p.GetProperty("id").GetGuid(),p.GetProperty("revision").GetInt64(),ex.GetType().Name,p.GetRawText());
+                        cycleSucceeded=false;
                         logger.LogError(ex,"Website intake held for retry. ExternalId={ExternalId} Revision={Revision} ErrorType={ErrorType}",p.GetProperty("id"),p.GetProperty("revision"),ex.GetType().Name);
                       }
                     }
@@ -293,6 +296,8 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                         await site.Post($"/api/v1/intakes/{s.External:D}/ack",new{revision=s.Revision,bookingStatus=s.Booking,reviewStatus=s.Booking is "Pending" or "Inquiry"?"AwaitingReview":s.Booking,acknowledgmentStatus=s.Ack},ct);
                         WorkflowStore.Sql(c,null,"update studio_website_imports set last_status=$3 where source=$1 and external_id=$2",source,s.External,s.Booking+"|"+s.Ack);
                     }
+                    var incomplete=WorkflowStore.Scalar(c,null,"select exists(select 1 from studio_website_import_errors where source=$1) or exists(select 1 from studio_intake_attachments a join studio_website_imports i on i.conversation_id=a.conversation_id where i.source=$1 and a.metadata->>'state'='Clean' and (a.local_attachment_id is null or a.state<>'Imported'))",source);
+                    if(cycleSucceeded && incomplete is false)PublicSiteSyncStatus.RecordSuccess(database,configuration,"Website intake");
                 }finally{WorkflowStore.Sql(c,null,"select pg_advisory_unlock(hashtextextended($1,0))","public-site-poll:"+source);}
             }
             catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}
@@ -318,4 +323,5 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
     }
 
 }
+
 

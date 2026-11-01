@@ -9,7 +9,7 @@ public static class StudioAccessPresentation
     {
         HashSet<string> paths = new(StringComparer.OrdinalIgnoreCase)
         {
-            "/", "/index.html", "/login.html", "/login.js", "/api/auth/me", "/api/auth/logout",
+            "/", "/index.html", "/login.html", "/login.js", "/api/auth/me", "/api/studio/about", "/api/auth/logout",
             "/thinking-machines-letterhead.png", "/thinking-machines-about-once.gif"
         };
         // Follow only local static references in the canonical shell; never allow an API path.
@@ -23,3 +23,4 @@ public static class StudioAccessPresentation
         return paths.ToArray();
     }
 }
+

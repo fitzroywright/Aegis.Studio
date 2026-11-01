@@ -213,6 +213,7 @@ public sealed class StudioPublicBookingCatalogPublisher(StudioPublicBookingCatal
                 var slots=StudioPublicBookingAvailabilityBuilder.Build(catalog,store.GetHours(),schedule,photographers,apiRevision,DateTimeOffset.UtcNow);
                 var availability=new{slots};var hash=Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(availability,new JsonSerializerOptions(JsonSerializerDefaults.Web)))).ToLowerInvariant();
                 await site.PutAvailability(availability,"availability-"+hash,ct);
+                PublicSiteSyncStatus.RecordSuccess(database,configuration,"Booking catalog and availability");
             }
             catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}
             catch(Exception ex){logger.LogError(ex,"Studio public booking catalog publication will retry.");}
@@ -277,3 +278,4 @@ public static class StudioPublicBookingAvailabilityBuilder
         return true;
     }
 }
+

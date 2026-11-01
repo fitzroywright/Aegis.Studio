@@ -6,6 +6,19 @@ public static class StudioServiceStatus
 {
     public static void MapStudioServiceStatus(this WebApplication app)
     {
+        PublicSiteSyncStatus.EnsureSchema(app.Services.GetRequiredService<StudioDatabase>());
+        app.MapGet("/api/studio/about", (StudioDatabase db, IConfiguration configuration, IWebHostEnvironment environment) =>
+        {
+            var deployment = StudioDeploymentInfo.Read(configuration, environment.ContentRootPath);
+            return Results.Ok(new {
+                deployedVersion = deployment.Version,
+                deployment.DeployedAtUtc,
+                environment = environment.EnvironmentName,
+                isDemo = environment.IsEnvironment("Demo"),
+                publicSiteConfigured = PublicSiteSyncStatus.Source(configuration) is not null,
+                lastSuccessfulPublicSiteSyncAtUtc = PublicSiteSyncStatus.LastSuccess(db, configuration)
+            });
+        }).RequireAuthorization();
         app.MapGet("/api/admin/studio-status",async(StudioDatabase db,IFileStorage storage,IConfiguration configuration,CancellationToken token)=>
         {
             object storageStatus;
@@ -26,3 +39,4 @@ public static class StudioServiceStatus
         }).RequireAuthorization(new Microsoft.AspNetCore.Authorization.AuthorizeAttribute{Roles="Administrator"});
     }
 }
+
