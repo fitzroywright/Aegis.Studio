@@ -450,3 +450,9 @@
 }
 .catalog-page .booking-session-grid thead th :is(label,span),
 .catalog-page .catalog-product-workspace .pos-grid thead th :is(label,span){color:inherit}
+
+/* Distinct detail card outline and left Add / right Cancel and Save actions. */
+.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){border:2px solid var(--studio-grid-border,#b8a18a);border-radius:9px}
+.catalog-page .booking-detail-form>footer{display:flex;align-items:center;justify-content:flex-end;gap:9px}
+.catalog-page .booking-detail-form>footer .booking-details-add{margin-right:auto;white-space:nowrap}
+.catalog-page .booking-detail-form>footer .booking-detail-footer-spacer{flex:1 1 auto;min-width:0}
