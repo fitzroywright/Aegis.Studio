@@ -9,7 +9,7 @@ window.StudioBookingSessions=(()=>{
         const root=host.querySelector('.booking-sessions');if(!root)return;
         const live=()=>current()&&root.isConnected;
         const field=name=>root.querySelector('[data-booking-'+name+']')||host.closest('.st-page')?.querySelector('[data-booking-'+name+']');
-        const state={tab:'sessions',sessions:[],hours:[],workspaces:[],resourceTypes:['Photographer'],loaded:{sessions:false,hours:false},dirty:{sessions:false,hours:false},errors:{},search:'',category:'',location:'',filter:'',selected:null,detailBaseline:null,selectedHour:0,hourLocation:'BK',saving:false,revision:null};
+        const state={tab:'sessions',sessions:[],hours:[],workspaces:[],resourceTypes:['Photographer'],loaded:{sessions:false,hours:false},dirty:{sessions:false,hours:false},errors:{},search:'',category:'',location:'',filter:'',selected:null,detailBaseline:null,selectedHour:0,hourLocation:'BK',saving:false,revision:null,addingSessionId:null,selectionBeforeAdd:null};
         let loadRevision=0;const persisted=new Map();
         const status=message=>{if(live())field('status').textContent=message;};
         const dirty=()=>{state.dirty[state.tab]=true;controls();status('Unsaved changes');};
@@ -112,7 +112,7 @@ window.StudioBookingSessions=(()=>{
                 const result=await json(tab==='sessions'?'/api/admin/public-booking/session-types/':'/api/admin/public-booking/hours',{method:'PUT',headers:{'Content-Type':'application/json','If-Match':String(state.revision)},body:JSON.stringify(payload)});
                 if(!live())return;
                 if(tab==='sessions'){if(!Array.isArray(result.sessionTypes))throw Error('Unexpected catalog response. Reload to verify the saved state.');state.sessions=result.sessionTypes.map(row=>({...row,price:String(row.priceMinor/100),deposit:String(row.depositMinor/100)}));persisted.clear();for(const row of result.sessionTypes)persisted.set(row.id,clone(row));}
-                state.revision=result.revision;state.dirty[tab]=false;state.detailBaseline=null;status(tab==='sessions'?'Session types saved in Studio. API Site publication will retry when enabled.':'Opening hours saved in Studio.');
+                state.revision=result.revision;state.dirty[tab]=false;state.detailBaseline=null;state.addingSessionId=null;state.selectionBeforeAdd=null;status(tab==='sessions'?'Session types saved in Studio. API Site publication will retry when enabled.':'Opening hours saved in Studio.');
             }catch(error){status('Save failed: '+error.message);}
             finally{if(live()){state.saving=false;root.querySelectorAll('button,input,select,textarea').forEach(control=>control.disabled=false);paintGrid();}}
         };
@@ -151,7 +151,7 @@ window.StudioBookingSessions=(()=>{
         field('reload').onclick=()=>{if((state.dirty.sessions||state.dirty.hours)&&!confirm('Discard unsaved booking settings and reload?'))return;void load();};
         field('add').onclick=()=>{
             try{if(state.tab==='sessions')readDetails();}catch(error){status(error.message);return;}
-            if(state.tab==='sessions'){state.search='';state.category='';state.location='';state.filter='';for(const name of ['search','category','location','filter']){const control=field(name);if(control)control.value='';}state.sessions.push({id:crypto.randomUUID(),name:'',description:'',durationMinutes:60,setupBufferMinutes:0,cleanupBufferMinutes:0,price:'0',deposit:'0',priceMinor:0,depositMinor:0,currency:'JMD',locations:['BK'],resourceRequirements:{Photographer:1},isActive:true,isPublished:false,defaultWorkspaceId:null,category:''});state.selected=state.sessions.at(-1).id;state.detailBaseline=null;}
+            if(state.tab==='sessions'){state.selectionBeforeAdd=state.selected;state.search='';state.category='';state.location='';state.filter='';for(const name of ['search','category','location','filter']){const control=field(name);if(control)control.value='';}state.sessions.push({id:crypto.randomUUID(),name:'',description:'',durationMinutes:60,setupBufferMinutes:0,cleanupBufferMinutes:0,price:'0',deposit:'0',priceMinor:0,depositMinor:0,currency:'JMD',locations:['BK'],resourceRequirements:{Photographer:1},isActive:true,isPublished:false,defaultWorkspaceId:null,category:''});state.selected=state.sessions.at(-1).id;state.addingSessionId=state.selected;state.detailBaseline=null;}
             else{state.hours.push({locationCode:state.hourLocation,dayOfWeek:state.hourDay??1,opensAt:'09:00',closesAt:'17:00',slotStepMinutes:30});state.selectedHour=state.hours.length-1;}
             dirty();paintGrid();const row=field('grid').querySelector('tbody tr:last-child');row?.querySelector('input,select')?.focus();row?.scrollIntoView?.({block:'nearest'});
         };
@@ -200,7 +200,7 @@ window.StudioBookingSessions=(()=>{
             function detailsChanged(){try{readDetails();form.querySelector('[role=alert]').textContent='';}catch(error){form.querySelector('[role=alert]').textContent=error.message;}dirty();form.querySelector('[type=submit]').disabled=false;}
             form.addEventListener('input',detailsChanged);form.addEventListener('change',detailsChanged);
             form.onsubmit=event=>{event.preventDefault();field('save').click();};
-            form.querySelector('[data-details-cancel]').onclick=()=>{if(state.detailBaseline)Object.assign(row,clone(state.detailBaseline));state.detailBaseline=null;paintGrid();controls();status('Changes to this service reverted.');};
+            form.querySelector('[data-details-cancel]').onclick=()=>{if(state.addingSessionId===row.id){state.sessions=state.sessions.filter(item=>item.id!==row.id);state.selected=state.sessions.some(item=>item.id===state.selectionBeforeAdd)?state.selectionBeforeAdd:state.sessions[0]?.id||null;state.addingSessionId=null;state.selectionBeforeAdd=null;state.detailBaseline=null;state.dirty.sessions=state.sessions.some(item=>JSON.stringify(item)!==JSON.stringify(persisted.get(item.id)))||state.sessions.length!==persisted.size;paintGrid();status('Add service cancelled.');return;}if(state.detailBaseline)Object.assign(row,clone(state.detailBaseline));state.detailBaseline=null;paintGrid();controls();status('Changes to this service reverted.');};
         }
         function readDetails(){
             const editor=field('editor');if(editor.hidden)return;
