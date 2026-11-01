@@ -287,3 +287,7 @@
 .catalog-page .booking-sessions .booking-feedback:empty{display:none}
 .catalog-page .booking-sessions .booking-feedback{min-height:0}
 .catalog-page .catalog-panel{gap:4px}
+
+/* Give the Services & Sessions grid more room while retaining the detail editor. */
+.catalog-page .booking-sessions:not(:has(.booking-hours-location-groups)) .booking-catalog-workspace{grid-template-columns:minmax(0,1.9fr) minmax(380px,1fr)}
+@media(max-width:1100px){.catalog-page .booking-sessions:not(:has(.booking-hours-location-groups)) .booking-catalog-workspace{grid-template-columns:minmax(0,1fr)}}
