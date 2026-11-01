@@ -614,3 +614,29 @@
 .catalog-page .catalog-product-workspace,.catalog-page .booking-catalog-workspace{padding-bottom:44px}
 .catalog-page .catalog-panel:not([hidden]){gap:4px}
 .catalog-page .booking-sessions>.booking-grid-footer [data-booking-footer-note]{min-width:0}
+
+/* Match Products and Services grid widths, using the wider Services split. */
+@media(min-width:1101px){
+ .catalog-page .catalog-product-workspace,
+ .catalog-page .booking-sessions:not(:has(.booking-hours-location-groups)) .booking-catalog-workspace{grid-template-columns:minmax(0,1.9fr) minmax(380px,1fr);column-gap:14px}
+}
+/* Give the service name/search column more room within the same grid width. */
+.catalog-page .booking-session-grid{table-layout:fixed;width:100%;min-width:0}
+.catalog-page .booking-session-grid th:first-child,
+.catalog-page .booking-session-grid td:first-child{width:29%;min-width:0}
+.catalog-page .booking-session-grid th:nth-child(2),
+.catalog-page .booking-session-grid td:nth-child(2){width:14%;min-width:0}
+.catalog-page .booking-session-grid th:nth-child(3),
+.catalog-page .booking-session-grid td:nth-child(3){width:8%;min-width:0}
+.catalog-page .booking-session-grid th:nth-child(4),
+.catalog-page .booking-session-grid td:nth-child(4){width:10%;min-width:0}
+.catalog-page .booking-session-grid th:nth-child(5),
+.catalog-page .booking-session-grid td:nth-child(5){width:10%;min-width:0}
+.catalog-page .booking-session-grid th:nth-child(6),
+.catalog-page .booking-session-grid td:nth-child(6){width:9%;min-width:0}
+.catalog-page .booking-session-grid th:nth-child(7),
+.catalog-page .booking-session-grid td:nth-child(7){width:13%;min-width:0}
+.catalog-page .booking-session-grid th:nth-child(8),
+.catalog-page .booking-session-grid td:nth-child(8){width:7%;min-width:0}
+.catalog-page .booking-session-grid .catalog-service-filter input{min-width:0;width:100%}
+@media(max-width:1100px){.catalog-page .booking-session-grid{min-width:780px}}
