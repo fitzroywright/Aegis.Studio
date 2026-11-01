@@ -690,3 +690,9 @@
 .catalog-page .catalog-panel[data-catalog-panel="products"] .catalog-product-workspace>.commercial-grid,
 .catalog-page .catalog-panel[data-catalog-panel="products"] .catalog-product-workspace>.catalog-product-editor{height:calc(100% - 46px);max-height:calc(100% - 46px);min-height:0;box-sizing:border-box;margin-top:0;align-self:start}
 .catalog-page .catalog-panel[data-catalog-panel="products"]>.booking-grid-footer{margin-top:0}
+
+/* Service feedback belongs below the detail editor, not above the grid. */
+.catalog-page .booking-sessions{position:relative}
+.catalog-page .booking-sessions>.booking-feedback{position:absolute;right:0;bottom:0;width:calc((100% - 14px)*1/2.9);box-sizing:border-box;margin:0;padding:3px 0;text-align:left;font-size:12px;pointer-events:none}
+.catalog-page .booking-sessions>.booking-feedback[hidden]{display:none}
+.catalog-page .booking-sessions>.booking-grid-footer{margin-right:auto}
