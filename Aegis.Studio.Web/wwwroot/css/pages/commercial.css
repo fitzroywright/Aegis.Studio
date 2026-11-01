@@ -557,3 +557,9 @@
 .catalog-page .catalog-product-editor .commercial-product-form>footer [data-product-add]{margin-right:auto}
 .catalog-page .catalog-product-editor .commercial-product-form>footer [role=alert]{flex:0 1 auto;margin:0}
 .catalog-page .catalog-product-editor .commercial-product-form>footer [data-product-cancel]{margin-left:auto}
+
+/* Package components: three compact columns and enough height to show all entries. */
+.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;max-height:none;min-height:205px;height:auto;overflow:visible;align-content:start}
+.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle>label{min-width:0;display:flex;flex-direction:column;gap:3px;margin:0}
+.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle>label input{width:100%;min-width:0;box-sizing:border-box}
+@media(max-width:1150px){.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle{grid-template-columns:repeat(2,minmax(0,1fr))}}
