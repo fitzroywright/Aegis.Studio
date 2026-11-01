@@ -567,3 +567,23 @@
 /* Products tab: match Services tab's tight spacing below the tab controls. */
 .catalog-page [data-catalog-panel="products"]{padding-top:0;margin-top:0;row-gap:0}
 .catalog-page [data-catalog-panel="products"]>.catalog-product-workspace{margin-top:0;padding-top:0}
+
+/* Products: keep name, category and both switches in a single compact row. */
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form{grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:auto auto auto auto minmax(0,1fr) auto;gap:7px 9px}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-name{grid-column:1/span 4;grid-row:1}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-category{grid-column:5/span 3;grid-row:1}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-active{grid-column:8/span 2;grid-row:1;align-self:end;min-height:29px;white-space:nowrap}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-production{grid-column:10/span 3;grid-row:1;align-self:end;min-height:29px;white-space:nowrap}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-description{grid-column:1/span 6;grid-row:2/span 3}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-price{grid-column:7/span 6;grid-row:2}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-cost{grid-column:7/span 6;grid-row:3}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-tax{grid-column:7/span 6;grid-row:4}
+.catalog-page .catalog-product-editor .commercial-product-form>label:has(>textarea[name=options]){grid-column:1/span 6;grid-row:5}
+.catalog-page .catalog-product-editor .commercial-product-form>label:has(>select[name=template]){grid-column:7/span 6;grid-row:5}
+.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle{grid-column:1/-1;grid-row:6;min-height:0;max-height:none;height:auto;overflow:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 8px;align-content:start;padding:4px 7px}
+.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle legend{font-size:10px;line-height:1.1}
+.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle>label{font-size:10px;line-height:1.1;gap:2px;min-width:0}
+.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle>label input{height:23px;padding:2px 5px;font-size:11px}
+.catalog-page .catalog-product-editor .commercial-product-form>footer{grid-column:1/-1;grid-row:7;flex-shrink:0;position:sticky;bottom:0;z-index:3;background:var(--studio-card-bg,#fff);padding:8px 0 0}
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form{grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto}
+@media(max-width:1100px){.catalog-page .catalog-product-editor .commercial-form.commercial-product-form{grid-template-columns:repeat(12,minmax(0,1fr))}}
