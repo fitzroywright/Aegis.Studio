@@ -154,11 +154,11 @@ public sealed class MediaInboxStore(StudioDatabase database, IFileStorage storag
     {
         string? key=GetStorageKey(id,actor,canReviewAll);
         if(key is null)throw new KeyNotFoundException("Media Inbox item was not found.");
-        using var connection=database.OpenConnection();
-        using var command=new NpgsqlCommand("""
+        using(var connection=database.OpenConnection())
+        using(var command=new NpgsqlCommand("""
             update studio_media_inbox set deleted_at_utc=now(),deleted_by=$2
             where id=$1 and deleted_at_utc is null and matched_job_id is null and ($3 or lower(uploaded_by)=lower($2))
-            """,connection);
+            """,connection))
         {
             command.Parameters.AddWithValue(id);command.Parameters.AddWithValue(actor);command.Parameters.AddWithValue(canReviewAll);
             if(command.ExecuteNonQuery()!=1)throw new InvalidOperationException("Matched media cannot be removed from the inbox.");
