@@ -696,3 +696,20 @@
 .catalog-page .booking-sessions>.booking-feedback{position:absolute;right:0;bottom:0;width:calc((100% - 14px)*1/2.9);box-sizing:border-box;margin:0;padding:3px 0;text-align:left;font-size:12px;pointer-events:none}
 .catalog-page .booking-sessions>.booking-feedback[hidden]{display:none}
 .catalog-page .booking-sessions>.booking-grid-footer{margin-right:auto}
+
+/* Align the detail action row with the grid's bottom navigation toggles. */
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer,
+.catalog-page .booking-details .booking-detail-form>footer.booking-details-actions{
+  top:calc(100% + 8px);height:34px;min-height:34px;max-height:34px;
+  padding:0;margin:0;box-sizing:border-box;gap:8px;align-items:center;
+}
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer>button,
+.catalog-page .booking-details .booking-detail-form>footer.booking-details-actions>button,
+.catalog-page .catalog-tabs-below-grid button{
+  height:30px;min-height:30px;max-height:30px;box-sizing:border-box;
+  padding:0 12px;line-height:28px;display:inline-flex;align-items:center;justify-content:center;
+}
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer>button:first-child,
+.catalog-page .booking-details .booking-detail-form>footer.booking-details-actions>button:first-child{margin-right:auto}
+.catalog-page .catalog-panel>.booking-grid-footer,
+.catalog-page .booking-sessions>.booking-grid-footer{height:34px;min-height:34px;max-height:34px;align-items:center}
