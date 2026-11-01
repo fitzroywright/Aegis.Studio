@@ -901,3 +901,20 @@
     column-gap:14px;grid-template-rows:minmax(0,1fr);
   }
 }
+
+/* Expanded package components grow to fit all rows; no nested scroll area. */
+.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle-disclosure[open]{
+  overflow:visible;max-height:none;height:auto;align-self:start;
+}
+.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle-disclosure>.commercial-bundle-items{
+  max-height:none;height:auto;overflow:visible;
+}
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form:has(>.commercial-bundle-disclosure[open]){
+  overflow-y:auto;overflow-x:hidden;align-content:start;
+}
+/* Services detail outline matches the Product detail's restrained 1px border. */
+.catalog-page .booking-sessions .booking-catalog-workspace>.booking-details:not([hidden]),
+.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){
+  border:1px solid var(--studio-grid-border,#dce4ec);
+  border-radius:9px;box-shadow:none;
+}
