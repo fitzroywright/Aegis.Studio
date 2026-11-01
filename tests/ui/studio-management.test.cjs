@@ -3,7 +3,7 @@ const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
 function setup(t,administrator=true){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{runScripts:'outside-only',url:'https://studio.test/#studio=studio-management'}),w=dom.window;t.after(()=>w.close());
  Object.assign(w,{esc:String,money:String,workspaceCache:[],workspaceAccessCache:[],studioRolesCache:[],selectedWorkspace:null,renderWorkspaceMenu(){},renderWorkspaceAdminRow:()=>'',renderEmployeeDirectorySection:()=>'<section>Staff directory and Roles</section>',renderSecurityRolesSection:()=>'<section>Roles</section>',renderWorkflowSection:()=>'<section>Workflows</section>',hydrateWorkspaceManagers:async()=>{},refreshStudioEmployees:async()=>{},refreshWorkflowList:async()=>{},renderGlobalRoleAdministration:async()=>{},renderAnnouncementAdministration:async()=>{},loadWorkspaces:async()=>{},studioGetCurrentDemoDataRun:async()=>null});
- w.json=async url=>url==='/api/auth/me'?{user:{isAdministrator:administrator}}:url==='/api/admin/studio-status'?{database:'Ready',storage:{provider:'Local',available:true,writable:true},previews:{queued:2,failed:0,unsupported:0},messaging:{queuedEmails:1,failedNotifications:0},checkedAtUtc:'2026-10-27T22:00:00Z'}:[];
+ w.json=async url=>url==='/api/auth/me'?{user:{isAdministrator:administrator}}:url==='/api/studio/about'?{deployedVersion:'abc123',deployedAtUtc:'2026-11-01T07:00:00Z',environment:'Demo',isDemo:true,publicSiteConfigured:true,lastSuccessfulPublicSiteSyncAtUtc:'2026-11-01T07:30:00Z'}:url==='/api/admin/studio-status'?{database:'Ready',storage:{provider:'Local',available:true,writable:true},previews:{queued:2,failed:0,unsupported:0},messaging:{queuedEmails:1,failedNotifications:0},checkedAtUtc:'2026-10-27T22:00:00Z'}:[];
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  w.ResizeObserver=class{observe(){} disconnect(){}};w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
  for(const file of ['studio-access.js','studio-message-card.js','studio-page.js','studio-admin.js','booking-sessions.js','commercial.js','studio-navigation.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));
@@ -29,11 +29,11 @@ test('About contains product, support, service health and demo tools; Staff and 
  for(const [old,canonical] of [['admin','about'],['studio-management','about'],['demo-data','about'],['staff-admin','staff-roles'],['roles-admin','staff-roles']]){await w.studioNavigate(old);assert.equal(w.document.body.dataset.studioView,canonical);assert.match(w.location.hash,new RegExp('studio='+canonical));}
 });
 test('Staff and Roles retains its administrator access check',async t=>{
- const {w}=setup(t,false);await w.studioNavigate('staff-roles');
+ const {w}=setup(t,false);await new Promise(resolve=>w.setTimeout(resolve,0));await w.studioNavigate('staff-roles');
  assert.match(w.document.getElementById('genericView').textContent,/You don’t have access to this page/);assert.equal(w.document.querySelector('[data-demo-remove]'),null);
 });
 test('ordinary signed-in staff can open About without privileged controls or API reads',async t=>{
- const {w}=setup(t,false);const read=w.json,calls=[];w.json=async(url,options)=>{calls.push(url);return read(url,options);};
+ const {w}=setup(t,false);await new Promise(resolve=>w.setTimeout(resolve,0));const read=w.json,calls=[];w.json=async(url,options)=>{calls.push(url);return read(url,options);};
  await w.studioNavigate('about');
  assert.match(w.document.querySelector('.studio-about').textContent,/it@thinkingmachines.ltd.*Bryan’s Photo Studios/s);
  assert.equal(w.document.querySelector('.st-page').getAttribute('aria-label'),'About');
@@ -41,14 +41,14 @@ test('ordinary signed-in staff can open About without privileged controls or API
  assert.equal(calls.some(url=>url.startsWith('/api/admin/')||url==='/api/security/roles'||url==='/api/workspace-access'),false);
 });
 test('legacy About aliases show staff information without opening administrative tools',async t=>{
- const {w}=setup(t,false);
+ const {w}=setup(t,false);await new Promise(resolve=>w.setTimeout(resolve,0));
  for(const view of ['studio-management','demo-data','api-site-key']){
   await w.studioNavigate(view);assert.equal(w.document.body.dataset.studioView,'about');assert.ok(w.document.querySelector('.studio-about'));
   assert.equal(w.document.querySelector('[data-about-api-key],[data-service-audit],[data-demo-remove],[data-load-demo]'),null);
  }
 });
 test('About fails closed when the signed-in user cannot be loaded',async t=>{
- const {w}=setup(t,false);w.json=async()=>{throw Error('Session expired');};await w.studioNavigate('about');
+ const {w}=setup(t,false);await new Promise(resolve=>w.setTimeout(resolve,0));w.json=async()=>{throw Error('Session expired');};await w.studioNavigate('about');
  assert.match(w.document.getElementById('genericView').textContent,/Sign in required/);assert.equal(w.document.querySelector('.studio-about,[data-about-api-key]'),null);
 });
 test('the avatar menu contains one Preferences action and no separate Administration entry',t=>{
@@ -58,7 +58,7 @@ test('the avatar menu contains one Preferences action and no separate Administra
 
 
 test('every extracted admin route denies non-administrators before rendering controls',async t=>{
- const {w}=setup(t,false);for(const view of ['staff-admin','roles-admin','workflows-admin']){
+ const {w}=setup(t,false);await new Promise(resolve=>w.setTimeout(resolve,0));for(const view of ['staff-admin','roles-admin','workflows-admin']){
   await w.studioNavigate(view);assert.match(w.document.getElementById('genericView').textContent,/You don’t have access to this page/);assert.equal(w.document.querySelector('[data-about-api-key],[data-api-key-generate],[data-demo-remove],#publicBookingCatalog'),null);
  }
 });
@@ -81,3 +81,24 @@ test('About retains demo removal confirmation and does not mutate data on cancel
 
 
 
+
+
+test('About shows deployment metadata, Jamaica dates and Demo label to signed-in staff',async t=>{
+ const {w}=setup(t,false);await new Promise(resolve=>w.setTimeout(resolve,0));await w.studioNavigate('about');
+ const card=w.document.querySelector('.studio-about');
+ assert.match(card.textContent,/DEMO ENVIRONMENT/);assert.match(card.textContent,/Deployed versionabc123/);
+ assert.match(card.textContent,/Deploy date.*Jamaica.*Last successful public-site sync.*Jamaica/s);
+ assert.equal(card.querySelectorAll('dl dt').length,8);
+});
+test('Production never shows Demo and missing timestamps are explicit',async t=>{
+ const {w}=setup(t,false);await new Promise(resolve=>w.setTimeout(resolve,0));const read=w.json;
+ w.json=async url=>url==='/api/studio/about'?{deployedVersion:'v1',environment:'Production',isDemo:false,publicSiteConfigured:true}:read(url);
+ await w.studioNavigate('about');const text=w.document.querySelector('.studio-about').textContent;
+ assert.doesNotMatch(text,/DEMO ENVIRONMENT/);assert.match(text,/Production/);assert.match(text,/Deploy dateNot recorded/);assert.match(text,/No successful sync recorded/);
+});
+test('About metadata failure leaves support available and reports unavailable information',async t=>{
+ const {w}=setup(t,false);await new Promise(resolve=>w.setTimeout(resolve,0));const read=w.json;
+ w.json=async url=>{if(url==='/api/studio/about')throw Error('Unavailable');return read(url);};
+ await w.studioNavigate('about');const text=w.document.querySelector('.studio-about').textContent;
+ assert.match(text,/Deployed versionUnavailable/);assert.match(text,/it@thinkingmachines.ltd/);assert.doesNotMatch(text,/DEMO ENVIRONMENT/);
+});
