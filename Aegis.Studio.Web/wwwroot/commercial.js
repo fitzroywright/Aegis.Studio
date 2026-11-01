@@ -57,7 +57,8 @@ async function showCommercialCatalog(options={}){
         add.disabled=tab!=='products'&&!bookingController;add.textContent=tab==='products'?'＋ Add product':tab==='hours'?'＋ Add opening window':'＋ Add service';
         page.querySelectorAll('[data-catalog-tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.catalogTab===tab)));
         page.querySelector('[data-catalog-tools]').hidden=tab==='products';
-        add.hidden=tab!=='products'&&tab!=='hours';
+        add.hidden=tab==='booking-sessions';
+        add.style.display=tab==='booking-sessions'?'none':'';
         paintSummary();
         const state={...window.history.state,studioView:hoursPage?'opening-hours':'catalog',studioCatalogTab:hoursPage?null:tab},params=new URLSearchParams(window.location.hash.slice(1));params.set('studio',hoursPage?'opening-hours':'catalog');if(hoursPage)params.delete('tab');else params.set('tab',tab);window.history.replaceState(state,'','#'+params);
         if(tab!=='products'){StudioPage.setCount(tab==='hours'?'Opening Hours':'Services & Sessions');await (bookingRequest ||= loadBookings());if(live()&&active===tab)bookingController?.selectTab(tab==='hours'?'hours':'sessions');}
