@@ -1094,3 +1094,20 @@
     height:auto;max-height:none;
   }
 }
+
+/* One column-header palette across Products, Services and Opening Hours. */
+.catalog-page .catalog-product-workspace .pos-grid thead,
+.catalog-page .booking-catalog-workspace .booking-session-grid thead,
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-week-table thead{
+  background:var(--studio-grid-header-bg,#243c55);
+  color:var(--studio-grid-header-text,#fff);
+}
+.catalog-page .catalog-product-workspace .pos-grid thead th,
+.catalog-page .booking-catalog-workspace .booking-session-grid thead th,
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-week-table thead th{
+  background:var(--studio-grid-header-bg,#243c55);
+  color:var(--studio-grid-header-text,#fff);
+}
+.catalog-page .catalog-product-workspace .pos-grid thead th :is(label,span,strong),
+.catalog-page .booking-catalog-workspace .booking-session-grid thead th :is(label,span,strong),
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-week-table thead th :is(label,span,strong){color:inherit}
