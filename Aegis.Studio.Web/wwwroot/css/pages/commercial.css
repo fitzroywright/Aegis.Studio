@@ -713,3 +713,11 @@
 .catalog-page .booking-details .booking-detail-form>footer.booking-details-actions>button:first-child{margin-right:auto}
 .catalog-page .catalog-panel>.booking-grid-footer,
 .catalog-page .booking-sessions>.booking-grid-footer{height:34px;min-height:34px;max-height:34px;align-items:center}
+
+/* Catalog grids are plain tables, not rounded cards. Keep the detail card distinct. */
+.catalog-page .catalog-product-workspace>.commercial-grid,
+.catalog-page .booking-catalog-workspace>.booking-grid-scroll{
+  border:0;border-radius:0;box-shadow:none;background:transparent;
+}
+.catalog-page .catalog-product-workspace .pos-grid,
+.catalog-page .booking-catalog-workspace .booking-session-grid{border-radius:0;box-shadow:none}
