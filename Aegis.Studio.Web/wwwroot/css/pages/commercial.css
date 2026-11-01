@@ -674,3 +674,11 @@
 .catalog-page .booking-catalog-workspace .booking-session-grid thead{padding-right:var(--catalog-scrollbar-width,12px);background:var(--studio-grid-header-bg)}
 .catalog-page .catalog-product-workspace .pos-grid th,
 .catalog-page .booking-catalog-workspace .booking-session-grid th{position:static}
+
+/* Action bar belongs to the grid row below the detail card, never clipped by it. */
+.catalog-page .catalog-product-workspace>.catalog-product-editor,
+.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){height:calc(100% - 46px);max-height:calc(100% - 46px);overflow:visible;position:relative}
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer,
+.catalog-page .booking-details .booking-detail-form>footer.booking-details-actions{position:absolute;top:calc(100% + 8px);bottom:auto;left:0;right:0;height:34px;display:flex;align-items:center;z-index:10;visibility:visible;opacity:1;overflow:visible;background:transparent}
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer{grid-row:auto;align-self:auto}
+.catalog-page .booking-catalog-workspace,.catalog-page .catalog-product-workspace{overflow:visible}
