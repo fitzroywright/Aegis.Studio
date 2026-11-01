@@ -721,3 +721,16 @@
 }
 .catalog-page .catalog-product-workspace .pos-grid,
 .catalog-page .booking-catalog-workspace .booking-session-grid{border-radius:0;box-shadow:none}
+
+/* Canonical catalog geometry: the workspace occupies the area above the 34px footer.
+   Both columns share the same grid track; action bars anchor to the editor card,
+   rather than the form's padded content box. */
+.catalog-page .catalog-command-row{display:none}
+.catalog-page .catalog-panel[data-catalog-panel="products"]:not([hidden]){display:flex;flex-direction:column;gap:0;padding:0;margin:0;min-height:0}
+.catalog-page .catalog-panel[data-catalog-panel="products"]>.catalog-product-workspace{display:grid;flex:1 1 0;min-height:0;height:auto;grid-template-rows:minmax(0,1fr);align-items:stretch;gap:14px;margin:0;padding:0}
+.catalog-page .catalog-panel[data-catalog-panel="products"] .catalog-product-workspace>.commercial-grid,
+.catalog-page .catalog-panel[data-catalog-panel="products"] .catalog-product-workspace>.catalog-product-editor{height:100%;max-height:100%;min-height:0;align-self:stretch;margin:0;box-sizing:border-box}
+.catalog-page .catalog-panel[data-catalog-panel="products"]>.booking-grid-footer{flex:0 0 34px;height:34px;min-height:34px;max-height:34px;margin:0;padding:0;align-items:center}
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form{position:static}
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer{position:absolute;top:calc(100% + 2px);bottom:auto;left:0;right:0;height:30px;min-height:30px;max-height:30px;margin:0;padding:0;display:flex;align-items:center}
+.catalog-page .catalog-tabs-below-grid{height:30px;align-items:center}
