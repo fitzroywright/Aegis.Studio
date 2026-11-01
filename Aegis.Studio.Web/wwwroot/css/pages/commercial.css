@@ -317,3 +317,7 @@
 .catalog-page .booking-session-grid .catalog-service-filter input{flex:1 1 auto;min-width:90px}
 .catalog-page .booking-session-grid .catalog-select-only{display:block}
 .catalog-page .booking-session-grid .catalog-select-only select{width:100%;min-width:0}
+
+/* Service status belongs in the detail editor, independently of online publication. */
+.catalog-page .booking-detail-card .booking-status-editor{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.catalog-page .booking-detail-card .booking-status-editor select{width:auto;min-width:125px;padding:5px 8px}
