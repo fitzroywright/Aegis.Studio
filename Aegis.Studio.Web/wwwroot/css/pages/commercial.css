@@ -860,3 +860,15 @@
 .catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle-disclosure .commercial-bundle-items>label input{
   width:54px;height:23px;min-width:0;margin:0;padding:2px 5px;box-sizing:border-box;text-align:right;
 }
+
+/* Compact Products column header: one slim row with inline search. */
+.catalog-page .catalog-product-workspace .pos-grid thead th{
+  height:34px;min-height:34px;max-height:34px;
+  padding:3px 8px;box-sizing:border-box;line-height:1.2;
+}
+.catalog-page .catalog-product-workspace .pos-grid .catalog-product-search{
+  display:flex;flex-direction:row;align-items:center;gap:7px;min-width:0;
+}
+.catalog-page .catalog-product-workspace .pos-grid .catalog-product-search input{
+  height:26px;min-height:26px;max-height:26px;margin:0;padding:3px 7px;
+}
