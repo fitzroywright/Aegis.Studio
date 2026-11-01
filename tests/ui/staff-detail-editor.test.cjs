@@ -149,3 +149,21 @@ test('unsaved staff edits block demo binding and an API failure leaves enrollmen
  await again.onclick();assert.equal(again.disabled,false);assert.match(w.document.querySelector('[data-editor-status]').textContent,/Enrollment failed/);
  w.json=json;await again.onclick();assert.equal(writes[0].body.accountId,'account');
 });
+
+test('header search retains focus while filtering and approvals sit beside the count',async t=>{
+ const {w}=await setup(t);const d=w.document,search=d.querySelector('thead [data-staff-search]');
+ assert.ok(search);assert.equal(d.querySelector('.staff-toolbar'),null);
+ assert.equal(d.querySelector('.staff-master').firstElementChild.id,'studioEmployeeList');
+ search.focus();search.value='sam';w.filterStudioStaff(search.value);
+ assert.equal(d.activeElement,search);assert.equal(d.querySelector('[data-staff-search]'),search);
+ assert.equal(d.querySelectorAll('[data-staff-user]').length,1);
+ // The header survives row redraws and asynchronous staff refreshes.
+ await w.refreshStudioEmployees();assert.equal(d.querySelector('[data-staff-search]'),search);assert.equal(search.value,'sam');
+ assert.equal(d.querySelectorAll('[data-staff-user]').length,1);
+ const footer=d.querySelector('.staff-grid-footer');assert.ok(footer.contains(d.querySelector('[data-staff-count]')));
+ assert.match(footer.textContent,/1 of 2 staff members.*1 staff awaiting approval/s);
+ const form=d.querySelector('.staff-person-form'),actions=form.querySelector('.staff-detail-actions');
+ assert.equal(actions.firstElementChild.textContent,'+ Add staff');assert.ok(actions.querySelector('[data-cancel]'));assert.ok(actions.querySelector('[type=submit]'));
+ assert.ok(form.querySelector('[name=isAssignable]'));
+ w.eval(actions.querySelector('.staff-add-action').getAttribute('onclick'));assert.ok(d.querySelector('[data-new-staff]'));
+});
