@@ -420,3 +420,18 @@
 .catalog-page .booking-detail-layout>.booking-section-resources .booking-section-label{display:block;font-weight:600;font-size:12px;margin-bottom:7px}
 .catalog-page .booking-detail-layout>.booking-section-resources [data-resource-add]{margin-top:6px}
 @media(max-width:1100px){.catalog-page .booking-detail-content.booking-detail-layout{grid-template-columns:1fr;grid-template-areas:"description" "timing" "routing" "pricing" "resources" "locations"}}
+
+/* Service details: consistent labels, compact aligned fields, and usable location tokens. */
+.catalog-page .booking-detail-layout>.booking-section-locations>.booking-section-label{display:block;font-size:11px;font-weight:400;color:var(--theme-muted,#667383);margin-bottom:6px}
+.catalog-page .booking-detail-layout>.booking-section-locations .booking-location-token-editor{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.catalog-page .booking-detail-layout>.booking-section-locations .booking-location-tokens{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.catalog-page .booking-detail-layout>.booking-section-locations [data-location-add]{min-width:130px;max-width:100%;width:auto}
+.catalog-page .booking-detail-layout>.booking-section-resources .booking-resource-row{display:grid;grid-template-columns:minmax(0,1fr) 58px auto;gap:6px;align-items:end;margin:0 0 8px;flex-wrap:nowrap}
+.catalog-page .booking-detail-layout>.booking-section-resources .booking-resource-row label{min-width:0;width:100%;flex:auto}
+.catalog-page .booking-detail-layout>.booking-section-resources .booking-resource-row input{width:100%;min-width:0}
+.catalog-page .booking-detail-layout>.booking-section-resources .booking-resource-row button{white-space:nowrap;padding:7px 8px}
+.catalog-page .booking-detail-layout>.booking-section-pricing label{min-width:0}
+.catalog-page .booking-detail-layout>.booking-section-pricing input{width:100%;min-width:0}
+.catalog-page .booking-detail-layout>.booking-section-timing label{grid-template-columns:minmax(0,1fr) 82px}
+.catalog-page .booking-detail-layout>.booking-section-routing select{width:100%;min-width:0}
+.catalog-page .booking-detail-layout>.booking-detail-description textarea{min-height:115px}
