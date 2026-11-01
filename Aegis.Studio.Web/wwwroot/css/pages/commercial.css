@@ -960,3 +960,34 @@
 .st-page.st-commercial.catalog-page>.st-board>.st-content{
   border:0;border-radius:0;box-shadow:none;background:transparent;
 }
+
+/* Match service switches to the established Product switch geometry. */
+.catalog-page .booking-detail-basic .booking-status-editor input.booking-toggle{
+  appearance:none;-webkit-appearance:none;display:inline-block;position:relative;
+  width:35px;min-width:35px;max-width:35px;flex:0 0 35px;
+  height:20px;min-height:20px;max-height:20px;
+  padding:0;margin:0;border:0;border-radius:12px;
+  background:#778399;cursor:pointer;box-sizing:border-box;
+}
+.catalog-page .booking-detail-basic .booking-status-editor input.booking-toggle::before{
+  content:'';position:absolute;left:3px;top:3px;width:14px;height:14px;
+  border-radius:50%;background:#fff;transition:transform .15s ease;
+}
+.catalog-page .booking-detail-basic .booking-status-editor input.booking-toggle:checked{background:#172e49}
+.catalog-page .booking-detail-basic .booking-status-editor input.booking-toggle:checked::before{transform:translateX(15px)}
+/* Keep Active at the far right of the first row on both detail editors. */
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-production{
+  grid-column:8/span 3;grid-row:1;justify-self:end;
+}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-active{
+  grid-column:11/span 2;grid-row:1;justify-self:end;
+}
+.catalog-page .booking-detail-basic .booking-status-editor{grid-column:4;justify-self:end}
+/* Equal thin neutral outlines, including the more-specific Services selector. */
+.catalog-page .catalog-product-workspace>.catalog-product-editor,
+.catalog-page .catalog-product-workspace .catalog-product-editor,
+.catalog-page .booking-sessions:not(:has(.booking-hours-week-table)) .booking-catalog-workspace>.booking-details:not([hidden]),
+.catalog-page .booking-sessions .booking-catalog-workspace>.booking-details:not([hidden]){
+  border:1px solid var(--studio-grid-border,#dce4ec);
+  border-radius:9px;box-shadow:none;
+}
