@@ -461,3 +461,6 @@
 .catalog-page .booking-detail-form>footer [role="alert"]{flex:0 1 auto;max-width:38%;min-width:0;margin-left:0}
 .catalog-page .booking-detail-form>footer [data-details-cancel]{margin-left:auto}
 .catalog-page .catalog-command-row>[data-add][hidden]{display:none}
+
+/* Match the selected service row's gold accent on its detail card outline. */
+.catalog-page .booking-sessions:not(:has(.booking-hours-week-table)) .booking-catalog-workspace>.booking-details:not([hidden]){border:2px solid #b88635}
