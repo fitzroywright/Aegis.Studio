@@ -15,7 +15,16 @@ async function showCommercialCatalog(options={}){
     const page=genericView.querySelector('.st-page'),live=()=>current()&&page.isConnected;
     const products=page.querySelector('[data-catalog-panel="products"]'),bookings=page.querySelector('[data-catalog-panel="booking-sessions"]'),add=page.querySelector('[data-add]');
     const catalogTabs=page.querySelector('.catalog-segmented-tabs');
-    function placeTabs(){if(!catalogTabs)return;const panel=active==='products'?products:bookings;const grid=panel.querySelector(active==='products'?'.commercial-grid':'[data-booking-grid]');if(!grid)return;let slot=panel.querySelector('.catalog-tabs-below-grid');if(!slot){slot=document.createElement('div');slot.className='catalog-tabs-below-grid';panel.append(slot);}slot.append(catalogTabs);}
+    function placeTabs(){
+        if(!catalogTabs)return;
+        const panel=active==='products'?products:bookings;
+        const footer=panel.querySelector(active==='products'?'.booking-grid-footer':'[data-booking-footer]');
+        if(!footer)return;
+        let slot=footer.querySelector('.catalog-tabs-below-grid');
+        if(!slot){slot=document.createElement('span');slot.className='catalog-tabs-below-grid';}
+        footer.append(slot);
+        slot.append(catalogTabs);
+    }
 
     function paintSummary(){
         if(!live())return;
@@ -51,6 +60,7 @@ async function showCommercialCatalog(options={}){
             if(toolbar){page.querySelector('[data-catalog-tools]').append(toolbar);toolbar.querySelector('[data-booking-count]').hidden=true;toolbar.querySelector('[data-booking-add]').hidden=true;toolbar.querySelector('[data-booking-reload]').hidden=true;}
             placeTabs();
             bookingController=await window.StudioBookingSessions.mount(bookings,live,{onSummary:value=>{summary=value;paintSummary();},embedded:true});
+            placeTabs();
             await settingsRequest;if(!live())return;
             bookingController?.selectTab(active==='hours'?'hours':'sessions');if(active!=='products'){add.disabled=false;add.hidden=false;}
         }catch(error){if(live()){bookings.innerHTML='<p role="alert">'+esc(error.message)+'</p><button type="button" class="action" data-bookings-retry>Retry</button>';bookings.querySelector('[data-bookings-retry]').onclick=()=>{bookingRequest=loadBookings();};add.disabled=active!=='products';}}
