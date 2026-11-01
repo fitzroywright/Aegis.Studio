@@ -464,3 +464,26 @@
 
 /* Match the selected service row's gold accent on its detail card outline. */
 .catalog-page .booking-sessions:not(:has(.booking-hours-week-table)) .booking-catalog-workspace>.booking-details:not([hidden]){border:2px solid #b88635}
+
+/* Products use the same master/detail conventions as Services & Sessions. */
+.catalog-page .catalog-product-workspace .pos-grid{border-collapse:separate;border-spacing:0}
+.catalog-page .catalog-product-workspace .pos-grid thead th{position:sticky;top:0;z-index:5;background:var(--studio-grid-header-bg);color:var(--studio-grid-header-text,var(--studio-grid-header-color,#fff));vertical-align:middle}
+.catalog-page .catalog-product-workspace .pos-grid .catalog-product-search{display:flex;align-items:center;gap:8px}
+.catalog-page .catalog-product-workspace .pos-grid .catalog-product-search>span{flex:0 0 auto}
+.catalog-page .catalog-product-workspace .pos-grid .catalog-product-search input{flex:1 1 auto;min-width:80px}
+.catalog-page .catalog-product-workspace .pos-grid .catalog-select-only select{width:100%;min-width:0}
+.catalog-page .catalog-product-workspace .catalog-product-editor{border:2px solid #b88635;border-radius:9px;overflow:hidden;display:flex;flex-direction:column;padding:14px}
+.catalog-page .catalog-product-editor .commercial-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;align-content:start;overflow-y:auto;min-height:0;padding:0 2px 0 0}
+.catalog-page .catalog-product-editor .commercial-form>label{min-width:0}
+.catalog-page .catalog-product-editor .commercial-form>label :is(input,textarea,select){min-width:0;box-sizing:border-box}
+.catalog-page .catalog-product-editor .commercial-form>label:has(textarea){align-self:stretch}
+.catalog-page .catalog-product-editor .commercial-form>label textarea{min-height:55px}
+.catalog-page .catalog-product-editor .commercial-form>.catalog-product-switch{display:flex;flex-direction:row;align-items:center;gap:8px}
+.catalog-page .catalog-product-editor .catalog-product-switch input[type=checkbox]{appearance:none;width:35px;height:20px;min-width:35px;min-height:20px;border:0;border-radius:12px;background:#778399;position:relative;cursor:pointer;margin:0}
+.catalog-page .catalog-product-editor .catalog-product-switch input[type=checkbox]::before{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .12s ease}
+.catalog-page .catalog-product-editor .catalog-product-switch input[type=checkbox]:checked{background:#172e49}
+.catalog-page .catalog-product-editor .catalog-product-switch input[type=checkbox]:checked::before{transform:translateX(15px)}
+.catalog-page .catalog-product-editor .commercial-form>.commercial-bundle{grid-column:1/-1;min-width:0}
+.catalog-page .catalog-product-editor .commercial-form>footer{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:var(--studio-card-bg,#fff);padding:10px 0;border-top:1px solid var(--studio-grid-border,#dce4ec)}
+.catalog-page .catalog-product-editor .commercial-form>footer [role=alert]{margin-right:auto}
+@media(max-width:1100px){.catalog-page .catalog-product-editor .commercial-form{grid-template-columns:1fr}}
