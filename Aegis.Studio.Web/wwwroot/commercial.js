@@ -122,7 +122,7 @@ async function showCommercialTemplates(kind='WorkOrder'){
         try{
             const me=await json('/api/auth/me');if(!live())return;
             if((me?.user||me)?.isAdministrator!==true){host.innerHTML='<p>Administrator access required to manage workflow automation.</p>';return;}
-            host.innerHTML=renderWorkflowSection();await refreshWorkflowList();if(live())StudioPage.setCount(host.querySelectorAll('#workflowList .job-row').length+' workflows');
+            host.innerHTML=renderWorkflowSection();await refreshWorkflowList();if(live())StudioPage.setCount(host.querySelectorAll('#workflowList [data-workflow-open]').length+' workflows');
         }catch(error){if(live()){host.innerHTML='<p role="alert">'+esc(error.message)+'</p><button type="button" class="action" data-automation-retry>Retry</button>';host.querySelector('[data-automation-retry]').onclick=()=>showCommercialTemplates('Automation');}}
         return;
     }
