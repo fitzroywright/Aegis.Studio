@@ -44,12 +44,12 @@ public static class MediaProductionEndpoints
             catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}
             catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}
         }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(101_000_000)).DisableAntiforgery().RequireAuthorization();
-        app.MapGet("/api/media/inbox/{id:guid}/content",async(Guid id,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage,CancellationToken token)=>
+        app.MapGet("/api/media/inbox/{id:guid}/content",async(Guid id,HttpContext context,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage,CancellationToken token)=>
         {
             if(!CanUseMediaInbox(user,access,db))return Results.Forbid();
             bool reviewAll=CanReviewMediaInbox(user,db);var inbox=new MediaInboxStore(db,storage);var item=inbox.Get(id,Name(user),reviewAll);
             if(item is null||item.MatchedJobId.HasValue)return Results.NotFound();
-            try{return Results.Stream(await inbox.OpenReadAsync(id,Name(user),reviewAll,token),item.ContentType,item.FileName,enableRangeProcessing:true);}
+            try{context.Response.Headers["X-Content-Type-Options"]="nosniff";string contentType=item.ContentType.ToLowerInvariant() is "image/jpeg" or "image/png" or "image/webp" or "image/gif" or "image/avif" ? item.ContentType : "application/octet-stream";return Results.Stream(await inbox.OpenReadAsync(id,Name(user),reviewAll,token),contentType,enableRangeProcessing:true);}
             catch(KeyNotFoundException){return Results.NotFound();}
         }).RequireAuthorization();
         app.MapPost("/api/media/inbox/{id:guid}/match",async(Guid id,MediaInboxMatch request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage,CancellationToken token)=>
@@ -213,7 +213,7 @@ public static class MediaProductionEndpoints
         =>user.IsInRole("Administrator")||new GlobalOperationalRoleStore(db).HasRole(user,StudioRoleNames.ProductionManager);
     private static bool CanUseMediaInbox(ClaimsPrincipal user,JobAccessService access,StudioDatabase db)
         =>user.IsInRole("Administrator")||new GlobalOperationalRoleStore(db).HasRole(user,StudioRoleNames.ProductionManager)
-          ||access.GetAccessibleJobIds(user,requireAttachments:true).Any(id=>access.HasPermission(user,id,"ManageProduction"));
+          ||access.GetProductionJobIds(user).Any(id=>access.HasPermission(user,id,"ManageProduction"));
     private static MediaProductionStore Store(StudioDatabase db,IFileStorage storage)=>new(db,new StudioVersionStore(db,storage));
     private static string Name(ClaimsPrincipal user)=>user.FindFirstValue("login_name")??user.Identity?.Name??throw new UnauthorizedAccessException();
     private static IResult DeleteMediaWrite(Guid job,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,Func<IResult> action)
