@@ -872,3 +872,16 @@
 .catalog-page .catalog-product-workspace .pos-grid .catalog-product-search input{
   height:26px;min-height:26px;max-height:26px;margin:0;padding:3px 7px;
 }
+
+/* Save feedback lives inside the bottom edge of each detail card, not in the action row. */
+.catalog-page .catalog-product-editor,
+.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){position:relative}
+.catalog-page .catalog-product-editor .commercial-product-form>footer>p[role="alert"],
+.catalog-page .booking-details .booking-detail-form>footer.booking-details-actions>p[role="alert"]{
+  position:absolute;right:8px;bottom:calc(100% + 12px);
+  max-width:calc(100% - 16px);width:auto;min-width:0;
+  margin:0;padding:0;flex:none;white-space:normal;
+  font-size:11px;line-height:15px;text-align:right;pointer-events:none;
+}
+.catalog-page .catalog-product-editor .commercial-product-form>footer>p[role="alert"]:empty,
+.catalog-page .booking-details .booking-detail-form>footer.booking-details-actions>p[role="alert"]:empty{display:none}
