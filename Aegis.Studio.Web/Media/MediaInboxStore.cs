@@ -70,6 +70,10 @@ public sealed class MediaInboxStore(StudioDatabase database, IFileStorage storag
                 stored=true;
                 if(result.Length!=file.Length||!result.Sha256.Equals(hash,StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("Stored inbox upload failed its size or checksum verification.");
+                using var verified=await storage.OpenReadAsync(key,cancellationToken);
+                string storedHash=Convert.ToHexString(SHA256.HashData(verified));
+                if(!storedHash.Equals(hash,StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Stored inbox upload failed its read-back checksum verification.");
             }
             using(var insert=new NpgsqlCommand("""
                 insert into studio_media_inbox(id,batch_id,file_name,content_type,size_bytes,sha256,storage_key,uploaded_by)
