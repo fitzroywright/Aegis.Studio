@@ -456,3 +456,8 @@
 .catalog-page .booking-detail-form>footer{display:flex;align-items:center;justify-content:flex-end;gap:9px}
 .catalog-page .booking-detail-form>footer .booking-details-add{margin-right:auto;white-space:nowrap}
 .catalog-page .booking-detail-form>footer .booking-detail-footer-spacer{flex:1 1 auto;min-width:0}
+
+/* Footer action alignment: reserve center space for feedback, keep Cancel/Save at far right. */
+.catalog-page .booking-detail-form>footer [role="alert"]{flex:0 1 auto;max-width:38%;min-width:0;margin-left:0}
+.catalog-page .booking-detail-form>footer [data-details-cancel]{margin-left:auto}
+.catalog-page .catalog-command-row>[data-add][hidden]{display:none}
