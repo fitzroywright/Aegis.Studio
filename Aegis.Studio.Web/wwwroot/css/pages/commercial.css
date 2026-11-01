@@ -321,3 +321,27 @@
 /* Service status belongs in the detail editor, independently of online publication. */
 .catalog-page .booking-detail-card .booking-status-editor{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .catalog-page .booking-detail-card .booking-status-editor select{width:auto;min-width:125px;padding:5px 8px}
+
+/* Flat service detail editor: no nested title/status cards. */
+.catalog-page .booking-catalog-workspace .booking-details:not([hidden]){padding:12px 14px}
+.catalog-page .booking-detail-scroll{padding:0 2px 10px 0}
+.catalog-page .booking-detail-basic{margin:0 0 12px;padding:0;border:0;background:transparent}
+.catalog-page .booking-detail-basic .booking-editor-basics{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.1fr) minmax(110px,.8fr) auto;gap:9px;align-items:end}
+.catalog-page .booking-detail-basic .booking-editor-basics label{min-width:0}
+.catalog-page .booking-detail-basic .booking-online-indicator{display:flex;align-items:center;gap:8px;white-space:nowrap;padding:8px 0}
+.catalog-page .booking-detail-basic .booking-online-indicator input{flex:0 0 auto}
+.catalog-page .booking-detail-basic .booking-status-editor{display:flex;flex-direction:column;align-items:stretch;gap:5px;margin:0}
+.catalog-page .booking-detail-basic .booking-status-editor select{width:100%;min-width:0}
+.catalog-page .booking-detail-basic .booking-detail-fields{margin-top:9px}
+.catalog-page .booking-detail-basic .booking-detail-fields textarea{min-height:58px;max-height:110px;resize:vertical}
+.catalog-page .booking-detail-flat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px;align-items:start}
+.catalog-page .booking-detail-section{min-width:0;padding:0;border:0;background:transparent}
+.catalog-page .booking-detail-section-title{font-size:12px;font-weight:650;margin:0 0 6px;color:var(--theme-text,#172d4a)}
+.catalog-page .booking-detail-section .booking-buffer-field>div{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.catalog-page .booking-detail-section .booking-editor-pricing{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.catalog-page .booking-detail-section .booking-editor-pricing input{width:100%;min-width:0;box-sizing:border-box}
+.catalog-page .booking-detail-section .booking-resources{border:0;padding:0;margin:0}
+.catalog-page .booking-detail-section .booking-resources summary{font-size:11px}
+.catalog-page .booking-detail-section .booking-location-token-editor{align-items:flex-start}
+@media(max-width:1350px){.catalog-page .booking-detail-basic .booking-editor-basics{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}.catalog-page .booking-detail-flat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1100px){.catalog-page .booking-detail-flat-grid{grid-template-columns:1fr}}
