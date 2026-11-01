@@ -991,3 +991,26 @@
   border:1px solid var(--studio-grid-border,#dce4ec);
   border-radius:9px;box-shadow:none;
 }
+
+/* Compact detail-card switches, matching the grid's small control density. */
+.catalog-page .catalog-product-editor .catalog-product-switch input[type=checkbox],
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-switch input[type=checkbox],
+.catalog-page .booking-detail-basic .booking-online-indicator input.booking-toggle,
+.catalog-page .booking-detail-basic .booking-status-editor input.booking-toggle{
+  appearance:none;-webkit-appearance:none;display:inline-block;position:relative;
+  flex:0 0 30px;width:30px;min-width:30px;max-width:30px;
+  height:17px;min-height:17px;max-height:17px;
+  padding:0;margin:0;border:0;border-radius:12px;
+  box-sizing:border-box;cursor:pointer;
+}
+.catalog-page .catalog-product-editor .catalog-product-switch input[type=checkbox]::before,
+.catalog-page .booking-detail-basic .booking-online-indicator input.booking-toggle::before,
+.catalog-page .booking-detail-basic .booking-status-editor input.booking-toggle::before{
+  content:'';position:absolute;left:2px;top:2px;
+  width:13px;height:13px;border-radius:50%;background:#fff;
+}
+.catalog-page .catalog-product-editor .catalog-product-switch input[type=checkbox]:checked::before,
+.catalog-page .booking-detail-basic .booking-online-indicator input.booking-toggle:checked::before,
+.catalog-page .booking-detail-basic .booking-status-editor input.booking-toggle:checked::before{
+  transform:translateX(13px);
+}
