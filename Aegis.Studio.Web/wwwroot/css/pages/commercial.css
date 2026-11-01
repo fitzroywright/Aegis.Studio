@@ -682,3 +682,11 @@
 .catalog-page .booking-details .booking-detail-form>footer.booking-details-actions{position:absolute;top:calc(100% + 8px);bottom:auto;left:0;right:0;height:34px;display:flex;align-items:center;z-index:10;visibility:visible;opacity:1;overflow:visible;background:transparent}
 .catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer{grid-row:auto;align-self:auto}
 .catalog-page .booking-catalog-workspace,.catalog-page .catalog-product-workspace{overflow:visible}
+
+/* Products: no empty command-row gap; equal-height grid and bordered editor.
+   Reserve the same 46px below both for navigation and edit actions. */
+.catalog-page .catalog-panel[data-catalog-panel="products"]:not([hidden]){padding-top:0;margin-top:0;row-gap:0}
+.catalog-page .catalog-panel[data-catalog-panel="products"]>.catalog-product-workspace{padding-top:0;margin-top:0;align-items:stretch;grid-template-rows:minmax(0,1fr)}
+.catalog-page .catalog-panel[data-catalog-panel="products"] .catalog-product-workspace>.commercial-grid,
+.catalog-page .catalog-panel[data-catalog-panel="products"] .catalog-product-workspace>.catalog-product-editor{height:calc(100% - 46px);max-height:calc(100% - 46px);min-height:0;box-sizing:border-box;margin-top:0;align-self:start}
+.catalog-page .catalog-panel[data-catalog-panel="products"]>.booking-grid-footer{margin-top:0}
