@@ -11,18 +11,14 @@ async function showCommercialCatalog(options={}){
     const hoursPage=options.page==='hours';
     const current=StudioPage.begin(hoursPage?'opening-hours':'catalog');
     let active=hoursPage?'hours':options.tab==='products'?'products':'booking-sessions',productsRequest,bookingRequest,bookingController,summary,settings,allowed=null;
-    commercialPage(hoursPage?'Opening Hours':'Products and Services',`<div class="catalog-heading"><div class="catalog-heading-copy"><p>${hoursPage?'Manage opening hours and appointment windows for each studio location.':'Manage what you sell and what clients can book.'}</p></div><div class="catalog-heading-actions"><button type="button" class="primary" data-add>＋ Add product</button></div></div><div class="catalog-status-strip" aria-label="Studio opening hours and publication"><span data-catalog-location="BK">Kings Plaza · Loading hours...</span><span data-catalog-location="BE">East Queen Street · Loading hours...</span><span data-catalog-publication>Checking publication settings...</span><button type="button" class="action" data-catalog-hours>${hoursPage?'Products and Services':'Opening Hours'}</button></div>${hoursPage?'':'<nav class="catalog-segmented-tabs" aria-label="Products and services sections"><button type="button" data-catalog-tab="products">Products</button><button type="button" data-catalog-tab="booking-sessions">Services &amp; Sessions</button></nav>'}<section class="catalog-panel" data-catalog-panel="products" aria-label="Product catalog" hidden></section><section class="catalog-panel" data-catalog-panel="booking-sessions" aria-label="Services and opening hours" hidden></section>`,'','<p>Manage products, services, public booking and location hours.</p>');
+    commercialPage(hoursPage?'Opening Hours':'Products and Services',`<div class="catalog-command-row">${hoursPage?'':'<nav class="catalog-segmented-tabs" aria-label="Products and services sections"><button type="button" data-catalog-tab="products">Products</button><button type="button" data-catalog-tab="booking-sessions">Services &amp; Sessions</button></nav>'}<span class="catalog-command-count" data-catalog-count></span><div class="catalog-command-tools" data-catalog-tools></div><button type="button" class="primary" data-add>＋ Add product</button></div><section class="catalog-panel" data-catalog-panel="products" aria-label="Product catalog" hidden></section><section class="catalog-panel" data-catalog-panel="booking-sessions" aria-label="Services and opening hours" hidden></section>`,'','');
     const page=genericView.querySelector('.st-page'),live=()=>current()&&page.isConnected;
     const products=page.querySelector('[data-catalog-panel="products"]'),bookings=page.querySelector('[data-catalog-panel="booking-sessions"]'),add=page.querySelector('[data-add]');
     function paintSummary(){
         if(!live())return;
-        const names={BK:'Kings Plaza',BE:'East Queen Street'},days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-        const day=days.indexOf(new Intl.DateTimeFormat('en-US',{timeZone:'America/Jamaica',weekday:'long'}).format(new Date()));
-        for(const code of ['BK','BE']){
-            const hours=(summary?.hours||[]).filter(row=>row.locationCode===code&&Number(row.dayOfWeek)===day).sort((a,b)=>a.opensAt.localeCompare(b.opensAt));
-            page.querySelector('[data-catalog-location="'+code+'"]').textContent=names[code]+' · '+(summary?.hoursLoaded?'Today: '+(hours.map(row=>row.opensAt.slice(0,5)+'–'+row.closesAt.slice(0,5)).join(', ')||'No opening hours')+(summary.dirtyHours?' (unsaved)':''):'Hours unavailable');
-        }
-        page.querySelector('[data-catalog-publication]').textContent=settings?(summary?.dirtyHours||summary?.dirtySessions?'Unsaved changes · not published':settings.publishingEnabled?'Automatic publishing enabled':'Automatic publishing disabled'):'Publication status unavailable';
+        const count=page.querySelector('[data-catalog-count]');
+        if(active==='products')count.textContent=commercialItems?.length?commercialItems.length+' products':'';
+        else if(summary)count.textContent=active==='hours'?summary.hours.length+' opening windows':bookingController?.count?.()||'';
     }
     add.onclick=()=>active==='products'?editCommercialItem():bookingController?.add();
     async function loadProducts(){
@@ -46,7 +42,9 @@ async function showCommercialCatalog(options={}){
             allowed=(me?.user||me)?.isAdministrator===true;
             if(!allowed){bookings.innerHTML='<p>Administrator access required to manage services and opening hours.</p>';paintSummary();if(active!=='products')add.hidden=true;return;}
             bookings.innerHTML=window.StudioBookingSessions.html({embedded:true});
-            const settingsRequest=json('/api/admin/public-booking/session-types/settings').then(value=>{settings=value;if(live())paintSummary();}).catch(()=>{settings=null;if(live())paintSummary();});
+            const settingsRequest=Promise.resolve();
+            const toolbar=bookings.querySelector('.booking-toolbar');
+            if(toolbar){page.querySelector('[data-catalog-tools]').append(toolbar);toolbar.querySelector('[data-booking-count]').hidden=true;toolbar.querySelector('[data-booking-add]').hidden=true;}
             bookingController=await window.StudioBookingSessions.mount(bookings,live,{onSummary:value=>{summary=value;paintSummary();},embedded:true});
             await settingsRequest;if(!live())return;
             bookingController?.selectTab(active==='hours'?'hours':'sessions');if(active!=='products'){add.disabled=false;add.hidden=false;}
@@ -58,12 +56,13 @@ async function showCommercialCatalog(options={}){
         active=tab;products.hidden=tab!=='products';bookings.hidden=tab==='products';add.hidden=tab!=='products'&&allowed===false;
         add.disabled=tab!=='products'&&!bookingController;add.textContent=tab==='products'?'＋ Add product':tab==='hours'?'＋ Add opening window':'＋ Add service';
         page.querySelectorAll('[data-catalog-tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.catalogTab===tab)));
+        page.querySelector('[data-catalog-tools]').hidden=tab==='products';paintSummary();
         const state={...window.history.state,studioView:hoursPage?'opening-hours':'catalog',studioCatalogTab:hoursPage?null:tab},params=new URLSearchParams(window.location.hash.slice(1));params.set('studio',hoursPage?'opening-hours':'catalog');if(hoursPage)params.delete('tab');else params.set('tab',tab);window.history.replaceState(state,'','#'+params);
         if(tab!=='products'){StudioPage.setCount(tab==='hours'?'Opening Hours':'Services & Sessions');await (bookingRequest ||= loadBookings());if(live()&&active===tab)bookingController?.selectTab(tab==='hours'?'hours':'sessions');}
         else{await (productsRequest ||= loadProducts());if(live()&&active==='products')products.querySelector('.commercial-search')?.dispatchEvent(new Event('input'));}
     }
     page.querySelectorAll('[data-catalog-tab]').forEach(button=>button.onclick=()=>selectTab(button.dataset.catalogTab));
-    page.querySelector('[data-catalog-hours]').onclick=()=>window.studioNavigate?.(hoursPage?'catalog':'opening-hours');
+
     await selectTab(active);if(live()&&active==='products')void (bookingRequest ||= loadBookings());
 }
 function showCommercialOpeningHours(){return showCommercialCatalog({page:'hours'});}
