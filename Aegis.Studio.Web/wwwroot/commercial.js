@@ -93,7 +93,7 @@ function editCommercialItem(item,host=null){
     if(host){
         const add=d.querySelector('[data-product-add]'),cancel=d.querySelector('[data-product-cancel]');
         add.onclick=()=>editCommercialItem(null,host);
-        cancel.onclick=event=>{event.preventDefault();const selected=host.closest('[data-catalog-panel]')?.querySelector('[data-item][aria-selected="true"]')?.dataset.item;const original=commercialItems.find(item=>item.id===selected);if(original)editCommercialItem(original,host);else if(p.id)editCommercialItem(p,host);else host.querySelector('form')?.reset();};
+        cancel.onclick=event=>{event.preventDefault();const selected=host.closest('[data-catalog-panel]')?.querySelector('[data-item][aria-selected="true"]')?.dataset.item;const original=commercialItems.find(item=>item.id===selected);if(original)editCommercialItem(original,host);else if(p.id)editCommercialItem(p,host);else {host.innerHTML='<p class="catalog-empty-editor">Select a product to edit, or choose Add product.</p>';}};
     }else{d.querySelector('[data-product-add]').hidden=true;d.querySelector('[data-product-cancel]').onclick=()=>d.close();}
 
     d.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;try{
