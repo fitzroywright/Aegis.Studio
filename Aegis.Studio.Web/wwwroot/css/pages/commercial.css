@@ -605,3 +605,12 @@
 .catalog-page .booking-details .booking-detail-form>footer.booking-details-actions{position:absolute;top:calc(100% + 8px);bottom:auto;left:0;right:0;height:35px;box-sizing:border-box;padding:0;margin:0;border:0;background:transparent;box-shadow:none;z-index:5}
 .catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer{grid-row:auto}
 @media(max-width:1100px){.catalog-page .catalog-tabs-below-grid{position:relative;width:100%;justify-content:flex-end}.catalog-page .catalog-product-workspace,.catalog-page .booking-catalog-workspace{padding-bottom:0}.catalog-page .catalog-product-workspace>.catalog-product-editor,.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){height:auto;max-height:none}.catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer,.catalog-page .booking-details .booking-detail-form>footer.booking-details-actions{position:static;height:auto;padding-top:8px}}
+
+/* Grid footer owns the tab switcher; no absolute offset or extra bottom gap. */
+.catalog-page .catalog-tabs-below-grid{position:static;left:auto;bottom:auto;width:auto;height:auto;display:flex;flex:0 0 auto;align-items:center;justify-content:flex-end;margin-left:auto;z-index:auto}
+.catalog-page .catalog-panel>.booking-grid-footer,
+.catalog-page .booking-sessions>.booking-grid-footer{display:flex;align-items:center;gap:10px;min-height:30px;padding:2px 0}
+.catalog-page .catalog-panel>.booking-grid-footer{justify-content:space-between}
+.catalog-page .catalog-product-workspace,.catalog-page .booking-catalog-workspace{padding-bottom:44px}
+.catalog-page .catalog-panel:not([hidden]){gap:4px}
+.catalog-page .booking-sessions>.booking-grid-footer [data-booking-footer-note]{min-width:0}
