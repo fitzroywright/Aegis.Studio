@@ -952,3 +952,11 @@
 }
 .catalog-page .booking-detail-basic .booking-status-editor .booking-toggle:checked{background:#172e49}
 .catalog-page .booking-detail-basic .booking-status-editor .booking-toggle:checked::before{transform:translateX(15px)}
+
+/* Products and Services is a full-page workspace, not an outer rounded card. */
+.st-page.st-commercial.catalog-page>.st-board{
+  border:0;border-radius:0;box-shadow:none;background:transparent;
+}
+.st-page.st-commercial.catalog-page>.st-board>.st-content{
+  border:0;border-radius:0;box-shadow:none;background:transparent;
+}
