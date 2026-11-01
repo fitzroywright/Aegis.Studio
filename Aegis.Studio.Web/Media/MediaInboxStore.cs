@@ -5,6 +5,8 @@ using Npgsql;
 
 namespace Aegis.Studio.Web.Media;
 
+public sealed record MediaInboxMatch(Guid JobId,Guid? SessionId,string? Collection=null,Guid? SubjectId=null);
+
 public sealed record MediaInboxItem(
     Guid Id, Guid BatchId, string FileName, string ContentType, long SizeBytes,
     string Sha256, string UploadedBy, DateTimeOffset UploadedAtUtc,
@@ -48,7 +50,7 @@ public sealed class MediaInboxStore(StudioDatabase database, IFileStorage storag
         using var transaction=connection.BeginTransaction();
         using(var guard=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",connection,transaction))
         {guard.Parameters.AddWithValue("studio-media-inbox:"+id.ToString("D"));guard.ExecuteNonQuery();}
-        using(var prior=new NpgsqlCommand("select batch_id,file_name,content_type,size_bytes,sha256,storage_key,uploaded_by,uploaded_at_utc,matched_job_id,matched_version_id from studio_media_inbox where id=$1",connection,transaction))
+        using(var prior=new NpgsqlCommand("select id,batch_id,file_name,content_type,size_bytes,sha256,storage_key,uploaded_by,uploaded_at_utc,matched_job_id,matched_version_id from studio_media_inbox where id=$1",connection,transaction))
         {
             prior.Parameters.AddWithValue(id);using var reader=prior.ExecuteReader();
             if(reader.Read())
