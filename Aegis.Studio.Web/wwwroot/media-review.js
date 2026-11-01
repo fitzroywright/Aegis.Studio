@@ -3,8 +3,8 @@
  'use strict';
  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
  let revision=0;
- const transfer={batch:null,running:false,paused:false,notify:null};
- window.addEventListener('beforeunload',event=>{if(transfer.batch){event.preventDefault();event.returnValue='';}});
+ const transfer={batch:null,running:false,paused:false,notify:null,pendingFiles:[]};
+ window.addEventListener('beforeunload',event=>{if(transfer.batch||transfer.pendingFiles.length){event.preventDefault();event.returnValue='';}});
  const ids=a=>(a.subjects||[]).map(x=>String(typeof x==='object'?x.id:x));
  const raw=name=>/\.(3fr|arw|cr2|cr3|crw|dng|erf|fff|iiq|kdc|mos|mrw|nef|nrw|orf|pef|raf|raw|rw2|rwl|sr2|srf|srw|x3f)$/i.test(name||'');
  const version=a=>a.versionId||a.latestVersionId;
@@ -23,10 +23,26 @@
   const availableJobs=()=>jobs.filter(j=>!workspace||String(j.workspaceId)===workspace);
   genericView.innerHTML=`<div class="studio-media-page">
    <header class="studio-media-heading"><h1>Media</h1><button type="button" class="action" data-plan disabled>Open session plan ↗</button></header>
+   <section class="studio-media-panel studio-media-upload">
+    <header><h2>Add photos</h2><button type="button" class="link-button" data-history disabled>Upload history</button></header>
+    <div class="studio-media-upload-layout">
+     <div class="studio-media-upload-left">
+      <div class="studio-media-drop" data-drop tabindex="0" role="group" aria-label="Add photos or folders to the upload queue"><strong>Drop photos or folders here</strong><p>Includes subfolders · Choose photos first, then set their destination</p><button type="button" class="primary" data-choose>Choose files</button><button type="button" class="action" data-folder>Choose folder</button><input type="file" data-files multiple hidden><input type="file" data-folders webkitdirectory multiple hidden></div>
+      <section class="studio-media-panel studio-media-queue"><header><h2>Upload progress</h2></header><p role="status" aria-live="polite" data-progress>No photos selected.</p><progress data-meter value="0" max="1" aria-label="Files uploaded"></progress><div class="studio-media-queue-files" data-queue></div><div class="studio-media-upload-actions"><button type="button" class="action" data-pause disabled>Pause</button><button type="button" class="primary" data-retry hidden>Retry failed</button><button type="button" class="action" data-cancel-upload hidden>Cancel remaining</button></div></section>
+      <section class="studio-media-panel studio-media-inbox"><header><h2>Media Inbox <span data-inbox-count>Loading…</span></h2><button type="button" class="action" data-inbox-refresh>Refresh</button></header><p class="studio-media-inbox-help">Photos are stored here before they are attached to a job. Select them, choose a job and session, then match.</p><div class="studio-media-inbox-grid" data-inbox aria-live="polite"><p>Loading Media Inbox…</p></div><footer class="studio-media-inbox-actions"><span data-inbox-selected>0 selected</span><button type="button" class="action" data-inbox-delete disabled>Remove selected</button><button type="button" class="primary" data-match-selected disabled>Match selected to job</button></footer></section>
+     </div>
+     <div class="studio-media-upload-right">
+      <h3>Where should these photos go?</h3><p class="studio-media-destination-hint">You can choose a job after selecting the photos.</p>
+      <label>Job<select data-job data-job-picker aria-label="Job"><option value="">Choose a job…</option>${StudioSubjectPicker.jobOptions(availableJobs())}</select></label>
+      <label>Upload session<select data-session aria-label="Upload session" disabled><option value="">Choose a job first</option></select></label>
+      <button type="button" class="action" data-open-job disabled>View job details ↗</button>
+      <div class="studio-media-destination-options"><label>Collection<select data-collection aria-label="Upload collection"><option>Unclassified</option></select></label><label>Person / planned group<select data-subject aria-label="Upload person or group"><option value="">Assign later</option></select></label></div>
+      <p class="studio-media-inbox-note"><strong>Don’t know the job yet?</strong> Upload them to the Media Inbox now. They remain available here until you match them to a job.</p>
+     </div>
+    </div>
+   </section>
    <section class="studio-media-panel studio-media-context" aria-label="Media context">
-    <label>Job<select data-job data-job-picker aria-label="Job"><option value="">Choose a job…</option>${StudioSubjectPicker.jobOptions(availableJobs())}</select></label>
-    <label>Upload session<select data-session aria-label="Upload session" disabled><option value="">Choose a job first</option></select></label>
-    <button type="button" class="action" data-open-job disabled>View job details ↗</button>
+    <span data-job-context>Photo library and Session Plan</span>
    </section>
    <section class="studio-media-panel studio-media-coverage" data-coverage aria-live="polite">Choose a job to load its Session Plan and media.</section>
    <nav class="studio-media-collections" data-collections aria-label="Job collections"></nav>
@@ -40,34 +56,47 @@
      <footer class="studio-media-selection"><label><input type="checkbox" data-select-all aria-label="Select visible photos"> <span data-selected>0 selected</span></label><button type="button" class="action" data-assign disabled>Assign people / group</button><button type="button" class="action" data-move disabled>Move to collection</button><button type="button" class="action" data-clear>Clear</button></footer>
     </section>
     <div class="studio-media-tools">
-     <section class="studio-media-panel studio-media-upload"><header><h2>Upload destination</h2><button type="button" class="action" data-change>Change destination</button></header><strong data-destination>Choose a job</strong><small data-destination-session></small><label>Collection<select data-collection aria-label="Upload collection"><option>Unclassified</option></select></label><label>Person / planned group<select data-subject aria-label="Upload person or group"><option value="">Assign later</option></select></label>
-      <div class="studio-media-drop" data-drop tabindex="0" role="group" aria-label="Upload files or folders"><strong>Drop photos or folders here</strong><p>Includes subfolders · Upload first, assign later</p><button type="button" class="primary" data-choose>Choose files</button><button type="button" class="action" data-folder>Choose folder</button><input type="file" data-files multiple hidden><input type="file" data-folders webkitdirectory multiple hidden></div><button type="button" class="link-button" data-unclassified>Upload to Unclassified if unsure</button>
-     </section>
-     <section class="studio-media-panel studio-media-queue"><header><h2>Current upload</h2><button type="button" class="link-button" data-history>History</button></header><p role="status" aria-live="polite" data-progress>No upload running.</p><progress data-meter value="0" max="1" aria-label="Files uploaded"></progress><div class="studio-media-queue-files" data-queue></div><div class="studio-media-upload-actions"><button type="button" class="action" data-pause disabled>Pause</button><button type="button" class="primary" data-retry hidden>Retry failed</button><button type="button" class="action" data-cancel-upload hidden>Cancel remaining</button></div></section>
      <section class="studio-media-panel studio-media-handoff"><h2>Coverage to review</h2><div data-review>Choose a job to review its plan.</div><small>Receiving files does not confirm planned shots or complete a session.</small><button type="button" class="primary" data-handoff disabled>Review handoff</button></section>
     </div>
    </div><p class="studio-media-feedback" role="status" aria-live="polite" data-feedback></p>
   </div>`;
   const root=genericView.querySelector('.studio-media-page'),q=selector=>root.querySelector(selector);
   const alive=()=>generation===revision&&root.isConnected;
-  const state={job:'',collection:'',subject:'',session:'',assets:[],subjects:[],sessions:[],collections:[],counts:{},batches:[],selected:new Set(),tab:'photos',list:false,request:0,canEdit:false,ready:false,get batch(){return transfer.batch;},set batch(value){transfer.batch=value;},get running(){return transfer.running;},set running(value){transfer.running=value;},get paused(){return transfer.paused;},set paused(value){transfer.paused=value;}};
+  const state={job:'',collection:'',subject:'',session:'',assets:[],subjects:[],sessions:[],collections:[],counts:{},batches:[],selected:new Set(),inboxItems:[],inboxSelected:new Set(),inboxAllowed:false,inboxUploading:false,inboxRetryFiles:[],tab:'photos',list:false,request:0,canEdit:false,ready:false,get batch(){return transfer.batch;},set batch(value){transfer.batch=value;},get running(){return transfer.running;},set running(value){transfer.running=value;},get paused(){return transfer.paused;},set paused(value){transfer.paused=value;}};
   const feedback=error=>{if(alive())q('[data-feedback]').textContent=error.message||String(error);};
   const run=fn=>async()=>{try{await fn();}catch(error){feedback(error);}};
   const api=path=>'/api/jobs/'+encodeURIComponent(state.job)+path;
   const title=j=>[j.jobNumber||j.reference,j.title||j.name||'Job'].filter(Boolean).join(' · ');
   const options=(values,selected)=>values.map(([value,label])=>`<option value="${esc(value)}" ${String(value)===String(selected)?'selected':''}>${esc(label)}</option>`).join('');
   function remember(){window.studioMediaContext={jobId:state.job,sessionId:state.session,collection:state.collection,subjectId:state.subject};}
+  function renderInbox(){
+   if(!alive()||!state.inboxAllowed)return;
+   const items=state.inboxItems.filter(item=>!item.matchedJobId);
+   q('[data-inbox-count]').textContent=`${items.length} waiting to match`;
+   q('[data-inbox-selected]').textContent=`${state.inboxSelected.size} selected`;
+   q('[data-inbox]').innerHTML=items.map(item=>`<article class="studio-media-inbox-item ${state.inboxSelected.has(item.id)?'selected':''}"><label><input type="checkbox" data-inbox-select="${esc(item.id)}" ${state.inboxSelected.has(item.id)?'checked':''} aria-label="Select ${esc(item.fileName)}"></label><a class="studio-media-inbox-preview" href="/api/media/inbox/${encodeURIComponent(item.id)}/content" target="_blank" rel="noopener" aria-label="Open ${esc(item.fileName)}">${String(item.contentType||'').startsWith('image/')?`<img loading="lazy" src="/api/media/inbox/${encodeURIComponent(item.id)}/content" alt="${esc(item.fileName)}">`:'<span>RAW / file</span>'}</a><strong>${esc(item.fileName)}</strong><small>${(Number(item.sizeBytes)/1024/1024).toFixed(1)} MB · ${esc(item.uploadedBy)}</small><small>${esc(new Date(item.uploadedAtUtc).toLocaleString())}</small><button type="button" class="link-button" data-inbox-remove="${esc(item.id)}">Remove</button></article>`).join('')||'<p class="studio-media-empty">No photos are waiting to be matched. Add photos above; they will be stored here even when you do not know the job.</p>';
+   q('[data-inbox]').querySelectorAll('[data-inbox-select]').forEach(input=>input.onchange=()=>{input.checked?state.inboxSelected.add(input.dataset.inboxSelect):state.inboxSelected.delete(input.dataset.inboxSelect);renderInbox();showDestination();});
+   q('[data-inbox]').querySelectorAll('[data-inbox-remove]').forEach(button=>button.onclick=run(async()=>{await json('/api/media/inbox/'+encodeURIComponent(button.dataset.inboxRemove),{method:'DELETE'});state.inboxSelected.delete(button.dataset.inboxRemove);await loadInbox();}));
+  }
+  async function loadInbox(){
+   try{const result=await json('/api/media/inbox');if(!alive())return;state.inboxItems=result.items||[];state.inboxAllowed=true;const valid=new Set(state.inboxItems.filter(item=>!item.matchedJobId).map(item=>String(item.id)));state.inboxSelected=new Set([...state.inboxSelected].filter(id=>valid.has(String(id))));renderInbox();showDestination();}
+   catch(error){if(!alive())return;state.inboxAllowed=false;q('[data-inbox-count]').textContent='Unavailable';q('[data-inbox]').innerHTML=`<p role="alert">${esc(error.message)} Upload permission is required to use this inbox.</p>`;showDestination();}
+  }
   function showDestination(){
    const person=state.subjects.find(s=>String(s.id)===state.subject),session=state.sessions.find(s=>String(s.id)===state.session);
-   q('[data-destination]').textContent=state.job?(person?person.name:state.collection||'Unclassified'):'Choose a job';
-   q('[data-destination-session]').textContent=[session?.title,state.job?'Job: '+title(jobs.find(j=>String(j.id)===state.job)||{}):''].filter(Boolean).join(' · ');
+   q('[data-job-context]').textContent=state.job?`Photo library · ${title(jobs.find(j=>String(j.id)===state.job)||{})}${session?' · '+session.title:''}${person?' · '+person.name:''}`:'Select a job to view its photo library and Session Plan.';
    q('[data-collection]').innerHTML=options(['Unclassified',...state.collections.filter(c=>c!=='Unclassified')].map(c=>[c,c]),state.collection||'Unclassified');
    q('[data-subject]').innerHTML='<option value="">Assign later</option>'+options(state.subjects.filter(s=>!state.collection||(s.collection||'Unclassified')===state.collection).map(s=>[s.id,[s.name,s.reference].filter(Boolean).join(' · ')]),state.subject);
-   const locked=state.running||Boolean(state.batch);
+   const locked=state.running||Boolean(state.batch)||state.inboxUploading;
    for(const control of root.querySelectorAll('[data-job],[data-session],[data-collection],[data-subject]'))control.disabled=locked||!state.ready&&control.matches('[data-session],[data-collection],[data-subject]');
-   for(const control of root.querySelectorAll('[data-choose],[data-folder]'))control.disabled=!state.ready||!state.canEdit||locked;
-   q('[data-drop]').setAttribute('aria-disabled',String(!state.ready||!state.canEdit||locked));
+   for(const control of root.querySelectorAll('[data-choose],[data-folder]'))control.disabled=locked;
+   q('[data-drop]').setAttribute('aria-disabled',String(locked||!state.inboxAllowed));
+   const match=q('[data-match-selected]');match.disabled=!state.inboxSelected.size||!state.job||!state.ready||!state.canEdit||locked||state.inboxUploading||Boolean(state.sessions.length&&!state.session);match.textContent=state.inboxUploading?'Matching…':`Match selected to job${state.inboxSelected.size?` (${state.inboxSelected.size})`:''}`;
+   q('[data-inbox-delete]').disabled=!state.inboxSelected.size||state.inboxUploading;
+   for(const control of root.querySelectorAll('[data-choose],[data-folder]'))control.disabled=!state.inboxAllowed||state.inboxUploading||locked;
+   q('[data-history]').disabled=!state.job;
    q('[data-plan]').disabled=!state.ready;q('[data-open-job]').disabled=!state.job;q('[data-handoff]').disabled=!state.ready||state.running||Boolean(state.batch);
+   renderInbox();
    window.StudioShell?.setMediaWorkspaceFilter(workspaces,workspace,changeWorkspace,locked);
    remember();
   }
@@ -171,8 +200,6 @@
   root.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;render();});
   q('[data-select-all]').onchange=e=>{for(const a of filteredAssets())e.target.checked?state.selected.add(a.id):state.selected.delete(a.id);render();};
   q('[data-clear]').onclick=()=>{state.selected.clear();render();};
-  q('[data-change]').onclick=()=>q('[data-collection]').focus();
-  q('[data-unclassified]').onclick=()=>{if(state.batch){feedback('Finish or retry the current batch before changing destination.');return;}state.collection='Unclassified';state.subject='';state.selected.clear();q('[data-person]').value='';render();};
   async function editSelected(move){
    if(!state.canEdit||!state.selected.size)return;
    const jobId=state.job,selected=[...state.selected];
@@ -189,18 +216,46 @@
   }
   q('[data-history]').onclick=run(async()=>{if(!state.job)return;const batches=await json(api('/media/upload-batches'));if(!alive())return;studioDialog('Upload history',`<div class="studio-media-history">${batches.map(b=>`<article><strong>${esc(b.createdBy)}</strong><small>${esc(new Date(b.createdAtUtc).toLocaleString())} · ${esc(state.sessions.find(s=>String(s.id)===String(b.sessionId))?.title||'No session')}</small><p>${(b.files||[]).filter(f=>f.state==='Stored').length} stored / ${(b.files||[]).length} declared ${b.cancelledAtUtc?'· Cancelled':''}</p>${(b.files||[]).filter(f=>!['Stored','Cancelled'].includes(f.state)).map(f=>`<small>${esc(f.fileName)} · ${esc(f.state)}</small>`).join('')}</article>`).join('')||'<p>No declared uploads yet.</p>'}<small>Most recent 100 batches. Pending files from earlier visits must be reselected by the original uploader.</small></div>`);});
   q('[data-choose]').onclick=()=>q('[data-files]').click();q('[data-folder]').onclick=()=>q('[data-folders]').click();
-  async function acceptFiles(incoming){
-   if(!state.ready||!state.canEdit||state.running||state.batch){feedback('Choose an editable job and finish the current batch before adding files.');return;}
-   if(state.sessions.length&&!state.session){feedback('Choose the upload session before selecting files.');return;}
+  async function uploadToInbox(incoming,retry=false){
    const files=Array.from(incoming||[]);if(!files.length)return;
-   if(files.some(f=>f.size<1||f.size>100000000)){feedback('Each file must contain between 1 byte and 100 MB.');return;}
-   if(files.length>5000){feedback('Choose at most 5000 files per batch.');return;}
-   // Folder names are never used to guess identities. The visible destination is authoritative.
-   state.batch={jobId:state.job,files:files.map(file=>({file,uploadId:crypto.randomUUID(),state:'Queued'})),declaration:{batchId:crypto.randomUUID(),sessionId:state.session||null,collection:state.collection||'Unclassified',subjectId:state.subject||null,returned:false,note:'Media · '+(state.session||'Job upload')}};
-   state.batch.declaration.files=state.batch.files.map(x=>({uploadId:x.uploadId,fileName:x.file.name,sizeBytes:x.file.size}));
-   state.paused=false;await upload();
+   if(!state.inboxAllowed){feedback('Media Inbox permission is required to upload without selecting a job.');return;}
+   if(state.running||state.batch||state.inboxUploading){feedback('Wait for the current upload to finish before adding more photos.');return;}
+   if(files.some(file=>file.size<1||file.size>100000000)){feedback('Each file must contain between 1 byte and 100 MB.');return;}
+   if(files.length>5000){feedback('Choose at most 5000 files per upload batch.');return;}
+   const tasks=files.map(file=>({file,uploadId:retry?state.inboxRetryFiles.find(item=>item.file===file)?.uploadId||crypto.randomUUID():crypto.randomUUID()}));
+   state.inboxRetryFiles=state.inboxRetryFiles.filter(item=>!files.includes(item.file));
+   transfer.pendingFiles.push(...files);state.inboxUploading=true;showDestination();q('[data-progress]').textContent=`Uploading 0 of ${files.length} photos to Media Inbox…`;q('[data-meter]').max=files.length;q('[data-meter]').value=0;
+   const outcomes=[];
+   try{
+    for(let index=0;index<tasks.length;index++){
+     const {file,uploadId}=tasks[index],form=new FormData();form.append('uploadId',uploadId);form.append('file',file);
+     q('[data-queue]').innerHTML=`<div><strong>${esc(file.name)}</strong><small>Uploading ${index+1} of ${files.length}…</small></div>`;
+     try{await json('/api/media/inbox/uploads',{method:'POST',body:form});outcomes.push({file,uploadId,ok:true});}
+     catch(error){outcomes.push({file,uploadId,ok:false,error:error.message});}
+     q('[data-progress]').textContent=`${index+1} of ${files.length} uploaded · ${outcomes.filter(item=>!item.ok).length} failed`;
+     q('[data-meter]').value=index+1;
+    }
+    state.inboxRetryFiles.push(...outcomes.filter(item=>!item.ok).map(({file,uploadId})=>({file,uploadId})));
+    q('[data-queue]').innerHTML=outcomes.map(item=>`<div><strong>${esc(item.file.name)}</strong><small>${item.ok?'Stored in Media Inbox':'Failed · '+esc(item.error)}</small>${item.ok?'':'<button type="button" class="link-button" data-inbox-retry="'+esc(item.uploadId)+'">Retry upload</button>'}</div>`).join('');
+    q('[data-queue]').querySelectorAll('[data-inbox-retry]').forEach(button=>button.onclick=run(async()=>{const retry=state.inboxRetryFiles.find(item=>item.uploadId===button.dataset.inboxRetry);if(retry)await uploadToInbox([retry.file],true);}));
+    await loadInbox();
+    const failed=outcomes.filter(item=>!item.ok).length;
+    q('[data-progress]').textContent=failed?`${files.length-failed} of ${files.length} stored · ${failed} failed. Use Retry upload beside each failed file.`:`${files.length} photo${files.length===1?'':'s'} stored in Media Inbox. Match them to a job whenever you are ready.`;
+   }finally{transfer.pendingFiles.splice(0,transfer.pendingFiles.length);state.inboxUploading=false;showDestination();}
   }
-  q('[data-files]').onchange=()=>void acceptFiles(q('[data-files]').files);q('[data-folders]').onchange=()=>void acceptFiles(q('[data-folders]').files);
+  async function matchInboxSelection(){
+   if(!state.inboxSelected.size||!state.job||!state.ready||!state.canEdit)return;
+   if(state.sessions.length&&!state.session){feedback('Choose the upload session before matching these photos.');return;}
+   const selected=[...state.inboxSelected];state.inboxUploading=true;showDestination();
+   try{
+    const matched=[];for(const id of selected){try{await json('/api/media/inbox/'+encodeURIComponent(id)+'/match',post('POST',{jobId:state.job,sessionId:state.session||null,collection:state.collection||'Unclassified',subjectId:state.subject||null}));matched.push(id);state.inboxSelected.delete(id);}catch(error){feedback(new Error(`${state.inboxItems.find(item=>item.id===id)?.fileName||'A photo'} was not matched: ${error.message}`));}}
+    await loadInbox();await loadJob(state.job,true);q('[data-progress]').textContent=`${matched.length} of ${selected.length} photo${selected.length===1?'':'s'} matched to ${title(jobs.find(j=>String(j.id)===String(state.job))||{})}. Photos that failed remain selected in the Media Inbox.`;
+   }finally{state.inboxUploading=false;showDestination();}
+  }
+  q('[data-match-selected]').onclick=run(matchInboxSelection);q('[data-inbox-refresh]').onclick=run(loadInbox);
+  q('[data-inbox-delete]').onclick=run(async()=>{for(const id of [...state.inboxSelected])await json('/api/media/inbox/'+encodeURIComponent(id),{method:'DELETE'});state.inboxSelected.clear();await loadInbox();});
+  q('[data-choose]').onclick=()=>q('[data-files]').click();q('[data-folder]').onclick=()=>q('[data-folders]').click();
+  q('[data-files]').onchange=()=>{const files=Array.from(q('[data-files]').files);q('[data-files]').value='';void uploadToInbox(files);};q('[data-folders]').onchange=()=>{const files=Array.from(q('[data-folders]').files);q('[data-folders]').value='';void uploadToInbox(files);};
   async function readEntry(entry){
    if(entry.isFile)return [await new Promise((resolve,reject)=>entry.file(resolve,reject))];
    if(!entry.isDirectory)return [];
@@ -210,7 +265,7 @@
   }
   const drop=q('[data-drop]');
   drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag-over');};drop.ondragleave=()=>drop.classList.remove('drag-over');
-  drop.ondrop=async e=>{e.preventDefault();drop.classList.remove('drag-over');try{const entries=Array.from(e.dataTransfer?.items||[]).map(i=>i.webkitGetAsEntry?.()).filter(Boolean);const files=entries.length?(await Promise.all(entries.map(readEntry))).flat():Array.from(e.dataTransfer?.files||[]);await acceptFiles(files);}catch(error){feedback(error);}};
+  drop.ondrop=async e=>{e.preventDefault();drop.classList.remove('drag-over');try{const entries=Array.from(e.dataTransfer?.items||[]).map(i=>i.webkitGetAsEntry?.()).filter(Boolean);const files=entries.length?(await Promise.all(entries.map(readEntry))).flat():Array.from(e.dataTransfer?.files||[]);await uploadToInbox(files);}catch(error){feedback(error);}};
   function renderQueue(batch){
    if(!alive()||!batch)return;
    const done=batch.files.filter(f=>f.state==='Stored').length,failed=batch.files.filter(f=>f.state==='Failed').length;
@@ -239,7 +294,7 @@
    }catch(error){feedback(error);for(const item of batch.files)if(item.state==='Queued'){item.state='Failed';item.error=error.message;}}
    finally{
     state.running=false;transfer.notify?.();
-    if(batch.files.every(f=>f.state==='Stored')){state.batch=null;state.paused=false;q('[data-files]').value='';q('[data-folders]').value='';q('[data-pause]').disabled=true;q('[data-retry]').hidden=true;q('[data-cancel-upload]').hidden=true;showDestination();if(alive())await loadJob(batch.jobId,true);else transfer.notify?.(batch);}
+    if(batch.files.every(f=>f.state==='Stored')){state.batch=null;state.paused=false;q('[data-files]').value='';q('[data-folders]').value='';q('[data-pause]').disabled=true;q('[data-retry]').hidden=true;q('[data-cancel-upload]').hidden=true;q('[data-progress]').textContent=`${batch.files.length} photo${batch.files.length===1?'':'s'} uploaded to ${title(jobs.find(j=>String(j.id)===String(batch.jobId))||{})}.`;showDestination();if(alive())await loadJob(batch.jobId,true);else transfer.notify?.(batch);}
    }
   }
   q('[data-pause]').onclick=()=>{if(state.running){state.paused=true;renderQueue(state.batch);}else if(state.paused){state.paused=false;void upload();}};
@@ -249,6 +304,8 @@
   const initial=transfer.batch?{jobId:transfer.batch.jobId,sessionId:transfer.batch.declaration.sessionId,collection:transfer.batch.declaration.collection,subjectId:transfer.batch.declaration.subjectId}:window.studioMediaFocus||window.studioMediaContext||{};
   const initialJob=transfer.batch?.jobId||window.history.state?.studioJobId||initial.jobId;
   if(transfer.batch||window.history.state?.studioJobId||window.studioMediaFocus?.jobId){workspace=String(jobs.find(j=>String(j.id)===String(initialJob))?.workspaceId||'');q('[data-job]').innerHTML='<option value="">Choose a job…</option>'+StudioSubjectPicker.jobOptions(availableJobs());}
+  await loadInbox();
   if(initialJob&&availableJobs().some(j=>String(j.id)===String(initialJob))){q('[data-job]').value=String(initialJob);const matching=String(initial.jobId)===String(initialJob);state.collection=matching?initial.collection||'':'';state.subject=matching?initial.subjectId||'':'';state.session=matching?initial.sessionId||'':'';await loadJob(String(initialJob),true);if(state.batch)renderQueue(state.batch);}else showDestination();
  };
 })();
+

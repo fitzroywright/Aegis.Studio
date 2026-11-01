@@ -15,6 +15,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         string[] statements = [
             Aegis.Studio.Web.Operations.JobWorkspaceParticipation.Schema,
             MediaUploadReceipts.Schema,
+            MediaInboxStore.Schema,
             "create table if not exists studio_media_migrations(version integer primary key,applied_at timestamptz not null default now())",
             "create table if not exists studio_media_galleries(id uuid primary key references studio_jobs(id) on delete cascade,name text not null default 'Media',default_lens text not null default 'Auto')",
             "alter table studio_media_galleries add column if not exists default_collection text null",
