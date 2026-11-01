@@ -529,3 +529,24 @@
 .catalog-page .catalog-product-editor .commercial-product-form>footer{grid-column:1/-1;grid-row:8}
 .catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-status select{width:100%;min-width:0;height:29px;padding:4px}
 @media(max-width:1100px){.catalog-page .catalog-product-editor .commercial-form.commercial-product-form{grid-template-columns:repeat(6,minmax(0,1fr))}}
+
+/* Products: matching Active/Production switches on top row; full finance labels beside inputs. */
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-name{grid-column:1/span 3;grid-row:1}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-category{grid-column:4/span 3;grid-row:1}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-active{grid-column:1/span 3;grid-row:2}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-production{grid-column:4/span 3;grid-row:2}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-description{grid-column:1/span 3;grid-row:3/span 3}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-price{grid-column:4/span 3;grid-row:3}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-cost{grid-column:4/span 3;grid-row:4}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-tax{grid-column:4/span 3;grid-row:5}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-price,
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-cost,
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-tax{display:grid;grid-template-columns:minmax(0,1fr) 105px;align-items:center;gap:8px;min-height:30px}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-price input,
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-cost input,
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-tax input{text-align:right}
+.catalog-page .catalog-product-editor .commercial-product-form>.catalog-product-description textarea{height:111px;min-height:111px}
+.catalog-page .catalog-product-editor .commercial-product-form>label:has(>textarea[name=options]){grid-column:1/span 3;grid-row:6}
+.catalog-page .catalog-product-editor .commercial-product-form>label:has(>select[name=template]){grid-column:4/span 3;grid-row:6}
+.catalog-page .catalog-product-editor .commercial-product-form>.commercial-bundle{grid-row:7}
+.catalog-page .catalog-product-editor .commercial-product-form>footer{grid-row:8}
