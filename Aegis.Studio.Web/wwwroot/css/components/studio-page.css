@@ -175,11 +175,9 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .staff-master-detail:not([hidden]) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:minmax(0,1fr); flex:1; min-height:0; overflow:hidden; gap:18px; }
 .staff-master { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
 .staff-master>.staff-grid-scroll { flex:1; min-height:0; overscroll-behavior:contain; }
-.staff-master>[data-staff-count] { flex-shrink:0; }
-.staff-toolbar { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
-.staff-toolbar input { flex:1; min-width:0; padding:10px 12px; border:1px solid var(--theme-border,#d9e2e9); border-radius:5px; background:var(--theme-surface,#fff); color:var(--theme-text,#213951); }
-.staff-toolbar button { white-space:nowrap; }
-.staff-approval-note { margin:0 0 10px; font-size:12px; color:var(--theme-text,#213951); }
+.staff-grid-footer { display:flex; flex-shrink:0; align-items:baseline; flex-wrap:wrap; gap:4px 12px; padding-top:8px; font-size:12px; }
+.staff-column-search { display:grid; gap:5px; }
+.staff-approval-note { margin:0; font-size:12px; color:var(--theme-text,#213951); }
 .staff-approval-note:empty { display:none; }
 .staff-directory-table { border:1px solid var(--theme-border,#d9e2e9); }
 .staff-directory-table [data-staff-user] { cursor:pointer; }
@@ -233,7 +231,8 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .staff-advanced { padding:10px; background:var(--theme-surface-subtle,#f5f7f9); border:1px solid var(--theme-border,#d9e2e9); border-radius:4px; }
 .staff-advanced summary { cursor:pointer; font-weight:600; }
 .staff-advanced[open] summary { margin-bottom:12px; }
-.staff-detail-actions { display:flex; justify-content:flex-end; gap:10px; }
+.staff-detail-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:10px; }
+.staff-add-action { margin-right:auto; }
 .staff-editor,.staff-grid-section { border:1px solid var(--theme-border,#d9e2e9); border-radius:5px; padding:10px; min-width:0; background:var(--theme-surface,#fff); }
 .staff-editor h2,.staff-global-role-section>h2,.staff-grid-section h2 { margin:0 0 6px; font-size:14px; }
 .staff-editor h3 { font-size:13px; margin:0 0 4px; }

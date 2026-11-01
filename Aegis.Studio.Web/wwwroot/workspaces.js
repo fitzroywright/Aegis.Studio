@@ -252,14 +252,17 @@ async function runMailboxImport(workspaceId) {
 
 let staffDirectoryState = null;
 
+function renderStaffDirectoryTable(query='') {
+    return `<table class="staff-editable-grid staff-directory-table"><caption class="sr-only">Staff directory. Select a person to edit.</caption><thead><tr><th><label class="staff-column-search"><span>Staff member</span><input type="search" data-staff-search aria-label="Search staff by name or email" placeholder="Search staff by name or email…" value="${esc(query)}" oninput="filterStudioStaff(this.value)"></label></th><th>Job Roles</th><th>Access Permissions</th><th>Status</th><th><span class="sr-only">Edit</span></th></tr></thead><tbody><tr><td colspan="5" role="status">Loading staff…</td></tr></tbody></table>`;
+}
+
 function renderEmployeeDirectorySection() {
     staffDirectoryState = null;
     return `<section class="staff-administration">
       <section id="staffPanel" class="staff-master-detail">
-        <div class="staff-master"><div class="staff-toolbar"><input type="search" aria-label="Search staff by name or email" placeholder="Search staff by name or email…" oninput="filterStudioStaff(this.value)"><button type="button" class="primary" onclick="openStaffEditor(null)">+ Add staff</button></div>
-          <p data-staff-approvals class="staff-approval-note" role="status"></p>
-          <div id="studioEmployeeList" class="staff-grid-scroll"><p role="status">Loading staff…</p></div>
-          <p data-staff-count class="muted"></p>
+        <div class="staff-master">
+          <div id="studioEmployeeList" class="staff-grid-scroll">${renderStaffDirectoryTable()}</div>
+          <footer class="staff-grid-footer"><span data-staff-count class="muted"></span><span data-staff-approvals class="staff-approval-note" role="status"></span></footer>
         </div>
         <section class="staff-detail" aria-label="Staff editor" aria-live="polite"><p>Select a staff member to edit their details and roles.</p></section>
       </section>
@@ -364,7 +367,8 @@ async function refreshStudioEmployees(current=()=>true) {
     const holder = document.getElementById('studioEmployeeList');
     if (!holder || !current() || staffDirectoryState?.dirty || staffDirectoryState?.saving) return;
     if(staffDirectoryState)staffDirectoryState.loading=true;
-    holder.innerHTML='<p role="status">Loading staff…</p>';
+    if(!holder.querySelector('.staff-directory-table'))holder.innerHTML=renderStaffDirectoryTable(staffDirectoryState?.query||'');
+    holder.querySelector('tbody').innerHTML='<tr><td colspan="5" role="status">Loading staff…</td></tr>';
     genericView.querySelector('.staff-detail').textContent='Loading staff details…';
     const generation = (holder.staffGeneration || 0) + 1; holder.staffGeneration = generation;
     try {
@@ -383,7 +387,7 @@ async function refreshStudioEmployees(current=()=>true) {
             employee.securityAccount = account;
         }
         const selected = staffDirectoryState?.selected;
-        staffDirectoryState = {employees:employees.sort((a,b)=>(a.displayName||a.userName).localeCompare(b.displayName||b.userName)), roles, memberships, jobRoles, workers, demoAccountsEnabled:authentication?.demoAccountsEnabled===true&&authentication?.defaultSource==='Mock', selected:null, query:genericView.querySelector('.staff-toolbar input').value, dirty:false, saving:false};
+        staffDirectoryState = {employees:employees.sort((a,b)=>(a.displayName||a.userName).localeCompare(b.displayName||b.userName)), roles, memberships, jobRoles, workers, demoAccountsEnabled:authentication?.demoAccountsEnabled===true&&authentication?.defaultSource==='Mock', selected:null, query:genericView.querySelector('[data-staff-search]')?.value||staffDirectoryState?.query||'', dirty:false, saving:false};
         drawStudioStaffList();
         const index = employees.findIndex(e=>e.userName===selected);
         openStaffEditor(index >= 0 ? index : employees.length ? 0 : null, true);
@@ -414,14 +418,15 @@ function drawStudioStaffList() {
     genericView.querySelector('[data-staff-approvals]').textContent=pending?`${pending} staff awaiting approval — select a person to review access and roles.`:'';
     const query = state.query.toLowerCase();
     const rows = state.employees.map((employee,index)=>({employee,index})).filter(({employee:e})=>[e.displayName,e.emailAddress,e.userName].some(x=>String(x||'').toLowerCase().includes(query)));
-    document.getElementById('studioEmployeeList').innerHTML = `<table class="staff-editable-grid staff-directory-table"><caption class="sr-only">Staff directory. Select a person to edit.</caption><thead><tr><th>Staff member</th><th>Job Roles</th><th>Access Permissions</th><th>Status</th><th><span class="sr-only">Edit</span></th></tr></thead><tbody>${rows.map(({employee:e,index})=>{
+    const holder=document.getElementById('studioEmployeeList');
+    if(!holder.querySelector('.staff-directory-table'))holder.innerHTML=renderStaffDirectoryTable(state.query);
+    holder.querySelector('tbody').innerHTML = rows.map(({employee:e,index})=>{
         const status=e.securityAccount?.status || 'Setup required';
         const roles=state.workers.filter(p=>p.userName.toLowerCase()===e.userName.toLowerCase()).map(p=>state.jobRoles.find(r=>r.code===p.jobRoleCode)?.displayName||p.jobRoleCode);
         const accessRoles=state.roles.map((role,i)=>({role,member:state.memberships[i]?.some(m=>m.isActive&&String(m.userName).toLowerCase()===e.userName.toLowerCase())})).filter(x=>x.member).map(x=>x.role.name);
         const accessSummary=accessRoles.length?accessRoles.map(role=>`<span class="staff-role-badge staff-access-role-badge">${esc(role)}</span>`).join(' '):'<span class="muted">No access role</span>';
         return `<tr data-staff-index="${index}" data-staff-user="${esc(e.userName)}" tabindex="0" aria-label="Select ${esc(e.displayName||e.userName)}" aria-selected="${state.selected===e.userName}"><td><button type="button" class="staff-person"><span class="staff-avatar" aria-hidden="true">${esc(staffInitials(e))}</span><span><strong>${esc(e.displayName||e.userName)}</strong><small>${esc(e.emailAddress||e.userName)}</small></span></button></td><td>${roles.map(role=>`<span class="staff-role-badge">${esc(role)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${accessSummary}</td><td><span class="staff-access-badge" data-state="${esc(status)}">${esc(status==='PendingAccess'?'Awaiting approval':status==='Active'&&!e.isActive?'Staff inactive':status)}</span></td><td><button type="button" class="staff-edit-link" aria-label="Edit ${esc(e.displayName||e.userName)}">•••</button></td></tr>`;
-    }).join('')||'<tr><td colspan="5">No matching staff members.</td></tr>'}</tbody></table>`;
-    const holder=document.getElementById('studioEmployeeList');
+    }).join('')||'<tr><td colspan="5">No matching staff members.</td></tr>';
     const selectRow=row=>{
         if(!row||staffDirectoryState.selected===row.dataset.staffUser)return;
         const index=staffDirectoryState.employees.findIndex(employee=>employee.userName===row.dataset.staffUser);
@@ -449,7 +454,7 @@ function openStaffEditor(index, force=false) {
     state.selected=employee?.userName||null; state.dirty=false;
     const panel=genericView.querySelector('.staff-detail');
     if (!employee) {
-        panel.innerHTML=`<h2>Add staff member</h2><form class="staff-person-form" data-new-staff><div class="staff-detail-card"><h3>Details</h3><div class="staff-field-pair"><label>User name<input id="employeeUserName" required autocomplete="off"></label><label>Display name<input id="employeeDisplayName" required></label></div><label>Email<input id="employeeEmail" type="email"></label><label>Sign-in method<select id="employeeAuthSource"><option value="ActiveDirectory">Active Directory</option><option value="EntraId">Microsoft Entra ID</option><option value="LocalDatabase">Local account</option>${state.demoAccountsEnabled?'<option value="Mock">Demo (no password)</option>':''}</select></label><p class="muted" data-signin-help></p><label data-local-password hidden>Initial password<input id="employeeLocalPassword" type="password" autocomplete="new-password" minlength="15" maxlength="256"></label><label>Available for job assignments<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><details data-identity-settings><summary>Advanced identity settings</summary><label>Directory / tenant ID<input id="employeeAuthScope" autocomplete="off"></label><label>Immutable user ID<input id="employeeAuthSubject" autocomplete="off"></label></details></div><p id="employeeAccountStatus" role="status"></p><div class="staff-detail-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Create staff account</button></div></form>`;
+        panel.innerHTML=`<h2>Add staff member</h2><form class="staff-person-form" data-new-staff><div class="staff-detail-card"><h3>Details</h3><div class="staff-field-pair"><label>User name<input id="employeeUserName" required autocomplete="off"></label><label>Display name<input id="employeeDisplayName" required></label></div><label>Email<input id="employeeEmail" type="email"></label><label>Sign-in method<select id="employeeAuthSource"><option value="ActiveDirectory">Active Directory</option><option value="EntraId">Microsoft Entra ID</option><option value="LocalDatabase">Local account</option>${state.demoAccountsEnabled?'<option value="Mock">Demo (no password)</option>':''}</select></label><p class="muted" data-signin-help></p><label data-local-password hidden>Initial password<input id="employeeLocalPassword" type="password" autocomplete="new-password" minlength="15" maxlength="256"></label><label>Available for job assignments<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><details data-identity-settings><summary>Advanced identity settings</summary><label>Directory / tenant ID<input id="employeeAuthScope" autocomplete="off"></label><label>Immutable user ID<input id="employeeAuthSubject" autocomplete="off"></label></details></div><p id="employeeAccountStatus" role="status"></p><div class="staff-detail-actions"><button type="button" class="primary staff-add-action" onclick="openStaffEditor(null)">+ Add staff</button><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Create staff account</button></div></form>`;
         const form=panel.querySelector('form'),source=form.querySelector('#employeeAuthSource');
         source.onchange=()=>{const local=source.value==='LocalDatabase';form.querySelector('[data-local-password]').hidden=!local;form.querySelector('#employeeLocalPassword').required=local;form.querySelector('#employeeLocalPassword').disabled=!local;if(!local)form.querySelector('#employeeLocalPassword').value='';const demo=source.value==='Mock';form.querySelector('[data-identity-settings]').hidden=demo;form.querySelectorAll('#employeeAuthScope,#employeeAuthSubject').forEach(input=>input.disabled=demo);form.querySelector('[data-signin-help]').textContent=demo?'Demo sign-in uses this user name with no password. Access must be approved and roles assigned separately.':local?'Uses a password managed by Studio.':'Uses the organisation’s directory account. Verified identity settings may be supplied now or linked later.';};if(state.demoAccountsEnabled)source.value='Mock';source.onchange();
         form.oninput=()=>state.dirty=true;
@@ -466,7 +471,7 @@ function openStaffEditor(index, force=false) {
       <section class="staff-detail-card staff-photo-card"><h3>Photo</h3><div class="staff-photo-frame">${employee.photoUrl?`<img src="${esc(employee.photoUrl)}" alt="${esc(employee.displayName||employee.userName)}">`:`<span class="staff-photo-placeholder" aria-hidden="true">${esc(staffInitials(employee))}</span>`}</div><p class="muted">${employee.photoUrl?`Source: ${esc(staffPhotoSourceLabel(employee.photoSource))}`:'No staff photo is available.'}</p><input type="file" accept="image/jpeg,image/png,image/webp" data-staff-photo-file hidden><div class="staff-photo-actions"><button type="button" data-change-photo>${employee.photoUrl?'Change Photo':'Add Photo'}</button>${employee.photoSource==='Studio'?'<button type="button" data-remove-photo>Remove</button>':''}</div></section>
       <section class="staff-detail-card"><header class="staff-card-heading"><h3>Job Roles</h3><button type="button" class="staff-text-action" data-manage-job-roles>Manage Job Roles</button></header><div data-token-kind="job"></div><p class="muted">Select all roles this person can perform.</p><label class="staff-checkbox"><input name="isAssignable" type="checkbox" ${employee.isAssignable?'checked':''}><span>Available for job assignments</span></label></section>
       <section class="staff-detail-card"><header class="staff-card-heading"><h3>Access Permissions</h3><button type="button" class="staff-text-action" data-manage-access-permissions>Manage Access Permissions</button></header><div data-token-kind="access"></div><p class="muted">Controls what this person can see and change.</p>
-      <details class="staff-advanced"><summary>Advanced</summary><label class="staff-checkbox"><input name="isActive" type="checkbox" ${employee.isActive?'checked':''}><span>Staff record active</span></label>${account?`<div class="staff-row-actions"><button type="button" data-identity-bind>Manage sign-in identity</button><button type="button" data-account-revoke>Revoke sessions</button>${account.providerKind==='LocalDatabase'?'<button type="button" data-account-recover>Account recovery</button>':''}</div>`:'<p>Complete sign-in setup to manage identity and recovery.</p>'}</details></section></div><p data-editor-status role="status"></p><div class="staff-detail-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`;
+      <details class="staff-advanced"><summary>Advanced</summary><label class="staff-checkbox"><input name="isActive" type="checkbox" ${employee.isActive?'checked':''}><span>Staff record active</span></label>${account?`<div class="staff-row-actions"><button type="button" data-identity-bind>Manage sign-in identity</button><button type="button" data-account-revoke>Revoke sessions</button>${account.providerKind==='LocalDatabase'?'<button type="button" data-account-recover>Account recovery</button>':''}</div>`:'<p>Complete sign-in setup to manage identity and recovery.</p>'}</details></section></div><p data-editor-status role="status"></p><div class="staff-detail-actions"><button type="button" class="primary staff-add-action" onclick="openStaffEditor(null)">+ Add staff</button><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save changes</button></div></form>`;
     const form=panel.querySelector('form');
     form.oninput=()=>state.dirty=true;
     form.querySelector('[data-cancel]').onclick=()=>openStaffEditor(index);
