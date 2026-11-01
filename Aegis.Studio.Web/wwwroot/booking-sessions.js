@@ -151,7 +151,7 @@ window.StudioBookingSessions=(()=>{
         field('reload').onclick=()=>{if((state.dirty.sessions||state.dirty.hours)&&!confirm('Discard unsaved booking settings and reload?'))return;void load();};
         field('add').onclick=()=>{
             try{if(state.tab==='sessions')readDetails();}catch(error){status(error.message);return;}
-            if(state.tab==='sessions'){state.search='';state.category='';state.location='';state.filter='';for(const name of ['search','category','location','filter'])field(name).value='';state.sessions.push({id:crypto.randomUUID(),name:'',description:'',durationMinutes:60,setupBufferMinutes:0,cleanupBufferMinutes:0,price:'0',deposit:'0',priceMinor:0,depositMinor:0,currency:'JMD',locations:['BK'],resourceRequirements:{Photographer:1},isActive:true,isPublished:false,defaultWorkspaceId:null,category:''});state.selected=state.sessions.at(-1).id;state.detailBaseline=null;}
+            if(state.tab==='sessions'){state.search='';state.category='';state.location='';state.filter='';for(const name of ['search','category','location','filter']){const control=field(name);if(control)control.value='';}state.sessions.push({id:crypto.randomUUID(),name:'',description:'',durationMinutes:60,setupBufferMinutes:0,cleanupBufferMinutes:0,price:'0',deposit:'0',priceMinor:0,depositMinor:0,currency:'JMD',locations:['BK'],resourceRequirements:{Photographer:1},isActive:true,isPublished:false,defaultWorkspaceId:null,category:''});state.selected=state.sessions.at(-1).id;state.detailBaseline=null;}
             else{state.hours.push({locationCode:state.hourLocation,dayOfWeek:state.hourDay??1,opensAt:'09:00',closesAt:'17:00',slotStepMinutes:30});state.selectedHour=state.hours.length-1;}
             dirty();paintGrid();const row=field('grid').querySelector('tbody tr:last-child');row?.querySelector('input,select')?.focus();row?.scrollIntoView?.({block:'nearest'});
         };
@@ -200,7 +200,7 @@ window.StudioBookingSessions=(()=>{
             function detailsChanged(){try{readDetails();form.querySelector('[role=alert]').textContent='';}catch(error){form.querySelector('[role=alert]').textContent=error.message;}dirty();form.querySelector('[type=submit]').disabled=false;}
             form.addEventListener('input',detailsChanged);form.addEventListener('change',detailsChanged);
             form.onsubmit=event=>{event.preventDefault();field('save').click();};
-            form.querySelector('[data-details-cancel]').onclick=()=>{Object.assign(row,clone(state.detailBaseline));state.detailBaseline=null;dirty();paintGrid();};
+            form.querySelector('[data-details-cancel]').onclick=()=>{if(state.detailBaseline)Object.assign(row,clone(state.detailBaseline));state.detailBaseline=null;paintGrid();controls();status('Changes to this service reverted.');};
         }
         function readDetails(){
             const editor=field('editor');if(editor.hidden)return;
