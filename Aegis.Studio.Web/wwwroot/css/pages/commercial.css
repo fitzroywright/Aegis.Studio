@@ -1111,3 +1111,72 @@
 .catalog-page .catalog-product-workspace .pos-grid thead th :is(label,span,strong),
 .catalog-page .booking-catalog-workspace .booking-session-grid thead th :is(label,span,strong),
 .catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-week-table thead th :is(label,span,strong){color:inherit}
+
+/* Opening Hours detail: exact two-column form and pinned explanation note. */
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hour-detail-form{
+  display:flex;flex-direction:column;gap:14px;min-height:100%;padding-bottom:0;position:static;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-editor-heading{
+  flex:0 0 auto;padding:4px 0 12px;margin:0;font-size:16px;
+}
+.catalog-page .booking-hours-editor-layout{
+  display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);
+  align-items:start;gap:20px;min-width:0;flex:1 1 auto;
+}
+.catalog-page .booking-hours-editor-fields{
+  display:flex;flex-direction:column;gap:14px;min-width:0;
+}
+.catalog-page .booking-hours-editor-fields>.booking-hours-time-fields{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+}
+.catalog-page .booking-hours-editor-fields>label{
+  display:grid;gap:6px;
+}
+.catalog-page .booking-hours-editor-fields input,
+.catalog-page .booking-hours-editor-fields select{
+  min-height:38px;box-sizing:border-box;
+}
+.catalog-page .booking-hours-editor-fields .booking-hour-options{
+  padding:14px;border:1px solid var(--studio-grid-border,#dce4ec);
+  border-radius:9px;display:flex;flex-direction:column;gap:9px;
+}
+.catalog-page .booking-hours-editor-fields .booking-hour-window-actions{
+  display:flex;flex-wrap:wrap;gap:9px;
+}
+.catalog-page .booking-hours-postit{
+  position:relative;min-width:0;margin:10px 0 0;
+  padding:24px 18px 22px;background:#fff4b8;color:#142746;
+  box-shadow:3px 6px 12px #00000029;transform:rotate(-.5deg);
+  font-size:12px;line-height:1.5;
+}
+.catalog-page .booking-hours-postit::after{
+  content:'';position:absolute;right:0;bottom:0;width:26px;height:26px;
+  background:linear-gradient(135deg,#fff4b8 0 49%,#ffdd59 50% 100%);
+  box-shadow:-2px -2px 4px #0000000d;
+}
+.catalog-page .booking-hours-pin{
+  position:absolute;top:-13px;left:50%;width:17px;height:17px;
+  border-radius:50%;background:#cf2222;box-shadow:2px 3px 3px #0005;
+}
+.catalog-page .booking-hours-pin::after{
+  content:'';position:absolute;left:8px;top:13px;width:3px;height:18px;
+  background:#8c1717;transform:rotate(22deg);border-radius:2px;
+}
+.catalog-page .booking-hours-postit h3{
+  margin:0 0 16px;font-size:16px;line-height:1.25;color:#102341;
+}
+.catalog-page .booking-hours-note-item{
+  display:grid;grid-template-columns:22px minmax(0,1fr);gap:9px;margin:0 0 14px;
+}
+.catalog-page .booking-hours-note-item>span{font-size:20px;line-height:1.2}
+.catalog-page .booking-hours-note-item strong{display:block;font-size:12px;line-height:1.3}
+.catalog-page .booking-hours-note-item p{margin:3px 0 0}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hour-actions{
+  position:static;flex:0 0 auto;display:flex;justify-content:flex-end;
+  align-items:center;gap:10px;height:auto;max-height:none;min-height:46px;
+  margin:0;padding:12px 0 0;border-top:1px solid var(--studio-grid-border,#dce4ec);
+}
+@media(max-width:1550px){
+  .catalog-page .booking-hours-editor-layout{grid-template-columns:minmax(0,1fr)}
+  .catalog-page .booking-hours-postit{max-width:100%;margin:10px 2px 12px}
+}
