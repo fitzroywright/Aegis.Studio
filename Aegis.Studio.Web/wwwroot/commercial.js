@@ -8,9 +8,10 @@ function commercialPage(title,body,tools='',summary='',attention='') {
     window.studioSetBreadcrumb?.([{label:title}]);
 }
 async function showCommercialCatalog(options={}){
-    const current=StudioPage.begin('catalog');
-    let active=['products','hours'].includes(options.tab)?options.tab:'booking-sessions',productsRequest,bookingRequest,bookingController,summary,settings,allowed=null;
-    commercialPage('Products and Services',`<div class="catalog-heading"><div class="catalog-heading-copy"><p>Manage what you sell, what clients can book, and when each studio is open.</p></div><div class="catalog-heading-actions"><button type="button" class="primary" data-add>＋ Add product</button></div></div><div class="catalog-status-strip" aria-label="Studio opening hours and publication"><span data-catalog-location="BK">Kings Plaza · Loading hours...</span><span data-catalog-location="BE">East Queen Street · Loading hours...</span><span data-catalog-publication>Checking publication settings...</span><button type="button" class="action" data-catalog-hours>View hours</button></div><nav class="catalog-segmented-tabs" aria-label="Products and services sections"><button type="button" data-catalog-tab="products">Products</button><button type="button" data-catalog-tab="booking-sessions">Services &amp; Sessions</button><button type="button" data-catalog-tab="hours">Opening Hours</button></nav><section class="catalog-panel" data-catalog-panel="products" aria-label="Product catalog" hidden></section><section class="catalog-panel" data-catalog-panel="booking-sessions" aria-label="Services and opening hours" hidden></section>`,'','<p>Manage products, services, public booking and location hours.</p>');
+    const hoursPage=options.page==='hours';
+    const current=StudioPage.begin(hoursPage?'opening-hours':'catalog');
+    let active=hoursPage?'hours':options.tab==='products'?'products':'booking-sessions',productsRequest,bookingRequest,bookingController,summary,settings,allowed=null;
+    commercialPage(hoursPage?'Opening Hours':'Products and Services',`<div class="catalog-heading"><div class="catalog-heading-copy"><p>${hoursPage?'Manage opening hours and appointment windows for each studio location.':'Manage what you sell and what clients can book.'}</p></div><div class="catalog-heading-actions"><button type="button" class="primary" data-add>＋ Add product</button></div></div><div class="catalog-status-strip" aria-label="Studio opening hours and publication"><span data-catalog-location="BK">Kings Plaza · Loading hours...</span><span data-catalog-location="BE">East Queen Street · Loading hours...</span><span data-catalog-publication>Checking publication settings...</span><button type="button" class="action" data-catalog-hours>View hours</button></div>${hoursPage?'':'<nav class="catalog-segmented-tabs" aria-label="Products and services sections"><button type="button" data-catalog-tab="products">Products</button><button type="button" data-catalog-tab="booking-sessions">Services &amp; Sessions</button></nav>'}<section class="catalog-panel" data-catalog-panel="products" aria-label="Product catalog" hidden></section><section class="catalog-panel" data-catalog-panel="booking-sessions" aria-label="Services and opening hours" hidden></section>`,'','<p>Manage products, services, public booking and location hours.</p>');
     const page=genericView.querySelector('.st-page'),live=()=>current()&&page.isConnected;
     const products=page.querySelector('[data-catalog-panel="products"]'),bookings=page.querySelector('[data-catalog-panel="booking-sessions"]'),add=page.querySelector('[data-add]');
     function paintSummary(){
@@ -57,14 +58,15 @@ async function showCommercialCatalog(options={}){
         active=tab;products.hidden=tab!=='products';bookings.hidden=tab==='products';add.hidden=tab!=='products'&&allowed===false;
         add.disabled=tab!=='products'&&!bookingController;add.textContent=tab==='products'?'＋ Add product':tab==='hours'?'＋ Add opening window':'＋ Add service';
         page.querySelectorAll('[data-catalog-tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.catalogTab===tab)));
-        const state={...window.history.state,studioView:'catalog',studioCatalogTab:tab},params=new URLSearchParams(window.location.hash.slice(1));params.set('studio','catalog');params.set('tab',tab);window.history.replaceState(state,'','#'+params);
+        const state={...window.history.state,studioView:hoursPage?'opening-hours':'catalog',studioCatalogTab:hoursPage?null:tab},params=new URLSearchParams(window.location.hash.slice(1));params.set('studio',hoursPage?'opening-hours':'catalog');if(hoursPage)params.delete('tab');else params.set('tab',tab);window.history.replaceState(state,'','#'+params);
         if(tab!=='products'){StudioPage.setCount(tab==='hours'?'Opening Hours':'Services & Sessions');await (bookingRequest ||= loadBookings());if(live()&&active===tab)bookingController?.selectTab(tab==='hours'?'hours':'sessions');}
         else{await (productsRequest ||= loadProducts());if(live()&&active==='products')products.querySelector('.commercial-search')?.dispatchEvent(new Event('input'));}
     }
     page.querySelectorAll('[data-catalog-tab]').forEach(button=>button.onclick=()=>selectTab(button.dataset.catalogTab));
-    page.querySelector('[data-catalog-hours]').onclick=()=>selectTab('hours');
+    page.querySelector('[data-catalog-hours]').onclick=()=>window.studioNavigate?.('opening-hours');
     await selectTab(active);if(live()&&active==='products')void (bookingRequest ||= loadBookings());
 }
+function showCommercialOpeningHours(){return showCommercialCatalog({page:'hours'});}
 function editCommercialItem(item,host=null){
     const p=item||{code:'',name:'',category:'Photography',unitPrice:0,estimatedCost:0,taxRate:0,isActive:true,options:{},bundle:[]};
     const options=Object.entries(p.options||{}).map(([key,values])=>`${key}: ${values.join(', ')}`).join('\n');
