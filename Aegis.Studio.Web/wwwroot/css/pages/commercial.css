@@ -440,3 +440,13 @@
 .catalog-page .booking-detail-content.booking-detail-layout{grid-template-areas:"description timing" "routing pricing" "locations resources";}
 .catalog-page .booking-detail-layout>.booking-section-timing{padding-top:18px}
 @media(max-width:1100px){.catalog-page .booking-detail-content.booking-detail-layout{grid-template-areas:"description" "timing" "routing" "pricing" "locations" "resources"} .catalog-page .booking-detail-layout>.booking-section-timing{padding-top:0}}
+
+/* Use Studio's standard grid column-header theme for both catalog tables. */
+.catalog-page .booking-session-grid thead th,
+.catalog-page .catalog-product-workspace .pos-grid thead th,
+.catalog-page .commercial-grid thead th{
+ background:var(--studio-grid-header-bg);
+ color:var(--studio-grid-header-text,var(--studio-grid-header-color,var(--theme-text,#172d4a)));
+}
+.catalog-page .booking-session-grid thead th :is(label,span),
+.catalog-page .catalog-product-workspace .pos-grid thead th :is(label,span){color:inherit}
