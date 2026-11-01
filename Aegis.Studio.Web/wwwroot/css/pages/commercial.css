@@ -1014,3 +1014,8 @@
 .catalog-page .booking-detail-basic .booking-status-editor input.booking-toggle:checked::before{
   transform:translateX(13px);
 }
+
+/* Match Services detail card inset to the Products detail card. */
+.catalog-page .booking-sessions .booking-catalog-workspace>.booking-details:not([hidden]){
+  padding:10px 12px;
+}
