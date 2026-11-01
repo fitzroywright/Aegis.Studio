@@ -654,3 +654,23 @@
 .catalog-page .catalog-tabs-below-grid{position:static;display:flex;align-items:center;justify-content:flex-end;margin-left:auto;width:auto;height:auto;flex-shrink:0}
 .catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer,
 .catalog-page .booking-details .booking-detail-form>footer.booking-details-actions{position:absolute;top:calc(100% + 6px);left:0;right:0;bottom:auto;z-index:4}
+
+/* Only table rows scroll; header filters remain outside the scrollbar track. */
+.catalog-page .catalog-product-workspace>.commercial-grid,
+.catalog-page .booking-catalog-workspace>.booking-grid-scroll:has(.booking-session-grid){overflow:hidden}
+.catalog-page .catalog-product-workspace .pos-grid,
+.catalog-page .booking-catalog-workspace .booking-session-grid{display:flex;flex-direction:column;height:100%;min-height:0;width:100%;table-layout:auto}
+.catalog-page .catalog-product-workspace .pos-grid thead,
+.catalog-page .booking-catalog-workspace .booking-session-grid thead{display:block;flex:0 0 auto}
+.catalog-page .catalog-product-workspace .pos-grid tbody,
+.catalog-page .booking-catalog-workspace .booking-session-grid tbody{display:block;flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
+.catalog-page .catalog-product-workspace .pos-grid tr,
+.catalog-page .booking-catalog-workspace .booking-session-grid tr{display:grid;width:100%;align-items:stretch}
+.catalog-page .catalog-product-workspace .pos-grid tr{grid-template-columns:55% 19% 12% 14%}
+.catalog-page .booking-catalog-workspace .booking-session-grid tr{grid-template-columns:34% 13% 7% 10% 10% 7% 15% 4%}
+.catalog-page .catalog-product-workspace .pos-grid :is(th,td),
+.catalog-page .booking-catalog-workspace .booking-session-grid :is(th,td){display:flex;align-items:center;min-width:0;width:auto;box-sizing:border-box}
+.catalog-page .catalog-product-workspace .pos-grid thead,
+.catalog-page .booking-catalog-workspace .booking-session-grid thead{padding-right:var(--catalog-scrollbar-width,12px);background:var(--studio-grid-header-bg)}
+.catalog-page .catalog-product-workspace .pos-grid th,
+.catalog-page .booking-catalog-workspace .booking-session-grid th{position:static}
