@@ -1019,3 +1019,78 @@
 .catalog-page .booking-sessions .booking-catalog-workspace>.booking-details:not([hidden]){
   padding:10px 12px;
 }
+
+/* Opening Hours uses the same two-column master/detail workspace as catalog. */
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace{
+  display:grid;grid-template-columns:minmax(0,1.9fr) minmax(380px,1fr);
+  grid-template-rows:minmax(0,1fr);column-gap:14px;align-items:stretch;
+  flex:1 1 0;height:auto;min-height:0;padding:0;margin:0;overflow:visible;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace>.booking-grid-scroll,
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace>.booking-details:not([hidden]){
+  height:100%;max-height:100%;min-height:0;min-width:0;
+  box-sizing:border-box;align-self:stretch;margin:0;
+  border:1px solid var(--studio-grid-border,#dce4ec);border-radius:9px;
+  box-shadow:none;background:var(--studio-card-bg,#fff);
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace>.booking-grid-scroll{
+  display:flex;flex-direction:column;padding:0;overflow:hidden;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-location-bar{
+  flex:0 0 auto;display:flex;align-items:center;gap:10px;
+  min-height:44px;margin:0;padding:6px 10px;
+  box-sizing:border-box;border-bottom:1px solid var(--studio-grid-border,#dce4ec);
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-location-bar label{
+  font-size:11px;gap:7px;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-location-bar select{
+  min-height:28px;height:28px;padding:3px 7px;font-size:12px;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-table-wrap{
+  flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;
+  border:0;border-radius:0;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-week-table{
+  width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-week-table th{
+  position:sticky;top:0;z-index:2;height:34px;padding:5px 9px;
+  background:var(--studio-grid-header-bg);color:var(--studio-grid-header-text,#fff);
+  font-size:11px;line-height:1.2;box-sizing:border-box;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hours-week-table td{
+  padding:8px 9px;line-height:1.3;font-size:12px;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace>.booking-details:not([hidden]){
+  padding:10px 12px;overflow:auto;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hour-detail-form{
+  display:grid;grid-template-columns:minmax(0,1fr);gap:10px;
+  align-content:start;min-height:100%;position:relative;padding-bottom:36px;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-editor-heading{
+  margin:0;padding:0 0 8px;font-size:13px;
+  border-bottom:1px solid var(--studio-grid-border,#dce4ec);
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hour-detail-form label{
+  font-size:11px;gap:4px;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hour-actions{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;
+  height:30px;min-height:30px;max-height:30px;
+  display:flex;align-items:center;justify-content:flex-end;
+  padding:0;margin:0;border:0;gap:9px;
+}
+.catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-hour-actions button{
+  height:30px;min-height:30px;max-height:30px;
+  padding:3px 12px;box-sizing:border-box;
+}
+@media(max-width:1100px){
+  .catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace{
+    grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(240px,1fr) auto;
+  }
+  .catalog-page .booking-sessions:has(.booking-hours-week-table) .booking-catalog-workspace>.booking-details:not([hidden]){
+    height:auto;max-height:none;
+  }
+}
