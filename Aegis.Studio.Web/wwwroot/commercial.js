@@ -30,7 +30,7 @@ async function showCommercialCatalog(options={}){
         if(!live())return;
         const count=page.querySelector('[data-catalog-count]');
         if(active==='products'){count.textContent='';const productCount=products.querySelector('[data-products-footer-count]');if(productCount&&Array.isArray(commercialItems))productCount.textContent=commercialItems.length+' products';}
-        else if(summary)count.textContent=active==='hours'?summary.hours.length+' opening windows':(summary.sessions?summary.sessions.length+' services · '+summary.sessions.filter(x=>x.isActive&&x.isPublished).length+' bookable online':page.querySelector('[data-booking-count]')?.textContent||'');
+        else if(summary)count.textContent=active==='hours'?summary.hours.length+' opening windows':'';
     }
     add.onclick=()=>active==='products'?editCommercialItem():bookingController?.add();
     async function loadProducts(){
