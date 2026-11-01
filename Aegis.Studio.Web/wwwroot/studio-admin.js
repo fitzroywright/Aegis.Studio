@@ -3,6 +3,7 @@
         {view:'catalog',icon:'i-pos',label:'Products and Services'},
         {view:'templates',icon:'i-jobs',label:'Templates'},
         {view:'staff-roles',icon:'i-people',label:'Staff and Roles'},
+        {view:'opening-hours',icon:'i-calendar',label:'Opening Hours'},
         {view:'workspace-management',icon:'i-grid',label:'Workspaces',staff:true},
         {view:'about',icon:'i-info',label:'About',staff:true}
     ];
