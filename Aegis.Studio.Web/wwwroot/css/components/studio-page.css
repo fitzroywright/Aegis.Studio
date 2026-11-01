@@ -174,12 +174,12 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .staff-global-role-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 .staff-master-detail:not([hidden]) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:minmax(0,1fr); flex:1; min-height:0; overflow:hidden; gap:18px; }
 .staff-master { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
-.staff-master>.staff-grid-scroll { flex:1; min-height:0; overscroll-behavior:contain; }
+.staff-master>.staff-grid-scroll { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; }
 .staff-grid-footer { display:flex; flex-shrink:0; align-items:baseline; flex-wrap:wrap; gap:4px 12px; padding-top:8px; font-size:12px; }
-.staff-column-search { display:grid; gap:5px; }
+.staff-column-search { display:grid; grid-template-columns:minmax(0,220px); gap:5px; }
 .staff-approval-note { margin:0; font-size:12px; color:var(--theme-text,#213951); }
 .staff-approval-note:empty { display:none; }
-.staff-directory-table { border:1px solid var(--theme-border,#d9e2e9); }
+.staff-directory-table { border:1px solid var(--theme-border,#d9e2e9); }\n.staff-directory-table thead { position:sticky; top:0; z-index:2; }\n.staff-directory-table th:first-child { min-width:0; }\n.staff-directory-table tbody tr:first-child td { border-top:0; }
 .staff-directory-table [data-staff-user] { cursor:pointer; }
 .staff-directory-table [data-staff-user]:focus-visible { outline:2px solid var(--theme-accent,#a5783d); outline-offset:-2px; }
 .staff-directory-table tr[aria-selected=true] { background:var(--theme-selected,#fbefd5); }
