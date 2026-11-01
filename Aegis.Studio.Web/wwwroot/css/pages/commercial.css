@@ -637,3 +637,20 @@
 .catalog-page .booking-session-grid .catalog-select-only select{min-width:0;max-width:100%}
 .catalog-page .booking-session-grid .booking-row-menu{max-width:100%}
 @media(max-width:1100px){.catalog-page .booking-session-grid{min-width:780px}}
+
+/* Catalog master/detail geometry: fill the available page, with one grid-height editor. */
+.catalog-page{--studio-content-padding:8px;--studio-content-gap:0}
+.catalog-page .catalog-command-row{height:0;min-height:0;padding:0;margin:0;border:0;overflow:visible}
+.catalog-page .catalog-command-row>[data-catalog-count]:empty{display:none}
+.catalog-page .catalog-panel:not([hidden]){flex:1 1 0;min-height:0;gap:0;display:flex;flex-direction:column;justify-content:stretch}
+.catalog-page .catalog-panel:not([hidden])>.catalog-product-workspace,
+.catalog-page .booking-sessions .booking-catalog-workspace{flex:1 1 0;min-height:0;align-items:stretch;padding-bottom:0;grid-template-columns:minmax(0,1.9fr) minmax(380px,1fr);column-gap:14px}
+.catalog-page .catalog-product-workspace>.commercial-grid,
+.catalog-page .booking-catalog-workspace>.booking-grid-scroll{height:100%;max-height:none;min-height:0;align-self:stretch}
+.catalog-page .catalog-product-workspace>.catalog-product-editor,
+.catalog-page .booking-catalog-workspace>.booking-details:not([hidden]){height:100%;max-height:none;min-height:0;align-self:stretch;box-sizing:border-box;overflow:visible}
+.catalog-page .catalog-panel>.booking-grid-footer,
+.catalog-page .booking-sessions>.booking-grid-footer{flex:0 0 34px;min-height:34px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0;margin:0;width:calc((100% - 14px)*1.9/2.9);box-sizing:border-box}
+.catalog-page .catalog-tabs-below-grid{position:static;display:flex;align-items:center;justify-content:flex-end;margin-left:auto;width:auto;height:auto;flex-shrink:0}
+.catalog-page .catalog-product-editor .commercial-form.commercial-product-form>footer,
+.catalog-page .booking-details .booking-detail-form>footer.booking-details-actions{position:absolute;top:calc(100% + 6px);left:0;right:0;bottom:auto;z-index:4}
