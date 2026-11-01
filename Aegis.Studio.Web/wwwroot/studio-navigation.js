@@ -356,6 +356,7 @@
         production:()=>showCatalogProduction({workspaceId:window.history.state?.studioWorkspaceId}),
         ...Object.fromEntries(['about','staff-roles'].map(view=>[view,()=>renderAdmin(view)])),
         catalog:()=>showCommercialCatalog({tab:window.history.state?.studioCatalogTab}),
+        'opening-hours':()=>showCommercialOpeningHours(),
         templates:()=>showCommercialTemplates(window.history.state?.studioTemplateKind||'Job'),
         media:()=>showMediaReview(),
         frontdesk:()=>showFrontDesk({queue:window.history.state?.studioDashboardQueue,workspaceId:window.history.state?.studioWorkspaceId}),
@@ -368,7 +369,7 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'dashboard';
-    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Products and Services','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',dashboard:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
+    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Products and Services','opening-hours':'Opening Hours','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',dashboard:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
         return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioDashboardQueue:options.queue||null,studioWorkspaceId:['jobs','frontdesk','production','delivery','schedule'].includes(view)?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioTemplateKind:view==='templates'?(['Job','WorkOrder','Automation'].includes(options.kind)?options.kind:'Job'):null,studioCatalogTab:view==='catalog'?(['products','hours'].includes(options.tab)?options.tab:'booking-sessions'):null,studioJobId:['workspaces','session-plan','session-plan-import','media'].includes(view)&&options.jobId?String(options.jobId):null};
@@ -441,7 +442,7 @@
             window.studioSetBreadcrumb?.([{label:navigationLabels[view]||view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
         }
         try{
-            if(['catalog','templates'].includes(view)){
+            if(['catalog','opening-hours','templates'].includes(view)){
                 const me=await json('/api/auth/me');
                 if(revision!==navigationRevision)return;
                 if((me?.user||me)?.isAdministrator!==true){window.StudioAccess.page({title:navigationLabels[view]});window.StudioShell?.sync(view);return;}
