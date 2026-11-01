@@ -8,7 +8,7 @@ window.StudioBookingSessions=(()=>{
     async function mount(host,current,options={}){
         const root=host.querySelector('.booking-sessions');if(!root)return;
         const live=()=>current()&&root.isConnected;
-        const field=name=>root.querySelector('[data-booking-'+name+']');
+        const field=name=>root.querySelector('[data-booking-'+name+']')||host.closest('.st-page')?.querySelector('[data-booking-'+name+']');
         const state={tab:'sessions',sessions:[],hours:[],workspaces:[],resourceTypes:['Photographer'],loaded:{sessions:false,hours:false},dirty:{sessions:false,hours:false},errors:{},search:'',category:'',location:'',filter:'',selected:null,detailBaseline:null,selectedHour:0,hourLocation:'BK',saving:false,revision:null};
         let loadRevision=0;const persisted=new Map();
         const status=message=>{if(live())field('status').textContent=message;};
