@@ -30,7 +30,7 @@ public sealed class StudioAccessPresentationTests
             Assert.Contains("/api/auth/logout", paths);
             Assert.DoesNotContain("/private.html", paths);
             Assert.DoesNotContain(paths, path => path.StartsWith("//"));
-            Assert.Equal(new[] { "/api/auth/logout", "/api/auth/me" },
+            Assert.Equal(new[] { "/api/auth/logout", "/api/auth/me", "/api/studio/about" },
                 paths.Where(path => path.StartsWith("/api/")).OrderBy(path => path).ToArray());
         }
         finally { Directory.Delete(directory, true); }
