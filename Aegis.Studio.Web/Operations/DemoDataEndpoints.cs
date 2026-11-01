@@ -118,6 +118,7 @@ public static class DemoDataEndpoints
         transaction.Commit();
         report?.Invoke(new(97, "Booking catalog", 0, 0, "Adding Bryan Studios services, session types and opening hours."));
         DemoBookingCatalog.Seed(database);
+        DemoAutomationSeed.Seed(database,report);
         DemoJobPhotoPopulation.Seed(database,storage,login,report);
         DemoDatasetFinalizer.Complete(database,storage,login,report);
         SeedDistinctStaffPhotos(database,report);
