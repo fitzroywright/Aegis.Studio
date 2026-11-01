@@ -918,3 +918,37 @@
   border:1px solid var(--studio-grid-border,#dce4ec);
   border-radius:9px;box-shadow:none;
 }
+
+/* Match Services header density to Products and keep Active on the right. */
+.catalog-page .booking-catalog-workspace .booking-session-grid thead th{
+  height:34px;min-height:34px;max-height:34px;
+  padding:3px 8px;box-sizing:border-box;line-height:1.2;
+}
+.catalog-page .booking-catalog-workspace .booking-session-grid thead input,
+.catalog-page .booking-catalog-workspace .booking-session-grid thead select{
+  height:26px;min-height:26px;max-height:26px;
+  margin:0;padding:3px 7px;box-sizing:border-box;
+}
+.catalog-page .booking-detail-basic .booking-editor-basics{
+  grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) auto auto;
+  align-items:end;
+}
+.catalog-page .booking-detail-basic .booking-status-editor{
+  grid-column:4;grid-row:1;display:flex;flex-direction:row;
+  align-items:center;justify-content:flex-end;gap:7px;
+  margin:0;padding:0 0 7px;white-space:nowrap;
+}
+.catalog-page .booking-detail-basic .booking-online-indicator{
+  grid-column:3;grid-row:1;justify-self:end;
+}
+.catalog-page .booking-detail-basic .booking-status-editor .booking-toggle{
+  appearance:none;-webkit-appearance:none;position:relative;flex:0 0 35px;
+  width:35px;height:20px;border:0;border-radius:20px;
+  background:#aeb9c6;cursor:pointer;margin:0;
+}
+.catalog-page .booking-detail-basic .booking-status-editor .booking-toggle::before{
+  content:'';position:absolute;left:3px;top:3px;width:14px;height:14px;
+  border-radius:50%;background:#fff;transition:transform .15s ease;
+}
+.catalog-page .booking-detail-basic .booking-status-editor .booking-toggle:checked{background:#172e49}
+.catalog-page .booking-detail-basic .booking-status-editor .booking-toggle:checked::before{transform:translateX(15px)}
