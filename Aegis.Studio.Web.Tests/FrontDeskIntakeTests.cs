@@ -44,6 +44,15 @@ public sealed class FrontDeskIntakeTests
     public void ReliableHistoricalAliasesUseTheBusinessLabels(string stored,string expected)
         =>Assert.Equal(expected,BookingSources.Normalize(stored));
 
+    [Fact]
+    public void HistoricalProviderNamespaceIsNotMistakenForBusinessSource()
+    {
+        Assert.Equal("Unknown",FrontDeskIntakeStore.Source("Email","{\"bookingSource\":\"FrontDesk\"}"));
+        Assert.Equal("Unknown",FrontDeskIntakeStore.Source("Email","{}"));
+        Assert.Equal("Email",FrontDeskIntakeStore.Source("Email","{\"conversationId\":\"original-enquiry\",\"bookingSource\":\"FrontDesk\"}"));
+        Assert.Equal("Staff Entry",FrontDeskIntakeStore.Source("Email","{\"source\":\"Staff Entry\",\"bookingSource\":\"FrontDesk\"}"));
+    }
+
     [Theory]
     [InlineData("today","2026-11-03","2026-11-03")]
     [InlineData("yesterday","2026-11-02","2026-11-02")]

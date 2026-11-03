@@ -20,7 +20,7 @@ public static class BookingSources
         "walk-in" or "walkin" or "walk in" => "Walk-In",
         "phone" or "telephone" => "Phone",
         "email" => "Email",
-        "staff entry" or "staffentry" or "manual" or "frontdesk" or "workday mobile" => "Staff Entry",
+        "staff entry" or "staffentry" or "manual" or "workday mobile" => "Staff Entry",
         _ => "Unknown"
     };
     public static string RequireSelectable(string source) => Selectable.Contains(source, StringComparer.Ordinal)

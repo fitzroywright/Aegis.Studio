@@ -45,9 +45,11 @@ public sealed class FrontDeskIntakeStore(StudioDatabase database)
                 return BookingSources.Normalize(source.GetString());
             if (root.TryGetProperty("bookingSource", out var provider) && provider.ValueKind == JsonValueKind.String)
             {
-                var known = BookingSources.Normalize(provider.GetString());
-                if (known != "Unknown") return known;
+                return BookingSources.Normalize(provider.GetString());
             }
+            // A generated booking conversation may use Email only as its transport.
+            // Its provider namespace is not evidence of the original business source.
+            return "Unknown";
         }
         return BookingSources.Normalize(channel);
     }
