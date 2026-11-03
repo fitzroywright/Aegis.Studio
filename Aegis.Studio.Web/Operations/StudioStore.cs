@@ -1,3 +1,4 @@
+using Aegis.Studio.Domain.Bookings;
 using System.Security.Claims;
 using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Web.Bookings;
@@ -111,7 +112,7 @@ public sealed class StudioStore
         DateTimeOffset now = DateTimeOffset.UtcNow;
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
-        InsertConversation(connection, transaction, conversationId, workspaceId, request.Subject.Trim(), request.ContactName.Trim(), request.ContactAddress.Trim(), NormaliseChannel(request.Channel), null, now);
+        InsertConversation(connection, transaction, conversationId, workspaceId, request.Subject.Trim(), request.ContactName.Trim(), request.ContactAddress.Trim(), request.Source is null ? NormaliseChannel(request.Channel) : BookingSources.RequireSelectable(request.Source), null, now);
         InsertMessage(connection, transaction, new StudioMessage(Guid.NewGuid(), request.ContactName.Trim(), "External", request.Body.Trim(), now, null, null), conversationId);
         transaction.Commit();
         return GetConversation(conversationId)!;
@@ -146,7 +147,7 @@ public sealed class StudioStore
         using (NpgsqlConnection connection = database.OpenConnection())
         using (NpgsqlTransaction transaction = connection.BeginTransaction())
         {
-            InsertConversation(connection, transaction, conversationId, route.WorkspaceId.Value, email.Subject.Trim(), email.FromName.Trim(), email.FromAddress.Trim(), "Email", NormaliseThreadId(email.ThreadId), DateTimeOffset.UtcNow);
+            InsertConversation(connection, transaction, conversationId, route.WorkspaceId.Value, email.Subject.Trim(), email.FromName.Trim(), email.FromAddress.Trim(), "Email", NormaliseThreadId(email.ThreadId), email.ReceivedAt.ToUniversalTime());
             InsertMessage(connection, transaction, message, conversationId);
             transaction.Commit();
         }
@@ -417,7 +418,7 @@ public sealed class StudioStore
         command.ExecuteNonQuery();
     }
 
-    private static string NormaliseChannel(string? channel) => string.IsNullOrWhiteSpace(channel) ? "Manual" : channel.Trim();
+    private static string NormaliseChannel(string? channel) => string.IsNullOrWhiteSpace(channel) ? "Staff Entry" : channel.Trim();
     private static string? NormaliseThreadId(string? id) => string.IsNullOrWhiteSpace(id) ? null : id.Trim();
 }
 
@@ -427,7 +428,7 @@ public sealed record StudioMessage(Guid Id, string Author, string Visibility, st
 public sealed record StudioJob(Guid Id, Guid WorkspaceId, Guid ConversationId, string Title, string ClientName, string Status, DateOnly? EventDate, DateTimeOffset CreatedAt, string? AssignedTo = null, List<StudioFinancialEvent>? FinancialEvents = null, Guid? ClientId = null, string? LinkedClientName = null,IReadOnlyList<Guid>? ParticipatingWorkspaceIds=null,string? JobLead=null,long WorkflowRevision=0);
 public sealed record StudioFinancialEvent(Guid Id, string Kind, decimal Amount, string? Note, DateTimeOffset CreatedAt,string? PaymentMethod=null,string? RecordedBy=null);
 public sealed record EmailIngestResult(StudioConversation Conversation, bool CreatedConversation, bool WasDuplicate);
-public sealed record IncomingInteractionRequest(Guid? WorkspaceId, string? Destination, string ContactName, string ContactAddress, string Subject, string Body, string? Channel);
+public sealed record IncomingInteractionRequest(Guid? WorkspaceId, string? Destination, string ContactName, string ContactAddress, string Subject, string Body, string? Channel,string? Source=null);
 public sealed record AddMessageRequest(string Body, bool IsInternal, string? SendingIdentity = null);
 public sealed record CreateJobRequest(string Title, DateOnly? EventDate);
 public sealed record UpdateJobRequest(string? Status, string? AssignedTo, DateOnly? EventDate,long? ExpectedRevision=null);

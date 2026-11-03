@@ -32,7 +32,7 @@ public static class PublicBookingEndpoints
             deposit=Math.Max(0,deposit);
             var pending=new PendingBookingRequest(workspace.Id,request.ClientName,request.ClientEmail,request.SessionType,
                 DateOnly.FromDateTime(request.StartsAt.DateTime),deposit,"JMD",request.Notes,null,null,request.ExternalBookingId,
-                request.StartsAt.ToUniversalTime(),request.EndsAt.ToUniversalTime(),request.Location,request.ClientPhone,request.Destination,"Web site");
+                request.StartsAt.ToUniversalTime(),request.EndsAt.ToUniversalTime(),request.Location,request.ClientPhone,request.Destination,"Web site",Source:"Website");
             FrontDeskRequest result=new FrontDeskBookingRequestStore(database).Create(pending,"Website booking");
             return Results.Created($"/api/public/booking-requests/{result.Id}",new{bookingRequestId=result.Id,result.Status,result.JobId,result.Request.RequiredDeposit,result.RecordedDeposit});
         }

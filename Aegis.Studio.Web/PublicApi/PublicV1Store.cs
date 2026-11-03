@@ -57,7 +57,7 @@ public sealed class PublicV1Store(StudioDatabase database)
             DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(request.StartsAt, TimeZoneInfo.FindSystemTimeZoneById("America/Jamaica")).DateTime),
             Math.Max(0, configuration.GetValue<decimal?>("BookingApi:RequiredDeposit") ?? 0), "JMD", request.Notes,
             ExternalBookingId: external, StartsAtUtc: request.StartsAt.ToUniversalTime(), EndsAtUtc: request.EndsAt.ToUniversalTime(),
-            Location: request.Location, ClientPhone: request.ClientPhone, Destination: request.Destination, BookingSource: "WebsiteV1");
+            Location: request.Location, ClientPhone: request.ClientPhone, Destination: request.Destination, BookingSource: "WebsiteV1", Source: "Website");
         var booking = new FrontDeskBookingRequestStore(database).Create(pending, "Website V1: " + client);
         var receipt = new PublicBookingReceiptV1(booking.Id, "received", pending.RequiredDeposit, "JMD");
         WorkflowStore.Sql(c, tx, "insert into studio_public_v1_bookings values($1,$2,$3,$4,$5::jsonb)", client, key, hash, booking.Id, JsonSerializer.Serialize(receipt, Json));

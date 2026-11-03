@@ -33,7 +33,7 @@ public sealed class Booking : Entity
 
     public string? Location { get; set; }
     public string? Notes { get; set; }
-    public BookingSource Source { get; set; }
+    public BookingSource Source { get; set; } = BookingSource.Unknown;
     public BookingStatus Status { get; set; } = BookingStatus.Requested;
     public string? ExternalBookingId { get; set; }
 
