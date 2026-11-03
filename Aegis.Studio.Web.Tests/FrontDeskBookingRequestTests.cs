@@ -73,7 +73,7 @@ public sealed class FrontDeskBookingRequestTests
         Assert.Throws<ArgumentException>(()=>store.Create(request with{ClientName="Someone else"},"website"));
     }
 
-    private sealed class DatabaseFixture : IAsyncDisposable
+    internal sealed class DatabaseFixture : IAsyncDisposable
     {
         private readonly string connectionString;
         private readonly string schema;

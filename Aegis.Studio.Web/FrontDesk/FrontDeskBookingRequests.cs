@@ -1,3 +1,4 @@
+using Aegis.Studio.Domain.Bookings;
 using System.Security.Claims;
 using System.Text.Json;
 using Aegis.Studio.Web.Operations;
@@ -10,7 +11,7 @@ using Aegis.Studio.Web.Intake;
 namespace Aegis.Studio.Web.FrontDesk;
 
 public sealed record BookingPriceSnapshot(string SessionTypeId,string SessionType,long CatalogRevision,long PriceMinor,long DepositMinor,string Currency,IReadOnlyDictionary<string,int> ResourceRequirements,int SetupBufferMinutes=0,int CleanupBufferMinutes=0);
-public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null,string? ExternalBookingId=null,DateTimeOffset? StartsAtUtc=null,DateTimeOffset? EndsAtUtc=null,string? Location=null,string? ClientPhone=null,string? Destination=null,string BookingSource="FrontDesk",Guid? JobTemplateId=null,Guid[]? SelectedServiceIds=null,BookingPriceSnapshot? PriceSnapshot=null);
+public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null,string? ExternalBookingId=null,DateTimeOffset? StartsAtUtc=null,DateTimeOffset? EndsAtUtc=null,string? Location=null,string? ClientPhone=null,string? Destination=null,string BookingSource="FrontDesk",Guid? JobTemplateId=null,Guid[]? SelectedServiceIds=null,BookingPriceSnapshot? PriceSnapshot=null,string? Source=null);
 public sealed record VerifiedDepositRequest(decimal Amount,string Currency,string Provider,string Reference);
 public sealed record FrontDeskRequest(Guid Id,PendingBookingRequest Request,string Status,Guid? JobId,decimal RecordedDeposit,DateTimeOffset CreatedAtUtc,string? IntakeReference=null);
 
@@ -20,6 +21,7 @@ public static class FrontDeskRequestRules
 {
     public static void Validate(PendingBookingRequest request)
     {
+        if(request.Source is not null) BookingSources.RequireSelectable(request.Source);
         if(request.WorkspaceId==Guid.Empty || string.IsNullOrWhiteSpace(request.Title) || request.Title.Length>200 || string.IsNullOrWhiteSpace(request.ClientName) || request.ClientName.Length>200)
             throw new ArgumentException("Workspace, client and job title are required (maximum 200 characters).");
         if(!System.Net.Mail.MailAddress.TryCreate(request.ClientEmail,out _) || request.ClientEmail.Length>320) throw new ArgumentException("A valid client email is required.");
@@ -66,6 +68,14 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         FrontDeskRequestRules.Validate(request);
         request=request with{ClientName=request.ClientName.Trim(),ClientEmail=request.ClientEmail.Trim(),Title=request.Title.Trim(),Currency=request.Currency.Trim().ToUpperInvariant(),ExternalBookingId=string.IsNullOrWhiteSpace(request.ExternalBookingId)?null:request.ExternalBookingId.Trim(),SelectedServiceIds=request.SelectedServiceIds?.Distinct().Order().ToArray()};
         using var connection=database.OpenConnection();using var tx=connection.BeginTransaction();
+        string intakeSource = request.Source ?? (BookingSources.Normalize(request.BookingSource) is var known && known != "Unknown" ? known : "Staff Entry");
+        if (request.ConversationId.HasValue)
+        {
+            using var original = new NpgsqlCommand("select channel from studio_conversations where id=$1 and workspace_id=$2 for update",connection,tx);
+            original.Parameters.AddWithValue(request.ConversationId.Value);original.Parameters.AddWithValue(request.WorkspaceId);
+            intakeSource = BookingSources.Normalize(original.ExecuteScalar() as string);
+        }
+        request=request with { Source=intakeSource };
         if(request.ExternalBookingId is not null)
         {
             Execute(connection,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","booking:"+request.BookingSource+":"+request.ExternalBookingId);
@@ -75,7 +85,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
             {
                 FrontDeskRequest prior=Read(reader);
                 // The server's deposit policy can change between retries; compare the submitted booking facts.
-                if(JsonSerializer.Serialize(prior.Request with { RequiredDeposit=request.RequiredDeposit },JsonOptions) != JsonSerializer.Serialize(request,JsonOptions))throw new ArgumentException("This booking reference was already used with different details.");
+                if(JsonSerializer.Serialize(prior.Request with { RequiredDeposit=request.RequiredDeposit, Source=prior.Request.Source ?? request.Source },JsonOptions) != JsonSerializer.Serialize(request,JsonOptions))throw new ArgumentException("This booking reference was already used with different details.");
                 return prior;
             }
         }
@@ -229,6 +239,14 @@ public static class FrontDeskBookingRequestEndpoints
     {
         var group=app.MapGroup("/api/frontdesk").RequireAuthorization();
         group.MapGet("/booking-requests",(ClaimsPrincipal user,StudioDatabase db)=>Allowed(user,db)?Results.Ok(new FrontDeskBookingRequestStore(db).GetAll()):Results.Forbid());
+        group.MapGet("/intake-options",(ClaimsPrincipal user,StudioDatabase db,IConfiguration configuration)=>
+            Allowed(user,db)?Results.Ok(new{sources=BookingSources.Selectable,timeZone=configuration["Studio:TimeZoneId"]??"America/Jamaica"}):Results.Forbid());
+        group.MapGet("/intake",(ClaimsPrincipal user,StudioDatabase db,IConfiguration configuration,string? received,DateOnly? from,DateOnly? to,string? source)=>
+        {
+            if(!Allowed(user,db))return Results.Forbid();
+            return Run(()=>Results.Ok(new FrontDeskIntakeStore(db).List(received,from,to,source,
+                TimeZoneInfo.FindSystemTimeZoneById(configuration["Studio:TimeZoneId"]??"America/Jamaica"),DateTimeOffset.UtcNow)));
+        });
         // Contact matches are suggestions only; they never establish ownership.
         group.MapGet("/gallery-access-requests/unresolved",(ClaimsPrincipal user,StudioDatabase db)=>
         {

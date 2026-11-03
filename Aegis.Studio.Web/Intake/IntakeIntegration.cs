@@ -76,13 +76,14 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
         string name=Text(p,"clientName"),email=Text(p,"clientEmail"),title=Text(p,"sessionType","Website inquiry"),kind=Text(p,"kind");
         if(string.IsNullOrWhiteSpace(name)||name.Length>200||email.Length>320||title.Length>200||kind is not ("Booking" or "Inquiry"))throw new ArgumentException("Invalid intake details.");
         Guid cv=conversation??Guid.NewGuid();Guid? requestId=null;
+        string intakeSource=Text(p,"source") switch {"Web site" or "Website"=>"Website","Workday Mobile"=>"Staff Entry",_=>"Unknown"};
         if(!conversation.HasValue)
         {
             // Exactly one existing client can be linked; importing an inquiry never creates a client.
             WorkflowStore.Sql(c,tx,"""
               insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc,intake_reference,client_id)
-              values($1,$2,$3,$4,$5,'Website',false,$6,$7,(select case when count(*)=1 then min(id::text)::uuid end from studio_clients where studio_normalize_email(email)=studio_normalize_email($5) and $5<>''))
-              """,cv,w.Id,string.IsNullOrWhiteSpace(title)?"Website inquiry":title,name,email,p.GetProperty("createdAtUtc").GetDateTimeOffset(),reference);
+              values($1,$2,$3,$4,$5,$8,false,$6,$7,(select case when count(*)=1 then min(id::text)::uuid end from studio_clients where studio_normalize_email(email)=studio_normalize_email($5) and $5<>''))
+              """,cv,w.Id,string.IsNullOrWhiteSpace(title)?"Website inquiry":title,name,email,p.GetProperty("createdAtUtc").GetDateTimeOffset(),reference,intakeSource);
             WorkflowStore.Sql(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,author_user_name,visibility,body,created_at_utc,external_message_id) values($1,$2,$3,$4,'External',$5,now(),$6)",Guid.NewGuid(),cv,name,email,Text(p,"notes","Website submission"),"website:"+source+":"+external);
             if(kind=="Booking")
             {
@@ -97,7 +98,7 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
                     requiredDeposit=price.DepositMinor/100m;
                 }
                 string bookingSource=Text(p,"source") switch{"Web site"=>"Web site","Workday Mobile"=>"Workday Mobile",_=>"API"};
-                var pending=new PendingBookingRequest(w.Id,name,email,title,DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start,TimeZoneInfo.FindSystemTimeZoneById(Text(p,"timeZone","America/Jamaica"))).DateTime),requiredDeposit,"JMD",Text(p,"notes"),ConversationId:cv,ExternalBookingId:source+":"+external,StartsAtUtc:start,EndsAtUtc:end,Location:string.IsNullOrWhiteSpace(Text(p,"location"))?Text(p,"locationCode") switch {"BK"=>"Kings Plaza","BE"=>"East Queen Street",_=>""}:Text(p,"location"),ClientPhone:Text(p,"clientPhone"),Destination:destination,BookingSource:bookingSource,PriceSnapshot:price);
+                var pending=new PendingBookingRequest(w.Id,name,email,title,DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start,TimeZoneInfo.FindSystemTimeZoneById(Text(p,"timeZone","America/Jamaica"))).DateTime),requiredDeposit,"JMD",Text(p,"notes"),ConversationId:cv,ExternalBookingId:source+":"+external,StartsAtUtc:start,EndsAtUtc:end,Location:string.IsNullOrWhiteSpace(Text(p,"location"))?Text(p,"locationCode") switch {"BK"=>"Kings Plaza","BE"=>"East Queen Street",_=>""}:Text(p,"location"),ClientPhone:Text(p,"clientPhone"),Destination:destination,BookingSource:bookingSource,PriceSnapshot:price,Source:intakeSource=="Unknown"?null:intakeSource);
                 FrontDeskRequestRules.Validate(pending);
                 Guid job=FrontDeskBookingRequestStore.CreatePendingJob(c,tx,pending,"Website import",false);
                 ExternalBookingResourceHolds.CreateForImportedBooking(c,tx,source+":"+external,job,title,pending.Location,

@@ -208,7 +208,8 @@ newRequestForm.onsubmit = async event => {
         contactAddress: requestContactAddress.value,
         subject: requestSubject.value,
         body: requestBody.value,
-        channel: requestChannel.value
+        channel: requestChannel.value,
+        source: requestChannel.value
     };
 
     const created = await json('/api/interactions', {
