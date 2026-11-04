@@ -71,7 +71,7 @@ public sealed partial class CrmStore(StudioDatabase database,ClaimsPrincipal use
             'lifetimeValue',case when $6 then coalesce(f.lifetime_value,0) else null end,'lastContact',contact.last_contact,'nextFollowUp',t.next_follow_up) item,
             row_number() over(order by
             """+order+"""
-            ) position from studio_clients c left join studio_workspaces w on w.id=c.primary_workspace_id
+            ) crm_row_ordinal from studio_clients c left join studio_workspaces w on w.id=c.primary_workspace_id
             left join j on j.client_id=c.id left join f on f.client_id=c.id left join t on t.client_id=c.id left join contact on contact.client_id=c.id
             where
             """+CrmAccess.Scope+"""
@@ -81,7 +81,7 @@ public sealed partial class CrmStore(StudioDatabase database,ClaimsPrincipal use
             and ($10='' or lower(c.account_owner)=lower($10))
             and ($11='' or ($11='overdue' and t.next_follow_up<now()) or ($11='upcoming' and t.next_follow_up>=now()) or ($11='none' and t.next_follow_up is null))
             and ($12::int is null or greatest(c.updated_at_utc,j.last_job,contact.last_contact)<now()-$12*interval '1 day'))
-            select jsonb_build_object('items',coalesce((select jsonb_agg(item order by position) from matching where position>$13 and position<=$14),'[]'::jsonb),
+            select jsonb_build_object('items',coalesce((select jsonb_agg(item order by crm_row_ordinal) from matching where crm_row_ordinal>$13 and crm_row_ordinal<=$14),'[]'::jsonb),
             'total',(select count(*) from matching),'page',$15,'pageSize',$16)::text
             """,request.Search?.Trim()??"",access.IsAdministrator,access.Workspaces,AllowedJobs(),finance?AllowedJobs("ViewFinancials"):Array.Empty<Guid>(),finance,request.Type??"",request.Status??"",request.Workspace,request.Owner??"",request.FollowUp??"",request.InactiveDays,(page-1)*size,page*size,page,size);
     }
