@@ -113,6 +113,17 @@ public sealed class CrmTests
         for(int i=0;i<55;i++)f.Admin.Note(client,new("Follow-up note "+i));
         Assert.Equal(50,f.Admin.Section(client,"activity").GetProperty("items").GetArrayLength());Assert.True(f.Admin.Section(client,"activity",2).GetProperty("items").GetArrayLength()>0);
     }
+    [StudioPostgresFact] public async Task DirectoryMultiColumnPaginationReturnsEveryClientOnce()
+    {
+        await using var f=await Fixture.Create();
+        foreach(var name in new[]{"Dahlia","Amara","Nia","Zuri","Campbell","Grant","Miller"})f.Admin.Save(null,f.Request(name));
+        var first=f.Admin.Directory(new(Sort:"-jobs,name",Page:1,PageSize:3));
+        var second=f.Admin.Directory(new(Sort:"-jobs,name",Page:2,PageSize:3));
+        var third=f.Admin.Directory(new(Sort:"-jobs,name",Page:3,PageSize:3));
+        Assert.Equal(7,first.GetProperty("total").GetInt32());
+        var names=first.GetProperty("items").EnumerateArray().Concat(second.GetProperty("items").EnumerateArray()).Concat(third.GetProperty("items").EnumerateArray()).Select(c=>c.GetProperty("displayName").GetString()).ToArray();
+        Assert.Equal(new[]{"Amara","Campbell","Dahlia","Grant","Miller","Nia","Zuri"},names);
+    }
     public sealed class Fixture:IAsyncDisposable
     {
         private readonly string schema="crm_"+Guid.NewGuid().ToString("N");private readonly string original=Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES")!;private NpgsqlDataSource source=null!;
