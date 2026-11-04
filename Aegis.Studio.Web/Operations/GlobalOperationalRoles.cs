@@ -47,6 +47,8 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         StudioPermissions.ManageSecurity,
         StudioPermissions.DeleteMedia
     };
+    static GlobalOperationalRoleStore() { SupportedPermissions.UnionWith(Aegis.Studio.Web.Crm.CrmPermissions.All); }
+
     private static readonly Guid UserRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc002");
     private static readonly Guid FrontDeskRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc001");
     private static readonly Guid AdministratorRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc003");
@@ -126,6 +128,11 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         SeedPermission(FinanceManagerRoleId, StudioPermissions.Billing);
         SeedPermission(ProductionManagerRoleId, StudioPermissions.AddClientAttachments);
         SeedPermission(UserRoleId, StudioPermissions.Access);
+        foreach (var permission in new[] { Aegis.Studio.Web.Crm.CrmPermissions.View, Aegis.Studio.Web.Crm.CrmPermissions.Create, Aegis.Studio.Web.Crm.CrmPermissions.Edit, Aegis.Studio.Web.Crm.CrmPermissions.Communications, Aegis.Studio.Web.Crm.CrmPermissions.Send, Aegis.Studio.Web.Crm.CrmPermissions.Tasks })
+            SeedPermission(FrontDeskRoleId, permission);
+        SeedPermission(FrontDeskRoleId, Aegis.Studio.Web.Crm.CrmPermissions.Financials);
+        SeedPermission(FinanceManagerRoleId, Aegis.Studio.Web.Crm.CrmPermissions.View);
+        SeedPermission(FinanceManagerRoleId, Aegis.Studio.Web.Crm.CrmPermissions.Financials);
         foreach (string permission in new[]
         {
             StudioPermissions.Access,

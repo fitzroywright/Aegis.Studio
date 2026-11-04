@@ -27,6 +27,7 @@
     <Content Include="Demo/Prepare-Kratos-Demo-Photo-Library.sh" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Demo/staff/*.jpg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Workflow/WorkflowSchema.sql" />
+    <EmbeddedResource Include="Crm/CrmSchema.sql" />
     <EmbeddedResource Include="Workers/WorkerSchema.sql" />
     <EmbeddedResource Include="Reminders/ClientReminders.sql" />
     <EmbeddedResource Include="Messaging/UnifiedMessagingSchema.sql" />

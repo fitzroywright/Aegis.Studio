@@ -405,6 +405,8 @@ Aegis.Studio.Web.Intake.IntakeSchema.Ensure(app.Services.GetRequiredService<Stud
 Aegis.Studio.Web.Intake.IntakeRosterStore.Map(app);
 Aegis.Studio.Web.Intake.SubjectMessages.Map(app);
 app.MapStudioQuotes();
+Aegis.Studio.Web.Crm.CrmEndpoints.MapStudioCrm(app);
+Aegis.Studio.Web.Crm.CrmAutomationEndpoints.MapStudioCrmAutomations(app);
 app.MapStudioNextActions();
 app.MapJobAccess();
 app.MapStudioServiceStatus();
@@ -565,12 +567,21 @@ app.MapGet("/api/conversations/{id:guid}/sending-identities", (Guid id, ClaimsPr
     });
 }).RequireAuthorization();
 
-app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, ClaimsPrincipal user, StudioStore store, OutboundEmailStore outbox, NotificationService notifications, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, WorkspaceStore workspaces, UserProfileStore profiles, IConfiguration configuration, StudioOperationsFlowPublisher operationsFlows) =>
+app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, ClaimsPrincipal user, StudioStore store, OutboundEmailStore outbox, NotificationService notifications, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, WorkspaceStore workspaces, UserProfileStore profiles, IConfiguration configuration, StudioOperationsFlowPublisher operationsFlows, StudioDatabase database) =>
 {
     if (string.IsNullOrWhiteSpace(request.Body)) return Results.BadRequest(new { error = "Message body is required." });
     StudioConversation? current = store.GetConversation(id); if (current is null) return Results.NotFound();
     bool allowed = workspaceAccess.HasPermission(user, current.WorkspaceId, "ReplyRequester") || (current.JobId.HasValue && jobAccess.HasPermission(user, current.JobId.Value, "ReplyRequester"));
     if (!allowed) return Results.Forbid();
+    if(!request.IsInternal)
+    {
+        using var c=database.OpenConnection();using var q=new NpgsqlCommand("select client_id from studio_conversations where id=$1",c);q.Parameters.AddWithValue(id);
+        if(q.ExecuteScalar() is Guid clientId)
+        {
+            try { new Aegis.Studio.Web.Crm.CrmAccess(database,user).Client(clientId,Aegis.Studio.Web.Crm.CrmPermissions.Send); }
+            catch(UnauthorizedAccessException){return Results.Forbid();}catch(KeyNotFoundException){return Results.NotFound();}
+        }
+    }
     StudioSendingIdentity? sendingIdentity = null;
     bool externalEmailReply = !request.IsInternal && string.Equals(current.Channel, "Email", StringComparison.OrdinalIgnoreCase);
     if (externalEmailReply)
