@@ -70,6 +70,10 @@ public class FullDemoRegenerationTests
         WorkflowSchema.Ensure(ctx.Database);StudioOperationsEnhancements.EnsureSchema(ctx.Database,new WorkspaceStore(ctx.Database));
         new Aegis.Studio.Web.WorkDay.WorkDayStore(ctx.Database).EnsureSchema();
         new StudioAccountsStore(ctx.Database).EnsureSchema();new ClientPortalStore(ctx.Database).EnsureSchema();
+        new Aegis.Studio.Web.FrontDesk.StudioQuoteStore(ctx.Database).Migrate();
+        var workspaces=new WorkspaceStore(ctx.Database);
+        new WorkflowAutomationEngine(ctx.Database,new(ctx.Database,workspaces),null!,new(ctx.Database),new(ctx.Database),new(ctx.Database,workspaces),new ConfigurationBuilder().Build()).EnsureSchema();
+        Aegis.Studio.Web.Crm.CrmStore.Migrate(ctx.Database);
         Sql(ctx.Connection,"create table studio_job_fulfillment(operation_id uuid primary key,job_id uuid not null unique references studio_jobs(id),method text not null,recipient text not null,recorded_by text not null,recorded_at timestamptz not null default now())");
         new GlobalOperationalRoleStore(ctx.Database).EnsureSchema();
         new StudioEmployeeDirectoryStore(ctx.Database).EnsureSchema();

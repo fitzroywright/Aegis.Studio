@@ -1,120 +1,32 @@
-/* Client surfaces reuse the Today frame and Workspaces cards. */
-.clients-page .clients-board{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:hidden;background:transparent;border:0;box-shadow:none}
-.clients-page .client-directory{display:flex;flex-direction:column;flex:0 1 30%;min-height:130px}
-.clients-page .client-directory:only-child{flex:1}
-.client-search{display:block;padding:10px 12px}
-.client-search input,.client-job-filters input,.client-job-filters select{width:100%;min-height:30px;padding:6px 9px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:6px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font:inherit;font-size:12px;box-sizing:border-box}
-.client-directory-rows{overflow:auto;min-height:0;flex:1}
-.client-directory-row{display:grid;grid-template-columns:minmax(120px,1.1fr) minmax(120px,1.2fr) minmax(95px,.8fr) 15px;gap:10px;align-items:center;width:100%;padding:10px 14px;border:0;border-bottom:1px solid var(--studio-control-border,#e2e8ef);background:transparent;color:inherit;text-align:left;cursor:pointer;font-size:12px}
-.client-directory-row>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.client-directory-row.is-selected,.client-directory-row:hover{background:var(--studio-control-surface,#e9f1fb)}
-.clients-page .client-record{display:flex;flex-direction:column;flex:1 1 0;min-height:0}
-.clients-page .client-record-heading{flex-wrap:wrap;min-height:70px}.client-record-heading h2{font-size:21px!important}.client-record-heading p{font-size:12px;opacity:.75;margin:6px 0 0}
-.client-tabs{display:flex;align-items:center;gap:3px;padding:6px 12px;border-bottom:1px solid var(--studio-control-border,#dce4ec);flex-wrap:wrap;flex:0 0 auto}
-.client-tabs button{min-height:25px;padding:4px 8px;background:transparent;color:inherit;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap}
-.client-tabs button[aria-pressed=true]{background:#986c55;border-color:#986c55;color:#fff;font-weight:700}
-.client-tab-content{overflow:auto;min-height:0;flex:1;padding:10px 12px}
-.client-text-link{appearance:none;background:transparent!important;border:0!important;box-shadow:none!important;padding:2px!important;font:inherit;color:var(--studio-control-text,#164879)!important;text-align:left;font-weight:700;cursor:pointer}
-.client-text-link:hover{text-decoration:underline}.client-table{width:100%;border-collapse:collapse;font-size:12px}.client-table th,.client-table td{padding:10px 8px;border-bottom:1px solid var(--studio-control-border,#e2e8ef);text-align:left}.client-table th{font-size:11px}.client-table small{display:block;margin-top:4px;opacity:.7}
-.client-status{display:inline-block;border-radius:99px;padding:4px 9px;font-size:10px;font-weight:700;background:var(--studio-control-surface,#edf3f8);color:var(--studio-control-text,#244464)}
-.client-tools{display:flex;flex-wrap:wrap;gap:8px;padding:12px}.client-workspaces{overflow:auto;font-size:12px}.client-workspaces>p{padding:12px;margin:0;line-height:1.5}
-.client-note{font-size:11px;line-height:1.5;opacity:.8;margin:4px 0 12px}.client-empty{padding:22px 12px;font-size:12px;line-height:1.6}
-.client-job-filters{display:flex;gap:8px;margin-bottom:10px}.client-job-filters input{flex:1}.client-job-filters select{width:auto;max-width:45%}
-.client-gallery-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--studio-control-border,#e2e8ef)}
-.client-gallery-image{width:76px;height:56px;flex:0 0 76px;border-radius:6px;overflow:hidden;display:grid;place-items:center;background:var(--studio-control-surface,#edf3f8);font-size:28px;color:var(--studio-control-text,#244464)}
-.client-gallery-image img{width:100%;height:100%;object-fit:cover}.client-gallery-copy{flex:1;min-width:160px}.client-gallery-copy h3{margin:0 0 5px;font-size:14px}.client-gallery-copy p{margin:0 0 5px;font-size:11px;opacity:.75}.client-gallery-row small{display:block;font-size:10px;opacity:.75;margin-top:5px}.client-gallery-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.client-gallery-actions button{font-size:11px}
-/* Financial statement content owns cards; the shared shell owns its frame. */
-.client-statement{display:flex;flex-direction:column;gap:18px;min-width:0;padding:4px}
-.client-statement-heading{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
-.client-statement-heading h3{font-size:16px;font-weight:600;margin:0}
-.client-statement-heading p{font-size:12px;margin:4px 0 0;color:var(--theme-muted,#6b7583)}
-.client-statement-section{min-width:0}
-.client-statement-section>header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
-.client-statement-section h4{display:flex;align-items:center;gap:8px;font-size:14px;margin:0}
-.client-statement-section h4 span{font-size:10px;font-weight:500;border:1px solid var(--studio-control-border,#dce4ec);border-radius:4px;padding:2px 5px;color:var(--theme-muted,#6b7583)}
-.client-statement-section>header>small{font-size:11px;color:var(--theme-muted,#6b7583)}
-.client-finance-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,235px),1fr));gap:12px}
-.client-finance-card{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0;padding:18px;border:1px solid var(--studio-control-border,#dce4ec);border-radius:9px;background:var(--theme-surface,#fff);box-shadow:0 2px 8px #142d4608}
-.client-finance-card>header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;width:100%}
-.client-finance-card h5{font-size:13px;line-height:1.5;margin:0;overflow-wrap:anywhere}
-.client-finance-label{font-size:11px;color:var(--theme-muted,#6b7583)}
-.client-finance-amount{font-size:25px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.client-finance-card>.client-text-link{margin-top:auto;font-size:11px}
-.client-invoice-card{border-top:3px solid #6b9b9b}
-.client-finance-card dl{width:100%;font-size:11px;margin:0;padding-top:10px;border-top:1px solid var(--studio-control-border,#dce4ec)}
-.client-finance-card dl>div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px}
-.client-finance-card dt{color:var(--theme-muted,#6b7583)}
-.client-finance-card dd{margin:0}
-.client-finance-warning{font-size:12px;line-height:1.5;padding:12px;border-left:3px solid #b98538;background:var(--theme-surface-alt,#fff7e9)}
-.client-ledger-scroll{max-width:100%;overflow-x:auto;border:1px solid var(--studio-control-border,#dce4ec);border-radius:8px}
-.client-statement-ledger{width:100%;min-width:520px;border-collapse:collapse;font-size:12px}
-.client-statement-ledger th{padding:10px 12px;text-align:left;background:var(--theme-surface-alt,#f3f6f9);font-size:11px;font-weight:600}
-.client-statement-ledger td{padding:12px;border-top:1px solid var(--studio-control-border,#e2e8ef);vertical-align:top;overflow-wrap:anywhere}
-.client-statement-ledger :is(th,td):last-child{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.client-statement-ledger small{display:block;margin-top:5px;font-size:10px;color:var(--theme-muted,#6b7583)}
-.client-activity{padding:12px 0;border-bottom:1px solid var(--studio-control-border,#e2e8ef)}.client-activity h3{font-size:13px;margin:5px 0}.client-activity p{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
-.client-welcome{display:grid;place-content:center;text-align:center;padding:28px;flex:1}.client-welcome>span{font-size:35px;color:#c77828}.client-welcome h2{font-size:20px}.client-welcome p{font-size:13px;max-width:420px;line-height:1.7}
-.clients-page button:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:2px}.client-load-error{padding:24px}
-@media(max-width:900px){.client-directory-row{grid-template-columns:1fr 1fr 15px}.client-directory-row>span:nth-child(3){display:none}.client-gallery-actions{width:100%}}
-.client-attention>header{border-left:3px solid #c34c35}.client-attention-body{display:flex;flex-direction:column;gap:9px;padding:12px;font-size:12px}
-.client-directory-tools{display:flex;align-items:center;gap:10px;font-size:11px}.client-directory-tools .action{font-size:11px;min-height:26px}
-
-
-/* Use the canonical Jobs grid and rail components within the client frame. */
-.clients-page .client-directory-table{min-width:480px}
-.clients-page .client-directory-table th:first-child,.clients-page .client-directory-table td:first-child{width:34%}
-.clients-page .client-directory-table th:nth-child(2),.clients-page .client-directory-table td:nth-child(2){width:40%}
-.clients-page .client-directory-table th:nth-child(3),.clients-page .client-directory-table td:nth-child(3){width:26%}
-.client-directory-table tr[data-c-id]{cursor:pointer}
-.client-directory-table tr[data-c-id]:hover,.client-directory-table tr[data-c-id]:focus-visible{background:var(--theme-surface-alt,#edf3f8);box-shadow:inset 3px 0 var(--theme-accent,#d97722);outline:0}
-.client-job-identity{display:flex;align-items:center;gap:8px;min-width:0}
-.client-job-photo{display:grid;place-items:center;flex:0 0 42px;width:42px;height:34px;overflow:hidden;border-radius:3px;background:#edf1f4;color:#8b99a5;font-size:20px}
-.client-job-photo img{display:block;width:100%;height:100%;object-fit:cover}
-.client-job-copy{min-width:0;overflow-wrap:anywhere}
-.clients-page .client-jobs-table{min-width:680px}
-.clients-page .client-jobs-table th{vertical-align:middle;white-space:nowrap}
-.clients-page .client-jobs-table .sj-column-filter-inline{flex-direction:row;align-items:center;gap:8px;white-space:nowrap}
-.clients-page .client-jobs-table .sj-column-filter-inline>span{flex:0 0 auto}
-.clients-page .client-jobs-table .sj-column-filter-inline select{flex:1 1 auto;width:auto;min-width:92px}
-.clients-page .client-jobs-table :is(th,td):first-child{width:38%}
-.clients-page .client-jobs-table :is(th,td):nth-child(2){width:16%}
-.clients-page .client-jobs-table :is(th,td):nth-child(3){width:21%}
-.clients-page .client-jobs-table :is(th,td):nth-child(4){width:25%}
-
-
-
-.client-column-search{display:flex;align-items:center;gap:10px;min-width:0}
-.client-column-search input{flex:1;min-width:0;width:100%;max-width:220px;height:23px;box-sizing:border-box;padding:2px 6px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:10px;font-weight:500}
-.client-column-search input::placeholder{color:#e2ebf6;opacity:1}
-.client-column-search input:focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
-
-/* Keep the client identity in the directory; selection persists beyond hover. */
-.clients-page .client-directory-table tr.is-selected>td{background:color-mix(in srgb,var(--theme-accent,#d97722) 22%,var(--studio-control-surface,#fff));color:var(--studio-control-text,#233e57);font-weight:600}
-.clients-page .client-directory-table tr.is-selected>td:first-child{box-shadow:inset 4px 0 var(--theme-accent,#d97722)}
-.client-tabs .client-edit-details{margin-left:auto;align-self:center;padding:6px 9px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;font-size:11px}
-
-/* Keep each header above scrolling rows, including selected-row backgrounds. */
-.clients-page :is(.client-directory-table,.client-jobs-table){border-collapse:separate;border-spacing:0}
-.clients-page :is(.client-directory-table,.client-jobs-table) thead{position:sticky;top:0;z-index:2}
-.clients-page :is(.client-directory-table,.client-jobs-table) thead th{position:static;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8)}
-
-
-/* In the Client Jobs tab, keep column labels above the independently scrolling rows. */
-.clients-page .client-tab-content--jobs{display:flex;flex-direction:column;min-width:0;min-height:0;padding:0;overflow:hidden}
-.clients-page .client-jobs-grid{display:flex;flex:1 1 auto;flex-direction:column;min-width:0;min-height:0;overflow-x:auto;overflow-y:hidden}
-.clients-page .client-jobs-head-clip{flex:0 0 auto;width:100%;min-width:680px;overflow-x:hidden;overflow-y:scroll;scrollbar-gutter:stable;scrollbar-width:thin}
-.clients-page .client-jobs-scroll{flex:1 1 auto;width:100%;min-width:680px;min-height:0;overflow-x:hidden;overflow-y:scroll;scrollbar-gutter:stable;scrollbar-width:thin}
-.clients-page .client-jobs-head-clip .client-jobs-table,.clients-page .client-jobs-scroll .client-jobs-table{display:table;width:100%;min-width:680px;table-layout:fixed}
-.clients-page .client-jobs-head-clip .client-jobs-table thead th{position:static}
-
-/* Client directory keeps its column header fixed while only client rows scroll. */
-.clients-page .client-directory{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
-.clients-page .client-directory-head-clip{flex:0 0 auto;width:100%;min-width:0;overflow-y:scroll;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7}
-.clients-page .client-directory-rows{flex:1 1 auto;width:100%;min-width:0;min-height:0;overflow-x:hidden;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7}
-.clients-page .client-directory-head-clip .client-directory-table,
-.clients-page .client-directory-rows .client-directory-table{display:table;width:100%;min-width:0;table-layout:fixed}
-.clients-page .client-directory-head-clip .client-directory-table thead th{position:static}
-
-.client-directory-toolbar{display:flex;flex:0 0 auto;align-items:center;justify-content:flex-end;padding:5px 9px;gap:8px;font-size:12px;font-weight:600}
-.client-directory-toolbar button{font-size:11px;min-height:24px}
-
+/* Canonical Clients directory/profile styling. Uses Studio controls and table tokens. */
+.crm-page{display:flex;flex-direction:column;min-width:0;min-height:0;gap:8px;overflow:hidden}
+.crm-toolbar,.crm-filters,.crm-bulk,.crm-pagination{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.crm-toolbar>input[type=search]{flex:1;min-width:180px;max-width:520px}
+.crm-page input,.crm-page select,.crm-form input,.crm-form select,.crm-form textarea{box-sizing:border-box;min-height:30px;max-width:100%;padding:5px 8px;font:inherit;color:var(--studio-control-text);background:var(--studio-control-surface);border:1px solid var(--studio-control-border);border-radius:4px}
+.crm-filters label,.crm-pagination label,.crm-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;min-width:0}
+.crm-filters input{width:140px}.crm-filters select{max-width:210px}
+.crm-sort-hint{margin:0;font-size:11px;opacity:.75}
+.crm-table-scroll{overflow:auto;min-height:0;max-width:100%;border-bottom:1px solid var(--studio-control-border)}
+.crm-directory-scroll{flex:1;max-height:calc(100dvh - 340px);min-height:180px}
+.crm-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;text-align:left}
+.crm-table th{position:sticky;top:0;z-index:1;background:var(--studio-grid-header-bg,var(--studio-control-surface));color:var(--studio-grid-header-text,var(--studio-control-text));white-space:nowrap}
+.crm-table th,.crm-table td{padding:8px 10px;border-bottom:1px solid var(--studio-control-border);vertical-align:top;max-width:380px;overflow-wrap:anywhere}
+.crm-table th button{background:transparent;color:inherit;border:0;font:inherit;font-weight:600;cursor:pointer;padding:0}
+.crm-table td:first-child{min-width:34px}.crm-table small{display:block;opacity:.7;margin-top:3px}
+.crm-table td button{white-space:nowrap}.crm-table tbody tr:hover{background:var(--studio-control-surface)}
+.crm-column-menu{position:relative}.crm-column-menu[open]{z-index:3}.crm-column-menu label{display:flex;align-items:center;gap:6px;padding:3px 8px}
+.crm-column-menu[open]{background:var(--studio-control-surface);border:1px solid var(--studio-control-border);padding:8px}
+.crm-page summary{cursor:pointer;font-size:12px;padding:6px}
+.crm-pagination{padding:6px 0;font-size:12px}.crm-pagination span{margin-right:auto}
+.crm-profile-header{flex:0 0 auto}.crm-identity{display:flex;gap:12px;align-items:center;margin:8px 0}.crm-identity h2{font-size:20px;margin:0}.crm-identity p{font-size:12px;margin:4px 0}
+.crm-more{display:flex;flex-wrap:wrap;gap:6px;padding:8px}
+.client-tabs{display:flex;flex-wrap:wrap;gap:3px;padding:6px 0;border-bottom:1px solid var(--studio-control-border)}
+.client-tabs button{padding:6px 10px;background:transparent;color:inherit;border:0;border-bottom:2px solid transparent;font:inherit;font-size:12px;cursor:pointer}
+.client-tabs button[aria-pressed=true]{border-bottom-color:currentColor;font-weight:600}
+.crm-profile-content{flex:1;overflow:auto;min-height:0;padding-bottom:10px}.crm-profile-content h3{font-size:14px;margin:18px 0 8px}
+.crm-profile-content p{font-size:12px}.crm-profile-content .crm-table-scroll{max-height:55dvh}
+.crm-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 24px;margin:8px 0 16px;font-size:12px}.crm-facts div{min-width:0}.crm-facts dt{opacity:.7}.crm-facts dd{margin:4px 0;overflow-wrap:anywhere}
+.client-text-link{padding:0;background:transparent;border:0;color:inherit;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font:inherit}
+.crm-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:800px}.crm-form p,.crm-form>button,.crm-form pre{grid-column:1/-1}.crm-form textarea{min-height:70px;width:100%;resize:vertical}.crm-form pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.crm-page [role=alert]:empty{display:none}.crm-page [role=alert]{margin:0;padding:5px 0}
+@media(max-width:700px){.crm-page{overflow:auto}.crm-toolbar>input[type=search]{max-width:none;width:100%;flex-basis:100%}.crm-filters label{flex:1 1 130px}.crm-filters select,.crm-filters input{width:100%;max-width:none}.crm-directory-scroll{max-height:60dvh}.crm-profile-content{overflow:visible}.crm-form{grid-template-columns:minmax(0,1fr)}.crm-facts{grid-template-columns:minmax(0,1fr)}.crm-table th,.crm-table td{padding:7px}.crm-pagination{position:sticky;bottom:0;background:var(--studio-control-surface)}}

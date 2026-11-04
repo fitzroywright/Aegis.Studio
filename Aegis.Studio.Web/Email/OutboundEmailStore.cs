@@ -82,7 +82,7 @@ public sealed class OutboundEmailStore
             update studio_outbound_email e set status='Sending',attempts=attempts+1,lease_id=$2,lease_until_utc=now()+interval '2 minutes'
               from candidate p where e.id=p.id returning e.id
             """,c,tx);q.Parameters.AddWithValue(channels.ToArray());q.Parameters.AddWithValue(leaseId);
-        object? result=q.ExecuteScalar();tx.Commit();return result is Guid id?Get(id):null;
+        object? result=q.ExecuteScalar();tx.Commit();return result is Guid id&&Get(id) is {Status:"Sending"} message?message:null;
     }
 
     public IReadOnlyList<OutboundEmailAuditRecord> GetRecentAudit(
@@ -272,8 +272,8 @@ public sealed class OutboundEmailStore
             message.DeliveryMetadata
         ];
         foreach (object? value in values) command.Parameters.AddWithValue(value ?? DBNull.Value);
-        int inserted = command.ExecuteNonQuery();
-        return inserted == 0 ? Get(message.Id) ?? throw new InvalidOperationException("The idempotent outbound email was not found.") : message;
+        command.ExecuteNonQuery();
+        return Get(message.Id) ?? throw new InvalidOperationException("The outbound email was not found after queueing.");
     }
 
     private static OutboundEmail Read(NpgsqlDataReader r) => new(

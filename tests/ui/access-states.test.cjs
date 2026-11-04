@@ -73,9 +73,9 @@ test('a media denial returned by the server uses the same section state',async t
 });
 test('financial statement checks permission before requesting balances or invoices',async t=>{
  const w=setup(t);w.document.body.dataset.studioView='clients';const calls=[];
- w.json=async url=>{calls.push(url);if(url==='/api/frontdesk/clients')return [{id:'client',displayName:'Example Client'}];if(url==='/api/jobs')return [{id:'job',clientId:'client',title:'Example job',financialEvents:[{amount:999999}]}];if(url.endsWith('/access'))return {permissions:{viewFinancials:false}};return [];};
+ w.json=async url=>{calls.push(url);if(url==='/api/crm/capabilities')return {permissions:['studio.crm.view'],types:[],statuses:[],taskTypes:[],leadStatuses:[]};if(url==='/api/workspaces')return [];if(url==='/api/crm/clients/client')return {id:'client',displayName:'Example Client',clientType:'Individual',tags:[],metadata:{}};return [];};
  w.eval(read('clients.js'));await w.StudioClients.render({clientId:'client',tab:'finance'});await settle();
- assert.match(w.document.querySelector('[data-c-content]').textContent,/don’t have access to this financial statement/);
- assert.doesNotMatch(w.document.querySelector('[data-c-content]').textContent,/999999/);
- assert.equal(calls.some(url=>/invoices|finance-release/.test(url)),false);
+ assert.match(w.document.querySelector('[data-content]').textContent,/don’t have access to client financials/);
+ assert.doesNotMatch(w.document.querySelector('[data-content]').textContent,/999999/);
+ assert.equal(calls.some(url=>/invoices|finance-release|\/financials$/.test(url)),false);
 });

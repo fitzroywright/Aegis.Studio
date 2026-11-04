@@ -4,6 +4,7 @@ using Aegis.Studio.Web.Media;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Npgsql;
+using Aegis.Studio.Web.Crm;
 
 namespace Aegis.Studio.Web.FrontDesk;
 
@@ -56,13 +57,35 @@ public static class StudioQuoteEndpoints
     public static void MapStudioQuotes(this WebApplication app)
     {
         new StudioQuoteStore(app.Services.GetRequiredService<StudioDatabase>()).Migrate();var group=app.MapGroup("/api/frontdesk/quotes").RequireAuthorization();
-        group.MapGet("",(Guid clientId,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>Results.Ok(new StudioQuoteStore(db).List(clientId))));
-        group.MapPost("",(ClientQuoteRequest request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>Results.Ok(new{id=new StudioQuoteStore(db).Create(request,Name(user))})));
-        group.MapPost("/{id:guid}/send",(Guid id,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>{new StudioQuoteStore(db).Send(id,Name(user));return Results.NoContent();}));
-        group.MapPost("/{id:guid}/accept",(Guid id,QuoteAcceptance request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>{new StudioQuoteStore(db).Accept(id,request.Reference);return Results.NoContent();}));
-        group.MapPost("/{id:guid}/convert",(Guid id,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>Results.Ok(new{requestId=new StudioQuoteStore(db).ConvertToBooking(id,Name(user))})));
+        group.MapGet("",(Guid clientId,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>Results.Ok(ListScoped(db,user,clientId))));
+        group.MapPost("",(ClientQuoteRequest request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>CreateScoped(db,user,request)));
+        group.MapPost("/{id:guid}/send",(Guid id,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>{DemandQuote(db,user,id,true);new StudioQuoteStore(db).Send(id,Name(user));return Results.NoContent();}));
+        group.MapPost("/{id:guid}/accept",(Guid id,QuoteAcceptance request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>{DemandQuote(db,user,id);new StudioQuoteStore(db).Accept(id,request.Reference);return Results.NoContent();}));
+        group.MapPost("/{id:guid}/convert",(Guid id,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>ConvertScoped(db,user,id)));
+    }
+    private static JsonElement ListScoped(StudioDatabase db,ClaimsPrincipal user,Guid client)
+    {
+        var access=new CrmAccess(db,user);access.Client(client,CrmPermissions.Financials);
+        var rows=new StudioQuoteStore(db).List(client).EnumerateArray().Where(row=>access.IsAdministrator||access.Workspaces.Contains(row.GetProperty("request").GetProperty("workspaceId").GetGuid())).ToArray();
+        return JsonSerializer.SerializeToElement(rows);
+    }
+    private static IResult CreateScoped(StudioDatabase db,ClaimsPrincipal user,ClientQuoteRequest request)
+    {
+        var access=new CrmAccess(db,user);access.Client(request.ClientId,CrmPermissions.Financials);access.Workspace(request.WorkspaceId);
+        return Results.Ok(new{id=new StudioQuoteStore(db).Create(request,Name(user))});
+    }
+    private static IResult ConvertScoped(StudioDatabase db,ClaimsPrincipal user,Guid id)
+    {
+        DemandQuote(db,user,id);return Results.Ok(new{requestId=new StudioQuoteStore(db).ConvertToBooking(id,Name(user))});
+    }
+    private static void DemandQuote(StudioDatabase db,ClaimsPrincipal user,Guid id,bool send=false)
+    {
+        using var c=db.OpenConnection();using var q=new NpgsqlCommand("select client_id,(payload->>'workspaceId')::uuid from studio_client_quotes where id=$1",c);q.Parameters.AddWithValue(id);
+        Guid client,workspace;using(var r=q.ExecuteReader()){if(!r.Read())throw new KeyNotFoundException();client=r.GetGuid(0);workspace=r.GetGuid(1);}
+        var access=new CrmAccess(db,user);access.Client(client,CrmPermissions.Financials);access.Workspace(workspace);
+        if(send){access.Demand(CrmPermissions.Send);using var allowed=new NpgsqlCommand("select studio_crm_channel_allowed($1,'Email')",c);allowed.Parameters.AddWithValue(client);if(allowed.ExecuteScalar() is not true)throw new ArgumentException("Client communication preferences or consent block email.");}
     }
     private static string Name(ClaimsPrincipal user)=>user.FindFirstValue("login_name")??user.Identity!.Name!;
-    private static IResult Run(ClaimsPrincipal user,StudioDatabase db,Func<IResult> action){if(!user.IsInRole("Administrator")&&!(new GlobalOperationalRoleStore(db).HasPermission(user,"ViewAllJobs")&&new GlobalOperationalRoleStore(db).HasPermission(user,"Billing")))return Results.Forbid();try{return action();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}}
+    private static IResult Run(ClaimsPrincipal user,StudioDatabase db,Func<IResult> action){if(!user.IsInRole("Administrator")&&!(new GlobalOperationalRoleStore(db).HasPermission(user,"ViewAllJobs")&&new GlobalOperationalRoleStore(db).HasPermission(user,"Billing")))return Results.Forbid();try{return action();}catch(UnauthorizedAccessException){return Results.Forbid();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}}
 }
 

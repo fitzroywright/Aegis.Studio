@@ -34,7 +34,7 @@ internal static class ConnectedWorkflowDemo
         {
             "studio_workspaces","studio_state","studio_user_profiles","studio_employees",
             "studio_workflow_thresholds","studio_workflow_audiences",
-            "studio_workflow_migrations","studio_global_operational_roles",
+            "studio_workflow_migrations","studio_crm_migrations","studio_global_operational_roles",
             "studio_global_operational_role_members","studio_global_operational_role_permissions",
             "studio_directory_group_roles","studio_security_roles","studio_demo_seed_runs",
             // Job roles are configurable application data required before worker seeding.

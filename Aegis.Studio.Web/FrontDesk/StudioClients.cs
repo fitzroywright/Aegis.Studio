@@ -4,6 +4,8 @@ using Aegis.Studio.Web.Media;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Npgsql;
+using Aegis.Studio.Web.Crm;
+using System.Text.Json;
 
 namespace Aegis.Studio.Web.FrontDesk;
 
@@ -18,9 +20,13 @@ public sealed class StudioClientStore(StudioDatabase database)
         MediaProductionStore.Execute(c,tx,"create index if not exists ix_studio_jobs_client on studio_jobs(client_id)");
         tx.Commit();
     }
-    public IReadOnlyList<Contact> List()
+    public IReadOnlyList<Contact> List(ClaimsPrincipal? user=null)
     {
-        using var c=database.OpenConnection();using var cmd=new NpgsqlCommand("select id,display_name,email,phone from studio_clients order by display_name",c);using var r=cmd.ExecuteReader();var values=new List<Contact>();
+        using var c=database.OpenConnection();
+        var access=user is null?null:new CrmAccess(database,user);access?.Demand(CrmPermissions.View);
+        using var cmd=new NpgsqlCommand(access is null?"select id,display_name,email,phone from studio_clients order by display_name":"select id,display_name,email,phone from studio_clients c where "+CrmAccess.Scope+" and c.archived_at_utc is null and c.merged_into_id is null order by display_name",c);
+        if(access is not null){cmd.CommandText=cmd.CommandText.Replace("$2","$1").Replace("$3","$2");cmd.Parameters.AddWithValue(access.IsAdministrator);cmd.Parameters.AddWithValue(access.Workspaces);}
+        using var r=cmd.ExecuteReader();var values=new List<Contact>();
         while(r.Read())values.Add(new(r.GetGuid(0),r.GetString(1),r.IsDBNull(2)?null:r.GetString(2),r.IsDBNull(3)?null:r.GetString(3)));return values;
     }
     public Contact Save(Guid? id,ClientRequest request)
@@ -48,15 +54,24 @@ public static class StudioClientEndpoints
         var group=app.MapGroup("/api/frontdesk/clients").RequireAuthorization();
         group.MapPost("/invoices",(CombinedInvoice request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>{
             if(request.JobIds is null||request.JobIds.Length==0)throw new ArgumentException("Select jobs to invoice.");
+            if(!user.IsInRole("Administrator")&&!new GlobalOperationalRoleStore(db).HasPermission(user,"Billing"))throw new UnauthorizedAccessException();
+            foreach(var job in request.JobIds)if(!new JobAccessService(db).HasPermission(user,job,"RecordFinancialActivity"))throw new UnauthorizedAccessException();
             return Results.Ok(new StudioAccountsStore(db).CreateInvoice(request.JobIds[0],request.Invoice,user.FindFirstValue("login_name")??user.Identity!.Name!,request.JobIds.Skip(1).ToArray()));
         }));
-        group.MapGet("",(ClaimsPrincipal user,StudioDatabase db)=>Allowed(user,db)?Results.Ok(new StudioClientStore(db).List()):Results.Forbid());
-        group.MapPost("",(ClientRequest request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>Results.Ok(new StudioClientStore(db).Save(null,request))));
-        group.MapPut("/{id:guid}",(Guid id,ClientRequest request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>Results.Ok(new StudioClientStore(db).Save(id,request))));
-        group.MapPut("/job/{jobId:guid}",(Guid jobId,ClientLink request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>{new StudioClientStore(db).Link(jobId,request.ClientId,user.FindFirstValue("login_name")??user.Identity!.Name!);return Results.NoContent();}));
+        group.MapGet("",(ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>Results.Ok(new StudioClientStore(db).List(user))));
+        group.MapPost("",(ClientRequest request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>Results.Ok(SaveCompatible(db,user,null,request))));
+        group.MapPut("/{id:guid}",(Guid id,ClientRequest request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>Results.Ok(SaveCompatible(db,user,id,request))));
+        group.MapPut("/job/{jobId:guid}",(Guid jobId,ClientLink request,ClaimsPrincipal user,StudioDatabase db)=>Run(user,db,()=>{new CrmAccess(db,user).Demand(CrmPermissions.Edit);if(!new JobAccessService(db).HasPermission(user,jobId,"EditJob"))throw new UnauthorizedAccessException();if(request.ClientId is {} client)new CrmAccess(db,user).Client(client);new StudioClientStore(db).Link(jobId,request.ClientId,user.FindFirstValue("login_name")??user.Identity!.Name!);return Results.NoContent();}));
     }
-    private static bool Allowed(ClaimsPrincipal user,StudioDatabase db)=>user.IsInRole("Administrator")||(new GlobalOperationalRoleStore(db).HasPermission(user,"ViewAllJobs")&&new GlobalOperationalRoleStore(db).HasPermission(user,"Billing"));
-    private static IResult Run(ClaimsPrincipal user,StudioDatabase db,Func<IResult> action){if(!Allowed(user,db))return Results.Forbid();try{return action();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(InvalidOperationException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}}
+    private static Aegis.Studio.Domain.Contacts.Contact SaveCompatible(StudioDatabase db,ClaimsPrincipal user,Guid? id,ClientRequest request)
+    {
+        var crm=new CrmStore(db,user);
+        var payload=id.HasValue?JsonSerializer.Deserialize<CrmClientRequest>(crm.Get(id.Value).GetRawText(),JsonSerializerOptions.Web)!:new CrmClientRequest(request.DisplayName);
+        Guid saved=crm.Save(id,payload with{DisplayName=request.DisplayName,Email=request.Email,Phone=request.Phone});
+        return new(saved,request.DisplayName,request.Email,request.Phone);
+    }
+    private static bool Allowed(ClaimsPrincipal user,StudioDatabase db)=>new CrmAccess(db,user).Has(CrmPermissions.View);
+    private static IResult Run(ClaimsPrincipal user,StudioDatabase db,Func<IResult> action){if(!Allowed(user,db))return Results.Forbid();try{return action();}catch(UnauthorizedAccessException){return Results.Forbid();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(InvalidOperationException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}}
 }
 public sealed record ClientRequest(string DisplayName,string? Email,string? Phone);
 public sealed record ClientLink(Guid? ClientId);

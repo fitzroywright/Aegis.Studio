@@ -17,6 +17,10 @@ public static class WorkflowAutomationRuntime
         engine = value;
     }
 
+    public static IReadOnlyList<WorkflowDefinition> Definitions=>engine?.GetDefinitions()??[];
+    public static WorkflowDefinition SaveCrmDefinition(WorkflowDefinitionRequest request)=>engine?.SaveDefinition(null,request)??throw new InvalidOperationException("Workflow engine is unavailable.");
+    public static void DisableCrmDefinition(WorkflowDefinition definition) { if(engine is null)throw new InvalidOperationException("Workflow engine is unavailable.");engine.SaveDefinition(definition.Id,new(definition.Name,definition.Description,definition.TriggerEvent,definition.ConditionsJson,definition.ActionsJson,false)); }
+
     public static void Publish(string eventType, Guid jobId, object? context = null)
     {
         engine?.HandleEvent(eventType, jobId, context);
@@ -112,6 +116,8 @@ public sealed class WorkflowAutomationEngine
         "WaitMinutes"
     };
 
+    static WorkflowAutomationEngine() { supportedActions.UnionWith(Aegis.Studio.Web.Crm.CrmAutomation.Actions); }
+
     private readonly StudioDatabase database;
     private readonly StudioStore studio;
     private readonly NotificationService notifications;
@@ -177,6 +183,7 @@ public sealed class WorkflowAutomationEngine
             alter table studio_workflow_runs add column if not exists lease_owner text null;
             alter table studio_workflow_runs add column if not exists lease_until_utc timestamptz null;
             alter table studio_workflow_runs add column if not exists attempt_count integer not null default 0;
+            alter table studio_workflow_runs alter column job_id drop not null;
             create index if not exists ix_studio_workflow_runs_due on studio_workflow_runs(status,next_action_at_utc);
             create index if not exists ix_studio_workflow_runs_lease on studio_workflow_runs(status,lease_until_utc);
             create table if not exists studio_workflow_run_log
@@ -286,6 +293,7 @@ public sealed class WorkflowAutomationEngine
 
     public void ResumeDueRuns()
     {
+        DispatchCrmEvents();
         FailExhaustedRuns();
         List<Guid> ids = [];
         using (NpgsqlConnection connection = database.OpenConnection())
@@ -373,7 +381,15 @@ public sealed class WorkflowAutomationEngine
                     return;
                 }
 
-                ExecuteAction(run.JobId, type, action);
+                if (Aegis.Studio.Web.Crm.CrmAutomation.Actions.Contains(type))
+                {
+                    Guid clientId;
+                    if(run.JobId!=Guid.Empty){using var c=database.OpenConnection();using var q=new NpgsqlCommand("select client_id from studio_jobs where id=$1",c);q.Parameters.AddWithValue(run.JobId);clientId=q.ExecuteScalar() is Guid id?id:throw new InvalidOperationException("Job has no linked client.");}
+                    else clientId=JsonDocument.Parse(run.ContextJson).RootElement.GetProperty("crmClientId").GetGuid();
+                    Aegis.Studio.Web.Crm.CrmAutomation.Execute(database,clientId,run.JobId==Guid.Empty?null:run.JobId,action,run.Id+":"+index);
+                }
+                else if(run.JobId==Guid.Empty)throw new InvalidOperationException("This action requires a related Job. Use a CRM action for client events.");
+                else ExecuteAction(run.JobId, type, action);
                 Log(runId, index, type, "Completed");
                 SetRun(runId, "Running", index + 1, null, null, false);
             }
@@ -471,6 +487,52 @@ public sealed class WorkflowAutomationEngine
             }
         }
         return true;
+    }
+
+    private void DispatchCrmEvents()
+    {
+        using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        // No schema assumptions during old maintenance/test contexts.
+        using(var exists=new NpgsqlCommand("select to_regclass('studio_crm_events') is not null",c,tx))if(exists.ExecuteScalar() is not true)return;
+        using(var periodic=new NpgsqlCommand("""
+            insert into studio_crm_events(client_id,workspace_id,event_type,event_key,payload)
+            select c.id,c.primary_workspace_id,'ClientInactive','inactive:'||c.id||':'||to_char(current_date,'YYYY-MM'),jsonb_build_object('inactiveDays',90)
+            from studio_clients c join studio_workspaces w on w.id=c.primary_workspace_id and w.crm_automation_enabled
+            where c.archived_at_utc is null and c.updated_at_utc<now()-interval '90 days'
+            and not exists(select 1 from studio_jobs j where j.client_id=c.id and j.created_at_utc>now()-interval '90 days') on conflict do nothing;
+            insert into studio_crm_events(client_id,workspace_id,event_type,event_key,payload)
+            select j.client_id,j.workspace_id,'SessionApproaching','session:'||s.id,jsonb_build_object('jobId',j.id,'sessionId',s.id)
+            from studio_shoot_sessions s join studio_jobs j on j.id=s.job_id join studio_workspaces w on w.id=j.workspace_id and w.crm_automation_enabled
+            where j.client_id is not null and s.status not in ('Cancelled','Completed') and s.call_time_utc between now() and now()+interval '48 hours' on conflict do nothing;
+            insert into studio_crm_events(client_id,workspace_id,event_type,event_key,payload)
+            select j.client_id,j.workspace_id,'PaymentOverdue','invoice:'||i.id,jsonb_build_object('jobId',j.id,'invoiceId',i.id)
+            from studio_account_invoices i join studio_jobs j on j.id=i.job_id join studio_workspaces w on w.id=j.workspace_id and w.crm_automation_enabled
+            where j.client_id is not null and i.status in ('Issued','Overdue') and i.due_at_utc<now() on conflict do nothing;
+            """,c,tx))periodic.ExecuteNonQuery();
+        var events=new List<(Guid Id,Guid Client,Guid? Workspace,string Type,string Payload)>();
+        using(var q=new NpgsqlCommand("select id,client_id,workspace_id,event_type,payload::text from studio_crm_events where processed_at_utc is null order by created_at_utc limit 50 for update skip locked",c,tx))
+        using(var r=q.ExecuteReader())while(r.Read())events.Add((r.GetGuid(0),r.GetGuid(1),r.IsDBNull(2)?null:r.GetGuid(2),r.GetString(3),r.GetString(4)));
+        // Use the same definitions, conditions, actions, leases, retries and audit log as job workflows.
+        var definitions=GetDefinitions();
+        foreach(var item in events)
+        {
+            bool workspaceEnabled;
+            using(var configured=new NpgsqlCommand("select exists(select 1 from studio_workspaces where id=$1 and is_enabled and crm_automation_enabled)",c,tx)){configured.Parameters.AddWithValue((object?)item.Workspace??DBNull.Value);workspaceEnabled=configured.ExecuteScalar() is true;}
+            foreach(var definition in definitions.Where(d=>workspaceEnabled&&d.IsEnabled&&d.TriggerEvent==item.Type))
+            {
+                var conditions=JsonDocument.Parse(definition.ConditionsJson).RootElement;
+                if(!conditions.TryGetProperty("workspaceId",out var workspace)||!Guid.TryParse(workspace.GetString(),out var id)||id!=item.Workspace)continue;
+                if(conditions.TryGetProperty("jobStatus",out _))continue;
+                if(JsonDocument.Parse(definition.ActionsJson).RootElement.EnumerateArray().Any(a=>!a.TryGetProperty("type",out var type)||!Aegis.Studio.Web.Crm.CrmAutomation.Actions.Contains(type.GetString()??"")))continue;
+                if(conditions.TryGetProperty("context",out var expected)&&expected.ValueKind==JsonValueKind.Object){var payload=JsonDocument.Parse(item.Payload).RootElement;if(expected.EnumerateObject().Any(p=>!payload.TryGetProperty(p.Name,out var actual)||actual.ToString()!=p.Value.ToString()))continue;}
+                Guid run=Guid.NewGuid();
+                using var insert=new NpgsqlCommand("insert into studio_workflow_runs(id,workflow_id,job_id,trigger_event,status,context_json,created_at_utc,updated_at_utc) values($1,$2,null,$3,'Waiting',$4::jsonb,now(),now())",c,tx);
+                insert.Parameters.AddWithValue(run);insert.Parameters.AddWithValue(definition.Id);insert.Parameters.AddWithValue(item.Type);insert.Parameters.AddWithValue(JsonSerializer.Serialize(new{crmClientId=item.Client,eventId=item.Id,payload=JsonDocument.Parse(item.Payload).RootElement}));insert.ExecuteNonQuery();
+                using var ready=new NpgsqlCommand("update studio_workflow_runs set next_action_at_utc=now() where id=$1",c,tx);ready.Parameters.AddWithValue(run);ready.ExecuteNonQuery();
+            }
+            using var done=new NpgsqlCommand("update studio_crm_events set processed_at_utc=now() where id=$1",c,tx);done.Parameters.AddWithValue(item.Id);done.ExecuteNonQuery();
+        }
+        tx.Commit();
     }
 
     private void FailExhaustedRuns()
@@ -573,7 +635,7 @@ public sealed class WorkflowAutomationEngine
         => element.TryGetProperty(name, out JsonElement value) && value.TryGetInt32(out int number) ? number : null;
 
     private static WorkflowRun ReadRun(NpgsqlDataReader reader)
-        => new(reader.GetGuid(0),reader.GetGuid(1),reader.GetGuid(2),reader.GetString(3),reader.GetString(4),reader.GetInt32(5),reader.GetString(6),reader.IsDBNull(7)?null:reader.GetFieldValue<DateTimeOffset>(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.GetFieldValue<DateTimeOffset>(9),reader.GetFieldValue<DateTimeOffset>(10),reader.IsDBNull(11)?null:reader.GetFieldValue<DateTimeOffset>(11));
+        => new(reader.GetGuid(0),reader.GetGuid(1),reader.IsDBNull(2)?Guid.Empty:reader.GetGuid(2),reader.GetString(3),reader.GetString(4),reader.GetInt32(5),reader.GetString(6),reader.IsDBNull(7)?null:reader.GetFieldValue<DateTimeOffset>(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.GetFieldValue<DateTimeOffset>(9),reader.GetFieldValue<DateTimeOffset>(10),reader.IsDBNull(11)?null:reader.GetFieldValue<DateTimeOffset>(11));
 }
 
 public sealed record WorkflowDefinition(Guid Id,string Name,string? Description,string TriggerEvent,string ConditionsJson,string ActionsJson,bool IsEnabled,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc);

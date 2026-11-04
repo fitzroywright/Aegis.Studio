@@ -23,12 +23,13 @@ window.StudioAttention=(()=>{
  async function load(){
   if(pending)return pending;
   pending=(async()=>{
-   const urls=['/api/today/jobs','/api/operations/activities?includeWorkflowDetails=false','/api/production/workload','/api/messages/attention','/api/frontdesk/gallery-access-requests/unresolved','/api/accounts/invoices'];
+   const urls=['/api/today/jobs','/api/operations/activities?includeWorkflowDetails=false','/api/production/workload','/api/messages/attention','/api/frontdesk/gallery-access-requests/unresolved','/api/accounts/invoices','/api/crm/tasks?overdue=true'];
    const results=await Promise.allSettled(urls.map(async(url,index)=>{let status;try{return await json(url,{onResponse:response=>status=response.status});}catch(error){if(index>1&&status===403)return [2,3].includes(index)?{}:[];throw error;}}).concat(window.StudioNextActions?[StudioNextActions.load()]:[]));
    const value=(i,fallback)=>results[i].status==='fulfilled'?results[i].value:fallback;
    let items=project(value(0,[]),value(1,[]),value(2,{}),value(3,{}),Date.now(),value(4,[]),value(5,[]));
-   if(window.StudioNextActions&&results[6]?.status==='fulfilled'){
-    const actions=results[6].value,taskIds=new Set(actions.map(a=>a.action.taskId).filter(Boolean).map(id=>'task:'+id));
+   for(const task of value(6,[]))items.push({id:'crm:'+task.id,clientId:task.clientId,title:task.taskType+' — '+task.displayName,context:task.assignedTo+' · Overdue · '+task.status,assignedTo:task.assignedTo,dueAtUtc:task.dueAtUtc});
+   if(window.StudioNextActions&&results[7]?.status==='fulfilled'){
+    const actions=results[7].value,taskIds=new Set(actions.map(a=>a.action.taskId).filter(Boolean).map(id=>'task:'+id));
     items=items.filter(item=>!taskIds.has(item.id));
     items.push(...actions.map(row=>({id:'next:'+row.kind+':'+row.entityId,jobId:row.jobId,title:row.action.title+' — '+row.entityTitle,context:[row.action.reason,row.assignedTo||'Unassigned',StudioNextActions.due(row).label,row.waitingReason?'Waiting: '+row.waitingReason:''].filter(Boolean).join(' · '),assignedTo:row.assignedTo,dueAtUtc:row.dueAtUtc,nextAction:row})));
    }
