@@ -272,7 +272,7 @@ function renderEmployeeDirectorySection() {
 const staffAccessPermissionChoices=[
     ['studio.access','Use Studio'],['studio.jobs.view_all','View all jobs'],['studio.clients.reply','Reply to clients'],
     ['studio.jobs.notify_members','Notify job members'],['studio.billing.manage','Manage billing'],['studio.attachments.view','View client attachments'],
-    ['studio.attachments.add','Add client attachments'],['studio.media.delete','Delete and restore media'],['studio.security.manage','Manage security'],['*','Full administrative access']
+    ['studio.attachments.add','Add client attachments'],['studio.media.delete','Delete and restore media'],['studio.security.manage','Manage security'],...['view','create','edit','merge','archive','communications.view','communications.send','tasks.manage','financials.view','export','automations.manage'].map(key=>['studio.crm.'+key,{'view':'View clients','create':'Create clients','edit':'Edit clients','merge':'Merge clients','archive':'Archive clients','communications.view':'View client communications','communications.send':'Send client communications','tasks.manage':'Manage CRM tasks','financials.view':'View client financials','export':'Export client data','automations.manage':'Manage CRM automations'}[key]]),['*','Full administrative access']
 ];
 
 function renderStaffAccessPermissionChoices(selected=[]){

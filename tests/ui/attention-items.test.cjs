@@ -19,3 +19,12 @@ test('Today attention lists individual jobs and tasks, combines reasons and open
 });
 
 
+
+test('overdue CRM follow-ups share Needs Attention and open the correct client profile',async t=>{
+ const dom=new JSDOM(read('index.html'),{url:'https://studio.test',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;t.after(()=>w.close());
+ Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),workspaceCache:[],loadWorkspaces:async()=>[],fetch:async()=>({ok:true,json:async()=>[]}),StudioStatusOrder:{sort:v=>[...new Set(v)]},StudioSubjectPicker:{isClosed:()=>false},json:async url=>url==='/api/crm/tasks?overdue=true'?[{id:'crm-task',clientId:'client-school',displayName:'Hummingbird School',taskType:'Confirm Booking',assignedTo:'staff',status:'Open',dueAtUtc:'2020-01-01'}]:url==='/api/auth/me'?{user:{userName:'staff'}}:[]});
+ for(const name of ['studio-next-actions.js','studio-attention.js','calendar-layouts.js','studio-message-card.js','studio-page.js','studio-shell-nav.js','studio-navigation.js'])w.eval(read(name));
+ w.document.dispatchEvent(new w.Event('DOMContentLoaded'));for(let i=0;i<6;i++)await settle();await w.studioTodayReady;await settle();
+ const item=w.document.querySelector('[data-attention-client="client-school"]');assert.ok(item);assert.match(item.textContent,/Confirm Booking.*Hummingbird School.*Overdue/s);
+ const opened=[];w.studioNavigate=async(view,options)=>opened.push({view,...options});item.click();await settle();assert.deepEqual(opened,[{view:'clients',clientId:'client-school',tab:'tasks'}]);
+});

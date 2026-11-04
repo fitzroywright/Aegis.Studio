@@ -432,10 +432,11 @@
             if (event.key === 'Escape' && (!drawer.hidden || !sessionsDrawer.hidden)) close();
         });
         drawer.addEventListener('click', event => {
-            const link = event.target.closest('[data-attention-job],[data-attention-route],[data-attention-next],[data-attention-enquiry]');
+            const link = event.target.closest('[data-attention-job],[data-attention-route],[data-attention-next],[data-attention-enquiry],[data-attention-client]');
             if (!link) return;
             close();
             if(link.dataset.attentionNext){const item=sharedAttention.items.find(item=>item.id===link.dataset.attentionNext);if(item?.nextAction)StudioNextActions.activate(item.nextAction).catch(error=>alert(error.message));}
+            else if(link.dataset.attentionClient)window.studioNavigate?.('clients',{clientId:link.dataset.attentionClient,tab:'tasks'});
             else if(link.dataset.attentionEnquiry)window.StudioNextActions?.openEnquiry(link.dataset.attentionEnquiry);
             else if(link.dataset.attentionJob)window.studioNavigate?.('workspaces',{jobId:link.dataset.attentionJob});
             else window.studioNavigate?.(link.dataset.attentionRoute);
@@ -490,6 +491,7 @@
                 button.type = 'button';
                 button.dataset.attentionItem = item.id;
                 if(item.nextAction)button.dataset.attentionNext=item.id;
+                else if(item.clientId)button.dataset.attentionClient=item.clientId;
                 else if(item.enquiryId)button.dataset.attentionEnquiry=item.enquiryId;
                 else if(item.route)button.dataset.attentionRoute=item.route;
                 else if(item.jobId)button.dataset.attentionJob = item.jobId;
