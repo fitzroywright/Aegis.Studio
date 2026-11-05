@@ -96,6 +96,46 @@ window.StudioClients=(()=>{
        find('[data-contact]')?.addEventListener('click',()=>{const d=simpleForm('Link an existing person',input('search','Find person by name, email or phone')+'<button class="action" type="button" data-find>Search</button><label>Person<select name="personId" required></select></label>'+input('role','Relationship role (Parent, Booking Contact…)','','text','required maxlength="100"')+'<label><input name="billing" type="checkbox">Primary billing contact</label><label><input name="booking" type="checkbox">Booking contact</label>',async f=>{await send(path+'/contacts','POST',{personId:f.elements.personId.value,role:f.elements.role.value,isPrimaryBilling:f.elements.billing.checked,isBookingContact:f.elements.booking.checked});await showTab();});d.querySelector('[data-find]').onclick=async()=>{try{const matches=await json(api+'/clients?search='+encodeURIComponent(d.querySelector('[name=search]').value)+'&pageSize=50');d.querySelector('[name=personId]').innerHTML=matches.items.filter(p=>p.id!==client.id).map(p=>`<option value="${p.id}">${esc(p.displayName)} · ${esc(p.email||p.phone||'')}</option>`).join('');}catch(e){status(d,e);}};});
        host.querySelectorAll('[data-lead]').forEach(b=>b.onclick=()=>{const lead=enquiries.items.find(x=>x.id===b.dataset.lead),m=lead.metadata||{};simpleForm('Update enquiry opportunity',select('status','Lead status',caps.leadStatuses,lead.status)+input('serviceRequested','Service requested',m.serviceRequested)+input('estimatedValue','Estimated value (JMD)',m.estimatedValue,'number','min="0" step="0.01"')+input('assignedTo','Assigned staff',m.assignedTo)+input('nextFollowUp','Next follow-up',m.nextFollowUp,'datetime-local')+input('expectedBookingDate','Expected booking date',m.expectedBookingDate,'date')+input('lostReason','Lost reason',m.lostReason)+`<label>Internal notes<textarea name="notes">${esc(m.notes||'')}</textarea></label>`,async f=>{const metadata={...m,...Object.fromEntries(['serviceRequested','estimatedValue','assignedTo','nextFollowUp','expectedBookingDate','lostReason','notes'].map(k=>[k,f.elements[k].value]))};await send(path+'/enquiries/'+lead.id,'PUT',{status:f.elements.status.value,metadata});await showTab();});});
        bindTaskActions(host,tasks);
+      }else if(tab==='communications'){
+       if(!can('communications.view')){StudioAccess.render(host,{kind:'section',title:'communications'});return;}
+       const [messages,activity,tasks,enquiries,financial]=await Promise.all([
+        json(path+'/sections/communications?page='+page),
+        json(path+'/sections/activity?page=1'),
+        json(api+'/tasks?clientId='+client.id),
+        json(path+'/sections/enquiries'),
+        can('financials.view')?json(path+'/financials').catch(()=>null):Promise.resolve(null)
+       ]);
+       if(!live()||turn!==sectionRevision)return;
+       const openTasks=tasks.filter(t=>['Open','In Progress'].includes(t.status)).sort((a,b)=>Date.parse(a.dueAtUtc||0)-Date.parse(b.dueAtUtc||0));
+       const opportunities=(enquiries.items||[]).filter(e=>!['Won','Lost','Cancelled','Closed'].includes(e.status)).slice(0,5);
+       const fmtDay=x=>x?new Date(x).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}):'—';
+       const latest=messages.items?.[0]?.createdAtUtc||activity.items?.[0]?.createdAtUtc;
+       const events=[
+        ...(messages.items||[]).map(m=>({...m,when:m.createdAtUtc,category:'communication',heading:m.channel||'Message',detail:m.body||m.subject||'',label:m.status||'',ref:m.jobId||m.enquiryId})),
+        ...(activity.items||[]).map(a=>({...a,when:a.createdAtUtc,category:'activity',heading:a.eventType||'Studio activity',detail:a.description||'',label:'',ref:a.jobId}))
+       ].filter(e=>e.when).sort((a,b)=>Date.parse(b.when)-Date.parse(a.when));
+       host.innerHTML=`<div class="crm-communications-layout">
+        <section class="crm-stream" aria-label="Client communications and activity">
+         <div class="crm-stream-tools"><label class="crm-activity-search">Search activity<input data-activity-search type="search" placeholder="Search communications, notes, tasks…"></label><label>Type<select data-activity-kind><option value="all">All Activity</option><option value="communication">Communications</option><option value="activity">Milestones</option></select></label></div>
+         <div data-activity-list class="crm-activity-list" role="list">${events.length?events.map(e=>`<article class="crm-activity-entry" role="listitem" data-kind="${esc(e.category)}" data-text="${esc([e.heading,e.detail,e.label].join(' ').toLowerCase())}"><div class="crm-activity-marker" aria-hidden="true">${esc(e.category==='communication'?'✉':'✓')}</div><div class="crm-activity-main"><div class="crm-activity-top"><strong>${esc(e.heading)}</strong><time>${esc(date(e.when))}</time></div><p>${esc(e.detail||'No further details recorded.')}</p><div class="crm-activity-meta">${e.label?`<span class="crm-status-label">${esc(e.label)}</span>`:''}${e.sender?`<span>From ${esc(e.sender)}</span>`:''}${e.recipient?`<span>To ${esc(e.recipient)}</span>`:''}${e.lastError?`<span class="crm-delivery-error">${esc(e.lastError)}</span>`:''}${e.jobId?`<button class="client-text-link" data-job="${esc(e.jobId)}">Open Job</button>`:e.enquiryId?`<button class="client-text-link" data-enquiry="${esc(e.enquiryId)}">Open Enquiry</button>`:''}</div></div></article>`).join(''):'<p class="crm-empty">No recorded communications or activity for this client.</p>'}</div>
+         <p class="crm-stream-notice">Only recorded events are displayed. Provider acceptance does not confirm recipient delivery.</p>
+        </section>
+        <aside class="crm-insights" aria-label="Relationship information and follow-ups">
+         <section class="crm-insight-section"><h3>Client Summary</h3><div class="crm-metrics"><div><span>Client Value</span><strong>${financial?esc(money(financial.lifetimeValue)):'Restricted'}</strong><small>Net recorded receipts</small></div><div><span>Last Contact</span><strong>${esc(fmtDay(latest))}</strong><small>Latest recorded interaction</small></div><div><span>Open Follow-ups</span><strong>${openTasks.length}</strong><small>Tasks requiring action</small></div></div></section>
+         <section class="crm-insight-section"><h3>Upcoming Opportunities</h3>${opportunities.length?opportunities.map(o=>`<div class="crm-side-row"><button class="client-text-link" data-enquiry="${esc(o.id)}">${esc(o.title||'Enquiry')}</button><span>${esc(o.status||'Open')}</span></div>`).join(''):'<p class="crm-empty">No open enquiries.</p>'}</section>
+         <section class="crm-next-action"><h3>Next Required Action</h3>${openTasks.length?`<strong>${esc(openTasks[0].taskType)}</strong><p>Due ${esc(date(openTasks[0].dueAtUtc))}</p><button class="action" data-open-tasks>Review follow-ups</button>`:'<p>No outstanding follow-ups.</p>'}</section>
+         <section class="crm-insight-section"><div class="crm-insight-title"><h3>Tasks & Follow-ups (${openTasks.length})</h3>${can('tasks.manage')?'<button class="action" data-add-task>Add Task</button>':''}</div>${openTasks.length?openTasks.slice(0,6).map(t=>`<div class="crm-side-task"><div><strong>${esc(t.taskType)}</strong><small>Due ${esc(date(t.dueAtUtc))} · ${esc(t.priority||'Normal')}</small></div>${can('tasks.manage')?`<button class="action" data-edit-task="${esc(t.id)}">Edit</button>`:''}</div>`).join(''):'<p class="crm-empty">No open follow-up tasks.</p>'}</section>
+         <section class="crm-insight-section"><div class="crm-insight-title"><h3>Automation Reminders</h3><button class="client-text-link" data-open-reminders>View</button></div><p class="crm-empty">Manage scheduled client messages and reminders in Studio.</p></section>
+        </aside>
+       </div>`;
+       const search=host.querySelector('[data-activity-search]'),kind=host.querySelector('[data-activity-kind]');
+       const filterActivity=()=>host.querySelectorAll('.crm-activity-entry').forEach(e=>{e.hidden=(kind.value!=='all'&&e.dataset.kind!==kind.value)||!e.dataset.text.includes(search.value.trim().toLowerCase());});
+       search.oninput=filterActivity;kind.onchange=filterActivity;
+       host.querySelector('[data-open-tasks]')?.addEventListener('click',()=>{tab='tasks';page=1;showTab();});
+       host.querySelector('[data-open-reminders]')?.addEventListener('click',()=>{tab='reminders';page=1;showTab();});
+       host.querySelector('[data-add-task]')?.addEventListener('click',()=>editTask(null));
+       bindTaskActions(host,tasks);
+       find('[data-pager]').hidden=messages.total<=50;find('[data-prev]').disabled=page<=1;find('[data-next]').disabled=page*50>=messages.total;find('[data-position]').textContent=`Page ${page} · ${messages.total} messages`;
       }else if(tab==='reminders'){
        const jobs=await json(path+'/sections/jobs?page='+page);if(!live()||turn!==sectionRevision)return;await StudioClientReminders.mountClient(host,jobs.items,()=>live()&&turn===sectionRevision);
       }else if(tab==='tasks'){
