@@ -75,7 +75,7 @@ window.StudioClients=(()=>{
      <header class="crm-profile-header crm-profile-spec">
       <button class="client-text-link" data-back>← Clients</button>
       <div class="crm-identity">
-       <span class="sj-initials" aria-hidden="true">${esc(client.displayName.split(/\\s+/).slice(0,2).map(x=>x[0]).join(''))}</span>
+       <span class="sj-initials" aria-hidden="true">${esc(client.displayName.split(/\s+/).slice(0,2).map(x=>x[0]).join(''))}</span>
        <div class="crm-client-name"><h2>${esc(client.displayName)}</h2><p class="crm-identity-contacts"><span>${esc(client.clientType)}</span><span>${esc(client.relationshipStatus)}</span>${client.phone?`<span>☎ ${esc(client.phone)}</span>`:''}${client.email?`<span>✉ ${esc(client.email)}</span>`:''}</p></div>
       </div>
       <div class="crm-toolbar">${can('edit')?'<button class="action" data-edit>Edit Client</button><button class="action" data-note>Add Note / Call</button>':''}<button class="action" data-new-job>New Job</button><button class="action" data-new-enquiry>New Enquiry</button>${can('communications.send')?'<button class="action" data-message>Send Message</button>':''}${can('tasks.manage')?'<button class="primary" data-task>Schedule Follow-up</button>':''}<details><summary>More Actions</summary><div class="crm-more"><button class="action" data-duplicates>Review duplicates</button>${caps.isAdministrator?'<button class="action" data-gallery-link>Gallery account link</button>':''}${can('automations.manage')?'<button class="action" data-automations>CRM automations</button>':''}${can('archive')?'<button class="action" data-archive>Archive Client</button>':''}</div></details></div>
