@@ -437,3 +437,39 @@
 @media(max-width:1250px){.crm-polished .crm-overview{grid-template-columns:minmax(0,1fr)}.crm-polished .crm-communications-layout{grid-template-columns:minmax(0,1fr)}.crm-polished .crm-overview-aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:850px){.crm-polished .crm-overview-main,.crm-polished .crm-overview-aside{grid-template-columns:minmax(0,1fr)}.crm-polished .crm-section-heading{flex-wrap:wrap}.crm-polished .crm-section-actions{margin-left:0}.crm-polished .crm-profile-spec{grid-template-columns:minmax(0,1fr)}.crm-polished .crm-quick-filters{gap:5px}}
 @media(max-width:650px){.crm-polished.crm-directory,.crm-polished.crm-client-profile{padding:12px!important;border-radius:10px}.crm-polished .crm-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-polished .crm-quick-filter{padding:6px 9px}.crm-polished .crm-table th,.crm-polished .crm-table td{padding:9px}}
+
+/* Latest Activity mockup: timeline plus follow-up and reminder panels. */
+.crm-polished .crm-activity-aside{display:flex;flex-direction:column;gap:13px}
+.crm-polished .crm-activity-aside .crm-insight-section{border-color:var(--crm-edge);box-shadow:0 3px 12px #4a271013;background:var(--studio-page-surface,#fff);padding:16px}
+.crm-polished .crm-activity-aside .crm-insight-title{padding-bottom:11px;border-bottom:1px solid var(--crm-edge);margin-bottom:5px}
+.crm-polished .crm-activity-aside .crm-insight-title h3{font-size:18px!important;letter-spacing:-.02em}
+.crm-polished .crm-activity-aside .crm-insight-title .client-text-link{color:var(--crm-warm-dark);font-weight:730;text-decoration:none}
+.crm-polished .crm-stream.crm-insight-section{padding:14px 16px;box-shadow:0 3px 13px #4a271010}
+.crm-polished .crm-stream .crm-insight-title{border-bottom:1px solid var(--crm-edge);padding-bottom:12px;margin-bottom:12px}
+.crm-polished .crm-stream .crm-insight-title h3{font-size:18px!important}
+.crm-polished .crm-stream .crm-insight-title .client-text-link{text-decoration:none;color:var(--crm-warm-dark);font-weight:730}
+.crm-polished .crm-stream .crm-stream-tools{grid-template-columns:minmax(140px,1fr) auto auto auto;gap:7px}
+.crm-polished .crm-activity-list{background:transparent;border:0;padding:0}
+.crm-polished .crm-activity-entry{position:relative;grid-template-columns:36px minmax(0,1fr);gap:11px;padding:13px 8px!important}
+.crm-polished .crm-activity-entry:before{content:'';position:absolute;top:43px;bottom:-16px;left:23px;width:2px;background:var(--crm-edge)}
+.crm-polished .crm-activity-entry:last-child:before{display:none}
+.crm-polished .crm-activity-marker{z-index:1;width:32px;height:32px;border-radius:50%;font-size:17px;background:#e1ebff;color:#2c68bc}
+.crm-polished .crm-activity-top strong{font-weight:770}
+.crm-polished .crm-activity-top time{font-size:11px}
+.crm-polished .crm-activity-main p{font-size:12px;line-height:1.5}
+.crm-polished .crm-date-heading{padding:12px 0 7px;margin:0;font-weight:760}
+.crm-polished .crm-task-item{display:flex;gap:11px;align-items:center;border-bottom:1px solid var(--crm-edge);padding:12px 0;min-height:49px}
+.crm-polished .crm-task-item:last-child{border-bottom:0}
+.crm-polished .crm-task-description{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.crm-polished .crm-task-description strong{font-size:12px;font-weight:730;overflow-wrap:anywhere}
+.crm-polished .crm-task-description small{font-size:11px;opacity:.74}
+.crm-polished .crm-task-checkbox,.crm-polished .crm-task-checkbox-disabled{font-size:23px;line-height:1;background:transparent;border:0;padding:0;color:var(--studio-control-text,#223);cursor:pointer;width:25px;flex:0 0 25px}
+.crm-polished .crm-task-checkbox:hover{color:var(--crm-warm-dark)}
+.crm-polished .crm-task-checkbox-disabled{opacity:.5;cursor:default}
+.crm-polished .crm-priority{padding:5px 11px;border-radius:999px;font-size:11px;font-weight:760;min-width:52px;text-align:center;background:#e0efff;color:#2556a2}
+.crm-polished .crm-priority-high,.crm-polished .crm-priority-urgent{background:#ffe1e1;color:#a3232b}
+.crm-polished .crm-priority-medium,.crm-polished .crm-priority-normal{background:#fff1cd;color:#9a6412}
+.crm-polished .crm-priority-low{background:#e5f4df;color:#276c2c}
+.crm-polished .crm-reminders-panel .action{border-radius:8px;min-height:31px;font-size:12px}
+@media(max-width:1200px){.crm-polished .crm-activity-aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:750px){.crm-polished .crm-activity-aside{display:flex}.crm-polished .crm-stream .crm-stream-tools{display:flex;flex-wrap:wrap}.crm-polished .crm-stream .crm-stream-tools label:first-child{flex:1 1 100%}}
