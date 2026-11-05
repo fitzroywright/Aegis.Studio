@@ -97,3 +97,18 @@ test('link errors remain visible and retryable; client navigation closes the dia
  fixture.failLink=false;let release;fixture.linkDelay=new Promise(resolve=>release=resolve);dialog.querySelector('[data-link-create]').click();dialog.querySelector('[data-link-create]').click();assert.equal(fixture.calls.filter(call=>call.options?.method==='POST').length,2);
  await w.StudioClients.render({clientId:'b',tab:'jobs'});release();await settle();assert.equal(w.document.querySelector('dialog'),null);assert.equal(dialog.querySelector('[data-link-code]').value,'');assert.match(w.document.querySelector('[data-content]').textContent,/Other client job/);
 });
+
+test('Clients directory uses Jobs-style board, inline filters and scrolling rows',async t=>{
+ const {w}=setup();t.after(()=>w.close());await w.StudioClients.render();
+ assert.ok(w.document.querySelector('.crm-jobs-board'));
+ assert.ok(w.document.querySelector('.crm-jobs-head [data-search]'));
+ assert.ok(w.document.querySelector('.crm-jobs-head [data-header-status]'));
+ assert.ok(w.document.querySelector('.crm-jobs-body [data-client-row]'));
+ assert.ok(w.document.querySelector('.crm-pagination'));
+ assert.equal(w.document.querySelectorAll('.crm-jobs-head th').length,6);
+ assert.equal(w.document.querySelector('[data-import]'),null);
+ assert.equal(w.document.querySelector('[data-export]'),null);
+ w.document.querySelector('[data-client-view=active]').click();
+ await settle();
+ assert.equal(w.document.querySelector('[data-client-view=active]').getAttribute('aria-pressed'),'true');
+});
