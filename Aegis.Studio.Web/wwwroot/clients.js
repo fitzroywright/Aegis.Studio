@@ -46,7 +46,6 @@ window.StudioClients=(()=>{
     const find=s=>genericView.querySelector(s),guard=fn=>async()=>{try{await fn();}catch(e){status(genericView,e);}};
     let debounce;find('[data-search]').oninput=e=>{state.search=e.target.value;state.page=1;clearTimeout(debounce);debounce=setTimeout(()=>{if(live())directory().catch(e=>status(genericView,e));},250);};
     find('.crm-filters').onsubmit=e=>{e.preventDefault();for(const k of ['type','status','workspace','owner','followUp','inactiveDays'])state[k]=e.currentTarget.elements[k].value;state.page=1;guard(directory)();};
-    for(const [button,field] of [['[data-filter-type]','type'],['[data-filter-status]','status'],['[data-filter-workspace]','workspace'],['[data-filter-owner]','owner']])find(button).onclick=()=>{const drawer=find('.crm-filter-drawer');drawer.open=true;drawer.querySelector('[name='+field+']')?.focus();};
     genericView.querySelectorAll('[data-client-view]').forEach(button=>button.onclick=()=>{state.status={all:'',active:'Active',prospect:'Prospect',inactive:'Inactive'}[button.dataset.clientView];state.page=1;guard(directory)();});
     find('[data-header-status]')?.addEventListener('change',e=>{state.status=e.target.value;state.page=1;guard(directory)();});
     find('[data-reset]').onclick=()=>{Object.assign(state,{search:'',type:'',status:'',workspace:'',owner:'',followUp:'',inactiveDays:'',page:1,sort:'name'});guard(directory)();};
