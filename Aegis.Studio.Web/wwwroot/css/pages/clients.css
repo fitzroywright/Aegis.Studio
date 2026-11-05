@@ -200,3 +200,55 @@
 .crm-empty{font-size:12px;line-height:1.6;opacity:.7}
 @media(max-width:1100px){.crm-communications-layout{grid-template-columns:minmax(0,1fr)}.crm-insights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}}
 @media(max-width:700px){.crm-insights{display:flex}.crm-activity-entry{padding:12px 0;grid-template-columns:34px minmax(0,1fr);gap:8px}.crm-activity-marker{width:30px;height:30px}.crm-activity-top{flex-direction:column;gap:3px}.crm-metrics strong{font-size:14px}}
+
+
+/* Client directory & overview: photographic CRM specification, not generic data administration. */
+.crm-directory .crm-page-title{margin-bottom:0}
+.crm-directory-count{font-size:12px;font-weight:600;opacity:.7;padding:5px 0}
+.crm-directory .crm-toolbar{padding:5px 0}
+.crm-directory .crm-filter-drawer{border-bottom:1px solid var(--crm-line);padding:1px 0 6px}
+.crm-directory .crm-filter-drawer>summary{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:650;cursor:pointer;min-height:28px;padding:5px 8px 5px 0}
+.crm-directory .crm-filter-drawer:not([open]){padding-bottom:3px}
+.crm-directory .crm-filters{padding:9px 0 12px;border:0}
+.crm-directory .crm-sort-hint{padding:0 2px;opacity:.62}
+.crm-directory .crm-bulk{min-height:29px;gap:8px}
+.crm-directory .crm-table{font-size:12px}
+.crm-directory .crm-table th{background:var(--studio-grid-header-bg,var(--crm-surface));font-size:11px}
+.crm-directory .crm-table td{padding:13px 12px;min-height:32px}
+.crm-directory .crm-table td:first-child{width:38px}
+.crm-directory .crm-table tbody tr{transition:background .1s ease}
+.crm-directory .crm-table td .client-text-link{font-size:13px}
+.crm-directory .crm-pagination{padding:9px 0}
+.crm-overview{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:18px;align-items:start;min-width:0}
+.crm-overview-main,.crm-overview-aside{display:grid;gap:14px;min-width:0}
+.crm-overview-main{grid-template-columns:minmax(235px,.8fr) minmax(0,1.3fr);align-items:start}
+.crm-overview-aside{grid-template-columns:minmax(0,1fr)}
+.crm-overview-panel{border:1px solid var(--crm-line);border-radius:10px;padding:16px;background:var(--studio-page-surface,transparent);min-width:0}
+.crm-overview-panel h3{font-size:15px!important;margin:0!important;line-height:1.4;font-weight:650}
+.crm-panel-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px}
+.crm-panel-title .client-text-link{font-size:12px;color:var(--crm-accent);font-weight:650;text-decoration:none}
+.crm-contact-list{display:flex;flex-direction:column;gap:0;margin:0}
+.crm-contact-list>div{display:flex;flex-direction:column;gap:4px;border-bottom:1px solid var(--crm-line);padding:9px 0}
+.crm-contact-list>div:first-child{padding-top:0}
+.crm-contact-list>div:last-child{border-bottom:0}
+.crm-contact-list dt{font-size:11px;opacity:.72}
+.crm-contact-list dd{margin:0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.crm-tag-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.crm-tag{font-size:11px;padding:4px 8px;background:var(--crm-surface);border-radius:99px}
+.crm-compact-rows{display:flex;flex-direction:column}
+.crm-compact-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--crm-line);font-size:12px;min-width:0}
+.crm-compact-row:first-child{padding-top:1px}
+.crm-compact-row:last-child{border-bottom:0;padding-bottom:0}
+.crm-compact-row>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.crm-compact-row .client-text-link{font-weight:650;text-decoration:none;overflow-wrap:anywhere}
+.crm-compact-row .client-text-link:hover{text-decoration:underline}
+.crm-compact-row strong{font-weight:650;overflow-wrap:anywhere}
+.crm-compact-row small{display:block;font-size:11px;opacity:.72;line-height:1.45;overflow-wrap:anywhere}
+.crm-compact-row time{font-size:11px;opacity:.7;white-space:nowrap}
+.crm-overview .crm-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+.crm-overview .crm-metrics strong{font-size:19px}
+.crm-overview .crm-next-action{min-height:90px}
+.crm-overview .crm-empty{margin:4px 0}
+@media(max-width:1350px){.crm-overview{grid-template-columns:minmax(0,1fr)}.crm-overview-aside{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:950px){.crm-overview-main,.crm-overview-aside{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.crm-overview{gap:12px}.crm-overview-panel{padding:13px}.crm-directory .crm-table td{padding:10px}.crm-directory .crm-toolbar{gap:6px}}
