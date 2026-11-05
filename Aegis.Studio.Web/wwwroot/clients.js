@@ -104,7 +104,7 @@ window.StudioClients=(()=>{
      const turn=++sectionRevision,host=find('[data-content]');if(!live())return;host.innerHTML='<p role="status">Loading…</p>';find('[data-pager]').hidden=true;genericView.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tab===tab));
      try{
       if(tab==='overview'){
-       const [contacts,tasks,enquiries,jobPage,sessionPage,recent]=await Promise.all([json(path+'/contacts'),json(api+'/tasks?clientId='+client.id),json(path+'/sections/enquiries'),json(path+'/sections/jobs'),json(path+'/sections/sessions'),json(path+'/sections/activity')]);if(!live()||turn!==sectionRevision)return;
+       const [contacts,tasks,enquiries,jobPage,sessionPage,recent,financial]=await Promise.all([json(path+'/contacts'),json(api+'/tasks?clientId='+client.id),json(path+'/sections/enquiries'),json(path+'/sections/jobs'),json(path+'/sections/sessions'),json(path+'/sections/activity'),can('financials.view')?json(path+'/financials').catch(()=>null):Promise.resolve(null)]);if(!live()||turn!==sectionRevision)return;
        const m=client.metadata||{};
        const openTasks=tasks.filter(t=>['Open','In Progress'].includes(t.status)).sort((x,y)=>Date.parse(x.dueAtUtc||0)-Date.parse(y.dueAtUtc||0));
        const important=Object.entries(m.importantDates||{}).filter(([,v])=>v);
@@ -113,6 +113,7 @@ window.StudioClients=(()=>{
        const recentEvents=(recent.items||[]).slice(0,5);
        host.innerHTML=`<div class="crm-overview">
         <div class="crm-overview-main">
+         <div class="crm-portrait-surface" aria-label="Client visual identity"><div class="crm-portrait-monogram" aria-hidden="true">${esc(client.displayName.split(/\s+/).slice(0,2).map(n=>n[0]).join(''))}</div><span>${esc(client.displayName)}</span><small>Client profile</small></div>
          <section class="crm-overview-panel crm-contact-panel"><div class="crm-panel-title"><h3>Contact Information</h3>${can('edit')?'<button class="client-text-link" data-overview-edit>Edit</button>':''}</div>
           <dl class="crm-contact-list">${contactValues.filter(([,v])=>v).map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')||'<p class="crm-empty">No contact details recorded.</p>'}</dl>
           ${client.tags?.length?`<div class="crm-tag-row">${client.tags.map(t=>`<span class="crm-tag">${esc(t)}</span>`).join('')}</div>`:''}
@@ -128,12 +129,12 @@ window.StudioClients=(()=>{
          </section>
         </div>
         <div class="crm-overview-aside">
-         <section class="crm-overview-panel"><div class="crm-panel-title"><h3>Client Summary</h3></div><div class="crm-metrics"><div><span>Jobs</span><strong>${jobPage.total}</strong><small>Accessible jobs</small></div><div><span>Sessions</span><strong>${sessionPage.total}</strong><small>Photography sessions</small></div><div><span>Follow-ups</span><strong>${openTasks.length}</strong><small>Open actions</small></div></div></section>
+         <section class="crm-overview-panel"><div class="crm-panel-title"><h3>Client Summary</h3></div><div class="crm-metrics"><div><span>Jobs</span><strong>${jobPage.total}</strong><small>Accessible jobs</small></div><div><span>Sessions</span><strong>${sessionPage.total}</strong><small>Photography sessions</small></div><div><span>Follow-ups</span><strong>${openTasks.length}</strong><small>Open actions</small></div><div><span>Lifetime Value</span><strong>${financial?esc(money(financial.lifetimeValue)):'Restricted'}</strong><small>Net JMD receipts</small></div></div></section>
          <section class="crm-next-action"><h3>Next Required Action</h3>${openTasks.length?`<strong>${esc(openTasks[0].taskType)}</strong><p>Due ${esc(date(openTasks[0].dueAtUtc))}</p><button class="action" data-overview-tasks>View follow-ups</button>`:'<p>No outstanding follow-ups.</p>'}</section>
          <section class="crm-overview-panel"><div class="crm-panel-title"><h3>Upcoming Follow-ups</h3>${can('tasks.manage')?'<button class="client-text-link" data-overview-add-task>Add task</button>':''}</div>
           ${openTasks.length?`<div class="crm-compact-rows">${openTasks.slice(0,5).map(t=>`<div class="crm-compact-row"><div><strong>${esc(t.taskType)}</strong><small>Due ${esc(date(t.dueAtUtc))} · ${esc(t.priority||'Normal')}</small></div>${can('tasks.manage')?`<button class="client-text-link" data-edit-task="${esc(t.id)}">Edit</button>`:''}</div>`).join('')}</div>`:'<p class="crm-empty">No scheduled tasks.</p>'}
          </section>
-         <section class="crm-overview-panel"><div class="crm-panel-title"><h3>Enquiries & Opportunities</h3></div>
+         <section class="crm-overview-panel crm-opportunity-panel"><div class="crm-panel-title"><h3>★ Upcoming Opportunities</h3></div>
           ${enquiries.items?.length?`<div class="crm-compact-rows">${enquiries.items.slice(0,5).map(e=>`<div class="crm-compact-row"><div><button class="client-text-link" data-enquiry="${esc(e.id)}">${esc(e.title||'Enquiry')}</button><small>${esc(e.status||'Open')}</small></div>${can('edit')?`<button class="client-text-link" data-lead="${esc(e.id)}">Edit</button>`:''}</div>`).join('')}</div>`:'<p class="crm-empty">No linked enquiries.</p>'}
          </section>
          ${important.length?`<section class="crm-overview-panel"><div class="crm-panel-title"><h3>Important Dates</h3></div><div class="crm-compact-rows">${important.map(([k,v])=>`<div class="crm-compact-row"><strong>${esc(k)}</strong><span>${esc(v)}</span></div>`).join('')}</div></section>`:''}
