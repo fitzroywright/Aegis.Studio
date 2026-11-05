@@ -309,3 +309,27 @@
 .crm-client-profile .crm-stream-notice{font-size:10px}
 @media(max-width:1200px){.crm-client-profile .crm-profile-spec{grid-template-columns:minmax(0,1fr)}.crm-client-profile .crm-profile-spec .crm-toolbar{max-width:none;justify-content:flex-start}.crm-client-profile .crm-communications-layout{grid-template-columns:minmax(0,1fr)}.crm-client-profile .crm-insights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.crm-client-profile{padding:12px!important}.crm-client-profile .crm-insights{display:flex}.crm-client-profile .crm-stream-tools{display:flex;flex-wrap:wrap}.crm-client-profile .crm-stream-tools label:first-child{flex:1 1 100%}.crm-client-profile .crm-profile-spec{padding:10px}.crm-client-profile .crm-client-name h2{font-size:20px}.crm-client-profile .crm-next-action{grid-template-columns:minmax(0,1fr)}}
+
+/* Final mockup details: compact profile controls, grouped activity and no navigation sidebar. */
+.crm-client-profile .crm-profile-actions{max-width:none;justify-content:flex-end;gap:9px}
+.crm-client-profile .crm-relationship-badge{display:inline-flex;align-items:center;white-space:nowrap;border-radius:99px;background:var(--crm-surface);color:var(--crm-accent);font-weight:700;font-size:12px;padding:7px 12px}
+.crm-client-profile .crm-relationship-badge:before{content:'';background:currentColor;display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:7px}
+.crm-client-profile .crm-actions-dropdown{position:relative}
+.crm-client-profile .crm-actions-dropdown>summary{display:flex;align-items:center;gap:5px;background:var(--studio-control-surface);border:1px solid var(--crm-line);border-radius:9px;min-height:31px;padding:5px 11px;font-size:12px;list-style:none;font-weight:600}
+.crm-client-profile .crm-actions-dropdown>summary::-webkit-details-marker{display:none}
+.crm-client-profile .crm-actions-dropdown[open]{z-index:8}
+.crm-client-profile .crm-actions-dropdown .crm-more{position:absolute;top:calc(100% + 7px);right:0;display:flex;flex-direction:column;min-width:210px;max-height:55vh;overflow:auto;z-index:10;padding:7px;background:var(--studio-control-surface);border:1px solid var(--crm-line);border-radius:9px;box-shadow:0 12px 35px #0002}
+.crm-client-profile .crm-actions-dropdown .crm-more button{width:100%;text-align:left;border:0;background:transparent;justify-content:flex-start;white-space:normal}
+.crm-client-profile .crm-actions-dropdown .crm-more button:hover{background:var(--crm-surface)}
+.crm-client-profile .crm-date-heading{font-size:12px;font-weight:750;color:var(--studio-control-text);padding:10px 0 7px;margin:0}
+.crm-client-profile .crm-stream-tools{grid-template-columns:minmax(220px,1fr) auto auto auto}
+.crm-client-profile .crm-stream-tools label>.crm-visually-hidden{position:absolute;overflow:hidden;width:1px;height:1px;clip:rect(0 0 0 0);white-space:nowrap}
+.crm-client-profile .crm-stream-tools input{font-size:12px}
+.crm-client-profile .crm-stream-tools select{max-width:150px;font-size:12px}
+.crm-client-profile .crm-activity-entry{min-height:52px;align-items:start}
+.crm-client-profile .crm-activity-entry+.crm-date-heading{margin-top:9px}
+.crm-client-profile .crm-activity-meta .crm-status-label{font-size:10px;font-weight:700;padding:3px 8px;border:1px solid var(--crm-line)}
+.crm-client-profile .crm-opportunity-panel,.crm-client-profile .crm-followups-panel,.crm-client-profile .crm-reminders-panel{overflow:hidden}
+.crm-client-profile .crm-side-row .client-text-link{text-decoration:none;font-weight:650;font-size:12px}
+.crm-client-profile .crm-side-task .client-text-link{text-decoration:none;font-size:11px}
+@media(max-width:850px){.crm-client-profile .crm-stream-tools{display:flex;flex-wrap:wrap;gap:7px}.crm-client-profile .crm-stream-tools label:first-child{flex:1 1 100%}}
