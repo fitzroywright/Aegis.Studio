@@ -7,8 +7,8 @@ namespace Aegis.Studio.Web.Crm;
 
 public static class CrmPermissions
 {
-    public const string View="studio.crm.view",Create="studio.crm.create",Edit="studio.crm.edit",Merge="studio.crm.merge",Archive="studio.crm.archive",Communications="studio.crm.communications.view",Send="studio.crm.communications.send",Tasks="studio.crm.tasks.manage",Financials="studio.crm.financials.view",Export="studio.crm.export",Automations="studio.crm.automations.manage";
-    public static readonly string[] All=[View,Create,Edit,Merge,Archive,Communications,Send,Tasks,Financials,Export,Automations];
+    public const string View="studio.crm.view",Create="studio.crm.create",Edit="studio.crm.edit",Merge="studio.crm.merge",Archive="studio.crm.archive",Communications="studio.crm.communications.view",Send="studio.crm.communications.send",Tasks="studio.crm.tasks.manage",Financials="studio.crm.financials.view",Automations="studio.crm.automations.manage";
+    public static readonly string[] All=[View,Create,Edit,Merge,Archive,Communications,Send,Tasks,Financials,Automations];
 }
 
 public sealed class CrmAccess(StudioDatabase database,ClaimsPrincipal user)
