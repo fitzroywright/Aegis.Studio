@@ -473,3 +473,56 @@
 .crm-polished .crm-reminders-panel .action{border-radius:8px;min-height:31px;font-size:12px}
 @media(max-width:1200px){.crm-polished .crm-activity-aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:750px){.crm-polished .crm-activity-aside{display:flex}.crm-polished .crm-stream .crm-stream-tools{display:flex;flex-wrap:wrap}.crm-polished .crm-stream .crm-stream-tools label:first-child{flex:1 1 100%}}
+
+/* Clients directory follows the existing Jobs page structure, density and controls.
+   These rules affect the Clients directory only. Studio shell and profile are unchanged. */
+.crm-jobs-parity.crm-directory{width:100%;height:100%;min-height:0;max-height:100%;margin:0;padding:0!important;background:transparent;border:0;border-radius:0;box-shadow:none;gap:0;overflow:hidden;color:var(--studio-control-text,#283442);font-size:12px}
+.crm-jobs-parity .crm-jobs-board{width:100%;height:100%;min-width:0;min-height:0;display:flex;flex-direction:column;border:var(--studio-rail-border,1px solid #d5d9dd);border-radius:5px;background:var(--studio-page-surface,#fff);box-shadow:0 2px 5px #2633440c;overflow:hidden}
+.crm-jobs-parity .crm-jobs-summary{flex:0 0 auto;display:flex;align-items:center;gap:9px;min-height:40px;padding:5px 10px;border-bottom:1px solid #e3e6e9;background:var(--studio-control-surface,#fafafa);color:var(--studio-control-text,#66707b)}
+.crm-jobs-parity .crm-jobs-tabs{display:flex;gap:3px;flex-wrap:wrap;align-items:center}
+.crm-jobs-parity .crm-jobs-tabs button{min-height:27px;padding:4px 10px;border:1px solid var(--studio-control-border,#c6d0db);border-radius:7px;background:transparent;color:inherit;font-size:11px;font-weight:650;cursor:pointer}
+.crm-jobs-parity .crm-jobs-tabs button[aria-pressed=true]{background:#986c55;border-color:#986c55;color:#fff}
+.crm-jobs-parity .crm-jobs-count{margin-left:auto;font-size:11px;white-space:nowrap;opacity:.8}
+.crm-jobs-parity .crm-jobs-commands{display:flex;gap:8px;align-items:center}
+.crm-jobs-parity .crm-jobs-commands .primary{min-height:28px;padding:4px 12px;border:1px solid #ae570c;border-radius:6px;background:#b46c2a;color:#fff;font-size:11px;font-weight:700;box-shadow:none}
+.crm-jobs-parity .crm-column-menu{position:relative}
+.crm-jobs-parity .crm-column-menu>summary{font-size:11px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:6px;padding:6px 9px}
+.crm-jobs-parity .crm-column-menu[open]{z-index:10}
+.crm-jobs-parity .crm-jobs-secondary{min-height:0;background:var(--studio-control-surface,#fff)}
+.crm-jobs-parity .crm-filter-drawer{padding:0 10px;margin:0;border:0;align-self:auto}
+.crm-jobs-parity .crm-filter-drawer>summary{display:inline-flex;align-items:center;padding:5px 0;font-weight:630;font-size:11px;min-height:26px}
+.crm-jobs-parity .crm-filter-drawer[open]{padding-bottom:7px}
+.crm-jobs-parity .crm-filters{padding:7px 8px;border:1px solid var(--studio-control-border,#d2dae3);background:var(--studio-control-surface,#fff);border-radius:6px;align-items:end;gap:7px}
+.crm-jobs-parity .crm-filters label{font-size:11px}
+.crm-jobs-parity .crm-filters input,.crm-jobs-parity .crm-filters select{min-height:27px;font-size:11px;border-radius:4px}
+.crm-jobs-parity .crm-bulk{flex:0 0 auto;padding:3px 10px 5px;min-height:30px;gap:9px;font-size:11px;border-bottom:1px solid #e4e8ed}
+.crm-jobs-parity .crm-bulk .action{min-height:25px;padding:3px 8px;border-radius:5px;font-size:11px}
+.crm-jobs-parity .crm-bulk[data-selected] {min-width:0}
+.crm-jobs-parity [role=alert]:empty{display:none}
+.crm-jobs-parity .crm-jobs-frame{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border:0;border-radius:0;background:var(--studio-page-surface,#fff)}
+.crm-jobs-parity .crm-jobs-head{flex:0 0 auto;min-width:0;overflow:hidden}
+.crm-jobs-parity .crm-jobs-body{flex:1 1 auto;width:100%;min-width:0;min-height:0;max-height:none;overflow-x:auto;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7;border:0;border-radius:0}
+.crm-jobs-parity .crm-jobs-table{width:100%;table-layout:fixed;border-collapse:collapse;border-spacing:0;font-size:11px;line-height:1.35}
+.crm-jobs-parity .crm-jobs-table th{position:static;background:var(--studio-grid-header-bg,#506780);color:var(--studio-grid-header-text,#fff);padding:7px 10px;font-size:11px;font-weight:700;white-space:normal;vertical-align:middle}
+.crm-jobs-parity .crm-jobs-table th button{font-size:11px;font-weight:700;border:0;background:transparent;color:inherit;padding:0;cursor:pointer}
+.crm-jobs-parity .crm-jobs-table th button:hover{text-decoration:underline}
+.crm-jobs-parity .crm-jobs-table th:nth-child(2){text-align:left}
+.crm-jobs-parity .crm-jobs-table th:nth-child(2) button{flex:0 0 auto}
+.crm-jobs-parity .crm-jobs-table th:nth-child(2):has([data-search]){display:flex;gap:7px;align-items:center;min-height:35px;box-sizing:border-box}
+.crm-jobs-parity .crm-jobs-table input[data-search]{height:25px;min-height:25px;min-width:0;flex:1 1 auto;width:90px;max-width:230px;background:var(--studio-control-surface,#fff);border:1px solid var(--studio-control-border,#bbcbd8);border-radius:4px;padding:3px 7px;color:var(--studio-control-text,#233e57);font-size:11px;font-weight:400}
+.crm-jobs-parity .crm-jobs-table select[data-header-status]{min-height:24px;max-width:125px;width:100%;border:1px solid #658bad;border-radius:4px;background:#2c537c;color:#fff;font-size:10px;font-weight:600;padding:2px 5px}
+.crm-jobs-parity .crm-jobs-table th:first-child{width:36px;border-radius:0}
+.crm-jobs-parity .crm-jobs-table td{padding:8px 10px;border-bottom:1px solid #e8ebee;vertical-align:middle;max-width:none;min-width:0;overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere;font-size:11px}
+.crm-jobs-parity .crm-jobs-table tbody tr{cursor:pointer}
+.crm-jobs-parity .crm-jobs-table .crm-directory-person{min-width:0;align-items:center}
+.crm-jobs-parity .crm-jobs-table .crm-directory-avatar{background:#edf0f5;color:#506079;border:0;width:27px;height:27px;flex-basis:27px;font-size:10px}
+.crm-jobs-parity .crm-jobs-table .crm-directory-person .client-text-link{font-size:12px;font-weight:650;white-space:normal;text-decoration:none}
+.crm-jobs-parity .crm-jobs-table .crm-directory-person small{font-size:10px;color:#707c89;line-height:1.3;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.crm-jobs-parity .crm-jobs-table .crm-client-status{padding:4px 8px;min-width:0;font-size:10px;border:1px solid #cddfbb;background:#edf5e6;color:#5c793c}
+.crm-jobs-parity .crm-pagination{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #dde2e7;background:var(--studio-control-surface,#fafbfc);padding:7px 11px;font-size:11px}
+.crm-jobs-parity .crm-pagination span{margin:0 auto 0 0}
+.crm-jobs-parity .crm-pagination button{padding:4px 9px;min-height:26px;font-size:11px;border:1px solid #d2d9e0;border-radius:4px;background:var(--studio-control-surface,#fff)}
+.crm-jobs-parity .crm-pagination label{font-size:10px}
+.crm-jobs-parity .crm-pagination select{min-height:26px;padding:2px 5px;font-size:11px}
+.crm-jobs-parity :is(button,summary,input,select):focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:2px}
+@media(max-width:900px){.crm-jobs-parity .crm-jobs-summary{flex-wrap:wrap}.crm-jobs-parity .crm-jobs-count{margin-left:auto}.crm-jobs-parity .crm-jobs-table{min-width:720px}.crm-jobs-parity .crm-jobs-head{overflow-x:auto}.crm-jobs-parity .crm-jobs-body{overflow-x:auto}}
