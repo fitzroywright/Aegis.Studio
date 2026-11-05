@@ -40,9 +40,6 @@ public static class CrmEndpoints
         group.MapGet("/views",(StudioDatabase db,ClaimsPrincipal user)=>Run(()=>Results.Ok(new CrmStore(db,user).Views())));
         group.MapPost("/views",(CrmViewRequest request,StudioDatabase db,ClaimsPrincipal user)=>Run(()=>{new CrmStore(db,user).SaveView(request);return Results.NoContent();}));
         group.MapDelete("/views/{id:guid}",(Guid id,StudioDatabase db,ClaimsPrincipal user)=>Run(()=>{new CrmStore(db,user).DeleteView(id);return Results.NoContent();}));
-        group.MapGet("/export",([AsParameters] CrmQuery query,StudioDatabase db,ClaimsPrincipal user)=>Run(()=>Results.File(System.Text.Encoding.UTF8.GetBytes(new CrmStore(db,user).Export(query)),"text/csv; charset=utf-8","studio-clients.csv")));
-        group.MapPost("/import-preview",(CrmImportRequest request,StudioDatabase db,ClaimsPrincipal user)=>Run(()=>Results.Ok(new CrmStore(db,user).ImportPreview(request))));
-        group.MapPost("/import",(CrmImportRequest request,StudioDatabase db,ClaimsPrincipal user)=>Run(()=>Results.Ok(new CrmStore(db,user).Import(request))));
     }
     private static IResult Run(Func<IResult> action)
     {
