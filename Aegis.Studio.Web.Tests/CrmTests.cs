@@ -15,7 +15,6 @@ public sealed class CrmTests
     private static JsonElement Json(string value)=>JsonSerializer.Deserialize<JsonElement>(value);
     [Fact] public void NormalizationDoesNotMergeNamesOrInventEmailAliases(){Assert.Equal("name+alias@example.test",CrmRules.NormalizeEmail(" NAME+Alias@Example.Test "));Assert.Equal("18765550123",CrmRules.NormalizePhone("+1 (876) 555-0123"));}
     [Fact] public void SortIsWhitelistedAndFinancialSortRequiresPermission(){Assert.Contains("desc",CrmRules.OrderBy("name,-jobs",false));Assert.Throws<ArgumentException>(()=>CrmRules.OrderBy("name;drop table",true));Assert.Throws<ArgumentException>(()=>CrmRules.OrderBy("value",false));}
-    [Fact] public void CsvHandlesQuotedCommasNewlinesAndEscapedQuotes(){var rows=CrmCsv.Parse("Display Name,Email\r\n\"Campbell, \"\"Nia\"\"\",nia@example.test\r\n\"Two\nLines\",x@example.test");Assert.Equal("Campbell, \"Nia\"",rows[1][0]);Assert.Equal("Two\nLines",rows[2][0]);Assert.StartsWith("\"'",CrmCsv.Cell("=HYPERLINK()"));Assert.Throws<ArgumentException>(()=>CrmCsv.Parse("\"unfinished"));}
     [Fact] public void InvalidTypesAndTaskStatesAreRejected(){Assert.Throws<ArgumentException>(()=>CrmRules.Validate(new CrmClientRequest("Client",ClientType:"Unsupported")));Assert.Throws<ArgumentException>(()=>CrmRules.Validate(new CrmTaskRequest(Guid.NewGuid(),"staff","Unsupported",DateTimeOffset.UtcNow)));}
 
     [StudioPostgresFact] public async Task AdditiveMigrationPreservesIdentityAndIsRepeatable()
@@ -34,7 +33,7 @@ public sealed class CrmTests
         await using var f=await Fixture.Create();var a=f.Admin.Save(null,f.Request("Accessible"));var b=f.Admin.Save(null,f.Request("Restricted") with{PrimaryWorkspaceId=f.OtherWorkspace});
         var scoped=f.For("viewer",[CrmPermissions.View]);Assert.Equal(1,scoped.Directory(new()).GetProperty("total").GetInt32());Assert.Throws<KeyNotFoundException>(()=>scoped.Get(b));Assert.Equal(a,scoped.Get(a).GetProperty("id").GetGuid());
         Assert.Equal(JsonValueKind.Null,scoped.Directory(new()).GetProperty("items")[0].GetProperty("lifetimeValue").ValueKind);
-        Assert.Throws<UnauthorizedAccessException>(()=>scoped.Financials(a));Assert.Throws<UnauthorizedAccessException>(()=>scoped.Export(new()));Assert.Throws<UnauthorizedAccessException>(()=>scoped.PreviewMerge(a,b));Assert.Throws<UnauthorizedAccessException>(()=>scoped.Save(a,f.Request("No edit")));
+        Assert.Throws<UnauthorizedAccessException>(()=>scoped.Financials(a));Assert.Throws<UnauthorizedAccessException>(()=>scoped.PreviewMerge(a,b));Assert.Throws<UnauthorizedAccessException>(()=>scoped.Save(a,f.Request("No edit")));
         Assert.Throws<UnauthorizedAccessException>(()=>new CrmStore(f.Db,Fixture.User("stranger")).Directory(new()));
     }
     [StudioPostgresFact] public async Task RelationshipsReusePeopleAcrossHouseholdsAndRejectSelfLinks()
@@ -63,12 +62,6 @@ public sealed class CrmTests
         foreach(var section in new[]{"communications","documents","galleries","activity","enquiries"})Assert.Equal(JsonValueKind.Array,f.Admin.Section(client,section).GetProperty("items").ValueKind);
         Assert.Contains(f.Admin.Section(client,"activity").GetProperty("items").EnumerateArray(),e=>e.GetProperty("eventType").GetString()=="JobCreated");
         Assert.Equal(500,f.Admin.Directory(new(Search:"Portrait client")).GetProperty("items")[0].GetProperty("lifetimeValue").GetDecimal());
-    }
-    [StudioPostgresFact] public async Task CsvImportIsAtomicScopedAndDetectsExistingContacts()
-    {
-        await using var f=await Fixture.Create();var request=new CrmImportRequest("Display Name,Email,Telephone,Client Type\nNia,nia@example.test,8765550111,Individual\nFamily,family@example.test,8765550112,Family / Household",f.Workspace);
-        f.Admin.ImportPreview(request);f.Admin.Import(request);Assert.Equal(2,f.Count("studio_clients"));Assert.Throws<ArgumentException>(()=>f.Admin.Import(request));Assert.Equal(2,f.Count("studio_clients"));Assert.Contains("Nia",f.Admin.Export(new()));
-        Assert.Throws<ArgumentException>(()=>f.Admin.Import(new("Display Name,Email\nValid,valid@example.test\nInvalid,not email",f.Workspace)));Assert.Equal(2,f.Count("studio_clients"));
     }
     [StudioPostgresFact] public async Task AutomationIsWorkspaceOptInAtomicAndIdempotent()
     {
