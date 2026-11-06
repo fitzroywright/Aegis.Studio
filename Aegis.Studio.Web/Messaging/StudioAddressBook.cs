@@ -65,8 +65,45 @@ public sealed class StudioAddressBook
         })).OrderBy(e => e.DisplayName).ToArray();
     }
 
+    // Messaging can target a subject's existing contact email, but inbound address resolution
+    // intentionally continues to use GetAll/Resolve so subject addresses are not mailbox routes.
+    public IReadOnlyList<StudioAddressEntry> GetMessagingRecipients(ClaimsPrincipal? user = null)
+    {
+        List<StudioAddressEntry> entries = GetAll(user).ToList();
+        using var connection = database.OpenConnection();
+        using var command = new NpgsqlCommand("""
+            select s.id,s.name,s.contact_email,s.job_id,j.title
+            from studio_job_subjects s
+            join studio_jobs j on j.id=s.job_id
+            where not s.is_system and nullif(btrim(s.contact_email),'') is not null
+            order by s.name,j.title,s.id
+            """, connection);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            Guid jobId = reader.GetGuid(3);
+            if (user is not null && !jobAccess.HasPermission(user, jobId, "ReplyRequester")) continue;
+            string rawEmail = reader.GetString(2);
+            string email = rawEmail;
+            string status = "Active";
+            try { email = ValidateAddress(rawEmail); }
+            catch (InvalidOperationException) { status = "Attention"; }
+            entries.Add(new StudioAddressEntry(
+                reader.GetGuid(0),
+                reader.GetString(1),
+                email,
+                "Subject",
+                "External",
+                "ExternalOnly",
+                ProviderReference: reader.GetString(4),
+                Status: status,
+                ScopeId: jobId));
+        }
+        return entries.OrderBy(e => e.DisplayName).ThenBy(e => e.ContactType).ToArray();
+    }
+
     public StudioAddressEntry Get(Guid id, ClaimsPrincipal? user = null)
-        => GetAll(user).FirstOrDefault(e => e.Id == id) ?? throw new KeyNotFoundException("Address book destination was not found.");
+        => GetMessagingRecipients(user).FirstOrDefault(e => e.Id == id) ?? throw new KeyNotFoundException("Address book destination was not found.");
 
     public StudioAddressEntry? Resolve(string address)
     {
