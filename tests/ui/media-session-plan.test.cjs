@@ -11,6 +11,7 @@ function fixture(t,{sessions=[{id:'morning',title:'Morning'}],edit=true,assets,s
  w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML=`<h2>${title}</h2>${html}`;w.document.body.append(d);d.showModal();return d;};
  w.json=async(url,o)=>{if(o){writes.push({url,options:o,body:typeof o.body==='string'?JSON.parse(o.body):o.body});return url.endsWith('/uploads')?{assetId:'new',unmatched:false}:{};}
  const u=new URL(url,'https://studio.test');
+ if(u.pathname==='/api/media/inbox')return {items:[]};
  if(u.pathname==='/api/jobs')return [{id:'j',workspaceId:'ws',title:'Graduation',status:'Photography'},{id:'other',workspaceId:'ws2',title:'Wedding',status:'Photography'}];
  if(u.pathname==='/api/workspaces')return [{id:'ws',name:'Kings Plaza'},{id:'ws2',name:'Weddings'}];
  if(u.pathname.endsWith('/access'))return {permissions:{manageProduction:edit}};
@@ -133,4 +134,23 @@ test('opening a specific job aligns the footer workspace and successful uploads 
  assert.equal(footer().value,'ws');assert.equal(f.q('[data-job]').value,'j');
  await f.files(['photo.jpg']);assert.equal(footer().disabled,false);
  assert.equal(f.writes[0].body.collection,'Unclassified');
+});
+
+test('upload queue appears during transfer, preserves the destination and collapses on success',async t=>{
+ const f=fixture(t),read=f.w.json;let finish,started;const held=new Promise(r=>finish=r),begin=new Promise(r=>started=r);
+ f.w.json=async(url,o)=>{if(url.endsWith('/uploads')){started();await held;}return read(url,o);};
+ await f.w.showMediaReview();await f.chooseJob();assert.equal(f.q('[data-transfer]').hidden,true);
+ assert.match(f.q('[data-job-context]').textContent,/Graduation/);assert.match(f.q('[data-session-context]').textContent,/Morning/);
+ const input=f.q('[data-files]');Object.defineProperty(input,'files',{value:[new f.w.File(['photo'],'portrait.jpg',{type:'image/jpeg'})]});input.onchange();await begin;
+ assert.equal(f.q('[data-transfer]').hidden,false);assert.ok(f.q('.has-transfer'));assert.match(f.q('[data-queue]').textContent,/portrait.jpg.*Uploading/);
+ assert.equal(f.q('[data-job]').disabled,true);assert.equal(f.q('[data-session]').disabled,true);finish();await settle();
+ assert.equal(f.q('[data-transfer]').hidden,true);assert.equal(f.q('.has-transfer'),null);assert.equal(f.q('[data-job]').disabled,false);
+});
+test('explicit inbox uploads keep failures visible and retry the original upload identity',async t=>{
+ const f=fixture(t),read=f.w.json;let fail=true;
+ f.w.json=async(url,o)=>{const result=await read(url,o);if(url==='/api/media/inbox/uploads'&&fail){fail=false;throw Error('Connection lost');}return result;};
+ await f.w.showMediaReview();await f.chooseJob();f.q('[data-inbox-mode]').click();assert.equal(f.q('[data-destination]').textContent,'Media Inbox');
+ await f.files(['inbox.jpg']);assert.equal(f.q('[data-transfer]').hidden,false);assert.ok(f.q('[data-inbox-retry]'));
+ await f.q('[data-inbox-retry]').onclick();assert.equal(f.writes.length,2);assert.equal(f.writes[0].url,'/api/media/inbox/uploads');
+ assert.equal(f.writes[0].body.get('uploadId'),f.writes[1].body.get('uploadId'));assert.equal(f.q('[data-transfer]').hidden,true);
 });
