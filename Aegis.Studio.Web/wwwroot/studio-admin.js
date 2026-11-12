@@ -1,8 +1,10 @@
 (() => {
     const entries = [
         {view:'catalog',icon:'i-pos',label:'Products and Services'},
-        {view:'templates',icon:'i-jobs',label:'Templates'},
-        {view:'session-plan-templates',icon:'i-calendar',label:'Session Plan Templates'},
+        {view:'templates',icon:'i-jobs',label:'Job Templates',parent:'templates',kind:'Job'},
+        {view:'work-order-templates',icon:'i-jobs',label:'Work Order Templates',parent:'templates'},
+        {view:'session-plan-templates',icon:'i-calendar',label:'Session Plan Templates',parent:'templates'},
+        {view:'workflows-admin',icon:'i-grid',label:'Workflow Automation'},
         {view:'staff-roles',icon:'i-people',label:'Staff and Roles'},
         {view:'opening-hours',icon:'i-calendar',label:'Opening Hours'},
         {view:'workspace-management',icon:'i-grid',label:'Workspaces',staff:true},
@@ -13,21 +15,39 @@
         menu.className='studio-admin-menu';
         menu.innerHTML='<summary aria-label="Administration menu"><svg class="studio-navigation-icon" aria-hidden="true"><use href="#i-settings"></use></svg>Admin <span aria-hidden="true">⌄</span></summary><div class="studio-admin-popover" aria-label="Administration"></div>';
         const body=menu.querySelector('div');
+        const templates=document.createElement('details');templates.className='studio-admin-submenu';templates.hidden=true;
+        templates.innerHTML='<summary class="studio-admin-item"><svg class="studio-navigation-icon" aria-hidden="true"><use href="#i-jobs"></use></svg><span>Templates</span><span class="studio-admin-chevron" aria-hidden="true">⌄</span></summary><div aria-label="Template types"></div>';
+        const templateItems=templates.querySelector('div');
+        const buttons=new Map();
+        const close=()=>{templates.open=false;menu.open=false;};
         for(const entry of entries){
             const button=document.createElement('button');button.type='button';button.className='studio-admin-item';const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('class','studio-navigation-icon');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('fill','none');icon.setAttribute('stroke','currentColor');icon.setAttribute('stroke-width','1.6');icon.setAttribute('stroke-linecap','round');icon.setAttribute('stroke-linejoin','round');icon.setAttribute('aria-hidden','true');icon.setAttribute('focusable','false');const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#'+entry.icon);icon.append(use);const label=document.createElement('span');label.textContent=entry.label;button.append(icon,label);button.dataset.studioAdminView=entry.view;button.hidden=!entry.staff;
-            button.onclick=()=>{menu.open=false;window.studioNavigate?.(entry.view);};body.append(button);
+            button.onclick=()=>{close();window.studioNavigate?.(entry.view,entry.kind?{kind:entry.kind}:{});};
+            if(entry.parent==='templates'){if(!templates.parentElement)body.append(templates);templateItems.append(button);}else body.append(button);
+            buttons.set(entry.view,button);
         }
-        const authorize=payload=>{const admin=(payload?.user||payload)?.isAdministrator===true;for(const button of body.children)button.hidden=window.StudioAccess?.pending()?button.dataset.studioAdminView!=='about':!admin&&!entries.find(entry=>entry.view===button.dataset.studioAdminView).staff;};
+        const authorize=payload=>{
+            const admin=(payload?.user||payload)?.isAdministrator===true,pending=window.StudioAccess?.pending();
+            for(const entry of entries)buttons.get(entry.view).hidden=pending?entry.view!=='about':!admin&&!entry.staff;
+            templates.hidden=!entries.some(entry=>entry.parent==='templates'&&!buttons.get(entry.view).hidden);
+            if(templates.hidden)templates.open=false;
+        };
         Promise.resolve(window.studioSignedInUserReady||window.json?.('/api/auth/me')).then(authorize).catch(()=>{});
         menu.addEventListener('keydown',event=>{
-            if(event.key==='Escape'){menu.open=false;menu.querySelector('summary').focus();}
+            const inside=templates.contains(document.activeElement),summary=templates.querySelector('summary');
+            if(event.key==='Escape'){event.preventDefault();if(inside&&templates.open){templates.open=false;summary.focus();}else{close();menu.querySelector('summary').focus();}}
+            if(event.key==='ArrowRight'&&document.activeElement===summary){event.preventDefault();templates.open=true;templateItems.querySelector('button:not([hidden])')?.focus();}
+            if(event.key==='ArrowLeft'&&inside){event.preventDefault();templates.open=false;summary.focus();}
             if(event.key==='ArrowDown'||event.key==='ArrowUp'){
-                event.preventDefault();menu.open=true;const buttons=[...body.children].filter(button=>!button.hidden),index=buttons.indexOf(document.activeElement),direction=event.key==='ArrowDown'?1:-1;
-                buttons[(index+direction+buttons.length)%buttons.length]?.focus();
+                event.preventDefault();menu.open=true;
+                const visible=[...body.querySelectorAll('button,summary')].filter(el=>!el.hidden&&!el.closest('[hidden]')&&(!templateItems.contains(el)||templates.open));
+                const index=visible.indexOf(document.activeElement),direction=event.key==='ArrowDown'?1:-1;
+                visible[index<0?(direction>0?0:visible.length-1):(index+direction+visible.length)%visible.length]?.focus();
             }
         });
-        document.addEventListener('click',event=>{if(!menu.contains(event.target))menu.open=false;});
-        window.addEventListener('studio-view-changed',()=>{menu.open=false;});
+        menu.addEventListener('toggle',()=>{if(!menu.open)templates.open=false;});
+        document.addEventListener('click',event=>{if(!menu.contains(event.target))close();});
+        window.addEventListener('studio-view-changed',close);
         host.append(menu);
     }
     const scopes=['intake:pull','intake:ack','gallery:access:pull','gallery:access:ack','booking:catalog:publish','booking:availability:publish','gallery:publish','gallery:selections:pull','gallery:selections:ack','client:link'];

@@ -34,6 +34,7 @@
 
     function labelFor(view) {
         if(view==='access-pending')return 'Access Pending';
+        if(view==='templates')return ({Job:'Job Templates',WorkOrder:'Work Order Templates',Automation:'Workflow Automation'})[window.history.state?.studioTemplateKind||'Job'];
         return window.StudioAdmin?.entries.find(entry=>entry.view===view)?.label || ({clients:'Client Management','workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',about:'About','staff-roles':'Staff and Roles','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
             || String(view || 'Studio').replace(/(^|\s)\S/g, match => match.toUpperCase());
     }

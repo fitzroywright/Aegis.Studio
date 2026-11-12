@@ -447,7 +447,7 @@
         window.studioShellMountContext?.([],view==='workspaces'&&context.studioJobId?'job-detail':view);
         if(studioPageTools)studioPageTools.innerHTML='';
         if(view!=='dashboard'){
-            window.studioSetBreadcrumb?.([{label:navigationLabels[view]||view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
+            window.studioSetBreadcrumb?.([{label:(view==='templates'?({Job:'Job Templates',WorkOrder:'Work Order Templates',Automation:'Workflow Automation'})[context.studioTemplateKind]:navigationLabels[view])||view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
         }
         try{
             if(['catalog','opening-hours','templates'].includes(view)){

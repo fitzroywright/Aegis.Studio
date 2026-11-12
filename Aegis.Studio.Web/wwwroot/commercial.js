@@ -1,7 +1,7 @@
 let commercialItems=[], commercialTemplates=[], commercialKind='WorkOrder';
 function commercialPage(title,body,tools='',summary='',attention='') {
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
-    const sharedTitle=['Products and Services','Opening Hours','Templates'].includes(title);
+    const sharedTitle=['Products and Services','Opening Hours','Job Templates','Work Order Templates','Workflow Automation'].includes(title);
     const content=sharedTitle&&tools?`<div class="commercial-page-actions">${tools}</div>${body}`:body;
     genericView.innerHTML=StudioPage.html({title,tools,showHeader:title!=='Production'&&!sharedTitle,content,className:'st-commercial'+(['Products and Services','Opening Hours'].includes(title)?' catalog-page':''),summary:summary||'<p>Manage Studio services, templates and production.</p>',attention});
     StudioPage.bind(genericView);
@@ -103,15 +103,13 @@ function editCommercialItem(item,host=null){
     }catch(error){f.querySelector('[role=alert]').textContent=error.message;}};
 }
 function commercialTemplatePage(kind,body,tools){
-    const tabs=`<nav class="booking-tabs" aria-label="Template types"><button type="button" data-template-kind="Job" aria-pressed="${kind==='Job'}">Job Templates</button><button type="button" data-template-kind="WorkOrder" aria-pressed="${kind==='WorkOrder'}">Work Order Templates</button><button type="button" data-template-kind="Automation" aria-pressed="${kind==='Automation'}">Workflow Automation</button></nav>`;
     const guidance=`<aside class="template-guidance" aria-label="Template guidance">
       <article class="template-postit template-postit-job"><h2>Job Templates</h2><p>Job Templates define <strong>what kind of job this is</strong>.</p><p>A Job Template defines the job type and structure: services, deliverables, Session Plan, stages, tasks, roles and expected workflow.</p><p>Example: Graduation, Wedding or Corporate Headshots.</p></article>
       <article class="template-postit template-postit-work"><h2>Work Order Templates</h2><p>Work Order Templates define <strong>what work must be done</strong>.</p><p>They define the internal production work: ordered steps, dependencies, responsible roles, skills, workstation, costs and quality control.</p><p>A Work Order Template is reusable; a Work Order is the actual work created for a job.</p></article>
       <article class="template-postit template-postit-automation"><h2>Workflow Automation</h2><p>Workflow Automation defines <strong>what happens next</strong>.</p><p>It reacts to events by changing status, creating tasks or work orders, notifying staff, waiting for approvals and enforcing prerequisites.</p><p>It must not silently override ownership, scheduling conflicts, financial approvals or final quality-control decisions.</p></article>
       <div class="template-guidance-flow" aria-label="Template relationship"><strong>Job Template</strong><span>→</span><strong>Workflow Automation</strong><span>→</span><strong>Work Orders</strong></div>
     </aside>`;
-    commercialPage('Templates',guidance+tabs+body,tools,'<p>Manage job templates, work order templates and workflow automation.</p>');
-    genericView.querySelectorAll('[data-template-kind]').forEach(button=>button.onclick=()=>studioNavigate('templates',{kind:button.dataset.templateKind}));
+    commercialPage(kind==='Automation'?'Workflow Automation':kind==='Job'?'Job Templates':'Work Order Templates',guidance+body,tools,kind==='Automation'?'<p>Manage event triggers, conditions and actions.</p>':'<p>Admin → Templates</p>');
     const params=new URLSearchParams({studio:'templates',kind});window.history.replaceState({...window.history.state,studioView:'templates',studioTemplateKind:kind},'','#'+params);
 }
 async function showCommercialTemplates(kind='WorkOrder'){

@@ -8638,7 +8638,7 @@ body .topbar {
   color: #422a1d;
   box-shadow: 0 14px 32px rgba(12,30,50,.25);
 }
-.studio-admin-popover button {
+.studio-admin-popover :is(button,.studio-admin-submenu > summary) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -8651,8 +8651,13 @@ body .topbar {
   background: transparent;
   color: inherit;
   font-size: 12px;
+  cursor: pointer;
+  list-style: none;
 }
-.studio-admin-popover button[hidden] { display: none; }
+.studio-admin-popover [hidden] { display: none; }
+.studio-admin-submenu > summary::-webkit-details-marker { display: none; }
+.studio-admin-submenu > div { margin: 2px 0 4px 12px; border-inline-start: 1px solid #bdc9d5; padding-inline-start: 5px; }
+.studio-admin-chevron { margin-inline-start: auto; }
 .studio-navigation-account {
   position: relative;
   display: flex;
