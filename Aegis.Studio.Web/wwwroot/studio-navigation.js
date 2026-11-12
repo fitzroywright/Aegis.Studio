@@ -364,6 +364,7 @@
         ...Object.fromEntries(['about','staff-roles'].map(view=>[view,()=>renderAdmin(view)])),
         catalog:()=>showCommercialCatalog({tab:window.history.state?.studioCatalogTab}),
         'opening-hours':()=>showCommercialOpeningHours(),
+        'session-plan-templates':()=>window.StudioPlanTemplates.render(),
         templates:()=>showCommercialTemplates(window.history.state?.studioTemplateKind||'Job'),
         media:()=>showMediaReview(),
         frontdesk:()=>showFrontDesk({queue:window.history.state?.studioDashboardQueue,workspaceId:window.history.state?.studioWorkspaceId}),

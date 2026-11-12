@@ -403,6 +403,7 @@ app.MapStudioFulfillment();
 Aegis.Studio.Web.Reminders.ClientReminderEndpoints.MapClientReminders(app);
 Aegis.Studio.Web.Intake.IntakeSchema.Ensure(app.Services.GetRequiredService<StudioDatabase>());
 Aegis.Studio.Web.Intake.IntakeRosterStore.Map(app);
+Aegis.Studio.Web.SessionPlanning.PlanTemplateEndpoints.MapPlanTemplates(app);
 Aegis.Studio.Web.Intake.SubjectMessages.Map(app);
 app.MapStudioQuotes();
 Aegis.Studio.Web.Crm.CrmEndpoints.MapStudioCrm(app);

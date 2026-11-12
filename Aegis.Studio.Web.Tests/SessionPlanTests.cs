@@ -8,7 +8,7 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class SessionPlanTests
 {
     // Uses the same isolated PostgreSQL fixture as the existing WorkDay journeys.
-    private static void Initialize(IntegratedWorkflowTests.WorkflowContext context)
+    internal static void Initialize(IntegratedWorkflowTests.WorkflowContext context)
     {
         using var input=typeof(IntakeSchema).Assembly.GetManifestResourceStream("Aegis.Studio.Web.Intake.IntakeSchema.sql")!;
         using var reader=new StreamReader(input);

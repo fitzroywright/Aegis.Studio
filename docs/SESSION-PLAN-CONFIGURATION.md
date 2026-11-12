@@ -53,3 +53,52 @@ Deployment does not automatically recreate the demo dataset. Use the existing ad
 Run the Mac's established `Aegis.Operations/scripts/Build-Deploy-Studio-Kratos.ps1` workflow with tests enabled. Also run the UI tests in `tests/ui` and the SubjectPlanRulesTests/SubjectPlanStoreTests tests. The latter require the existing disposable `STUDIO_TEST_POSTGRES` fixture for database checks. Browser acceptance should exercise nested groups, same-name people, multiple images per required shot, a stale revision, read-only access, partial bulk-save retry, large roster paging and demo regeneration.
 
 The implementation session ran JavaScript behavior and stylesheet ownership checks. The execution environment had no .NET SDK or PostgreSQL fixture, and browser rendering was unavailable. Compilation, native/database tests, visual acceptance and Kratos deployment must be completed on the Mac/deployment environment.
+
+## Reusable Session Plan templates
+
+Admin → Session Plan Templates is the single template management page. Create a blank
+structure or choose Browse examples and copy an example into the same editor. Example
+school, wedding, corporate and product content does not define any special application
+branches. Blank templates have no categories or levels.
+
+The editor supports arbitrary category names; Individual, Group and Item subject kinds;
+up to eight ordered grouping levels per category; additional identifying fields; and up
+to twenty named photo requirements per category. Photo requirements have instructions
+and a Required flag. Categories, levels, fields and requirements can be added, renamed,
+removed and reordered using the up/down controls. Stable subject reference and name
+remain mandatory, independently of additional identifying fields.
+
+Set availability to all workspaces or selected workspaces. Deactivate a template to
+remove it from future job selections. Duplicate creates a separate, initially inactive
+copy. Template writes check the expected revision; conflicting edits retain the form.
+
+From a job's Session Plan choose Apply template, review the structure and apply it, or
+choose Start blank. Available templates are restricted to active templates that include
+the job's workspace. The server rechecks availability and both preview/template and job
+structure revisions when applying. Template changes never update existing job copies.
+Customize structure edits only that job's copy.
+
+Applying or changing a structure preserves all existing subjects, photos, requirements
+and approvals. The copied category requirements initialize new subjects created through
+the manual-entry or staff roster-import path. For imports into a multi-category plan,
+map `planCategory`; `planGroups` uses that category's ordered grouping level names.
+Existing subjects continue to use their own requirements, editable individually or with
+the existing selected-subject structure/shot tools. This avoids retroactively replacing
+reviewed work. Custom identifying values are entered in Photos / requirements → Edit
+structure / required shots. Required identification fields must be completed before
+confirming identity. Their definitions are copied per subject and cannot be removed by
+an incoming subject-save payload. Optional photographs do not block required coverage.
+
+Persistence uses `studio_session_plan_templates` and `studio_job_plan_structures`, created
+idempotently during normal database initialization. Job structures contain independent
+JSON snapshots. Template writes require Administrator; job structure writes and template
+selection require EditJob; reading a job structure requires ViewJob. Existing subject and
+production approval permissions remain enforced. Deployment does not recreate demo data.
+
+Validation for this change: focused JavaScript/DOM and canonical CSS ownership checks
+pass (74 tests); the whole UI run passed 554 with 19 existing failures before updating
+the two stale Admin navigation expectations. Those two now pass in the focused run.
+Native .NET/PostgreSQL tests were added for generic validation, copied requirements,
+identification enforcement, revision conflicts, scope and snapshot independence. The
+.NET SDK/PostgreSQL are unavailable in the editing environment; run the normal Mac
+build/deployment script without SkipTests. Browser visual comparison remains pending.

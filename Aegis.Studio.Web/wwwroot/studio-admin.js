@@ -2,6 +2,7 @@
     const entries = [
         {view:'catalog',icon:'i-pos',label:'Products and Services'},
         {view:'templates',icon:'i-jobs',label:'Templates'},
+        {view:'session-plan-templates',icon:'i-calendar',label:'Session Plan Templates'},
         {view:'staff-roles',icon:'i-people',label:'Staff and Roles'},
         {view:'opening-hours',icon:'i-calendar',label:'Opening Hours'},
         {view:'workspace-management',icon:'i-grid',label:'Workspaces',staff:true},

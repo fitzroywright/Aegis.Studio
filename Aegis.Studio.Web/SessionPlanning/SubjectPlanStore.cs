@@ -63,7 +63,11 @@ public sealed class SubjectPlanStore(StudioDatabase database)
                 if (!(bool)check.ExecuteScalar()!) throw new ArgumentException("The approved version must belong to a selected photograph.");
             }
         }
-        var saved = request with { Revision = checked(request.Revision + 1) };
+        // Identification requirements are copied per subject, so later structure edits cannot weaken them.
+        var identityFields = previous?.IdentificationFields ?? [];
+        if (request.IdentityConfirmed && identityFields.Any(f => f.Required && (request.Identification is null || !request.Identification.TryGetValue(f.Name, out var value) || string.IsNullOrWhiteSpace(value))))
+            throw new ArgumentException("Complete the required identification fields before confirming identity.");
+        var saved = request with { Revision = checked(request.Revision + 1), IdentificationFields = identityFields, SubjectKind = previous?.SubjectKind ?? request.SubjectKind };
         using var write = new NpgsqlCommand("update studio_job_subjects set attributes=jsonb_set(coalesce(attributes,'{}'::jsonb),'{sessionPlan}',$3::jsonb,true),updated_by=$4,updated_at_utc=clock_timestamp() where id=$1 and job_id=$2", connection, transaction);
         write.Parameters.AddWithValue(subject); write.Parameters.AddWithValue(job); write.Parameters.AddWithValue(JsonSerializer.Serialize(saved, Json)); write.Parameters.AddWithValue(actor); write.ExecuteNonQuery();
         using var audit = new NpgsqlCommand("insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'SessionPlanUpdated',$3,$4,now())", connection, transaction);

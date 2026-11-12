@@ -91,6 +91,8 @@ public sealed class IntakeRosterStore(StudioDatabase database)
         using var c=database.OpenConnection();using var tx=c.BeginTransaction(System.Data.IsolationLevel.Serializable);
         try
         {
+            using(var guard=new Npgsql.NpgsqlCommand("select id from studio_jobs where id=$1 for update",c,tx)){guard.Parameters.AddWithValue(job);guard.ExecuteScalar();}
+            var structure=PlanTemplateStore.ReadJob(c,tx,job);
             var current=ReadJob(c,tx,job);
             if(current.Revision!=request.Revision)throw new InvalidOperationException("Session Plan changed. Reload before saving; your proposed changes have been retained.");
             var existing=current.Rows.EnumerateArray().ToDictionary(r=>WebsiteIntakeStore.Text(r,"reference"),StringComparer.OrdinalIgnoreCase);
@@ -110,7 +112,11 @@ public sealed class IntakeRosterStore(StudioDatabase database)
                         throw new UnauthorizedAccessException("Scheduling permission is required to change planned times or locations.");
             }
             WorkflowStore.Sql(c,tx,"select studio_apply_job_roster($1,$2::jsonb,$3)",job,request.Rows.GetRawText(),actor);
-            foreach(var row in incoming)SubjectPlanStore.SaveStructure(c,tx,job,row);
+            foreach(var row in incoming)
+            {
+                if(structure?.Definition.Categories.Length > 0 && !existing.ContainsKey(WebsiteIntakeStore.Text(row,"reference"))) PlanTemplateStore.InitializeSubject(c,tx,job,row,structure);
+                else SubjectPlanStore.SaveStructure(c,tx,job,row);
+            }
             // Mark linked intake as staff-edited so later website updates require review.
             WorkflowStore.Sql(c,tx,"""
               insert into studio_intake_rosters(conversation_id,revision,rows,updated_by)

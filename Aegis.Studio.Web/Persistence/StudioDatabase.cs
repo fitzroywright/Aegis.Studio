@@ -345,7 +345,7 @@ public sealed class StudioDatabase
             );
             """;
 
-        await using NpgsqlCommand command = dataSource.CreateCommand(sql);
+        await using NpgsqlCommand command = dataSource.CreateCommand(sql + Aegis.Studio.Web.SessionPlanning.PlanTemplateSchema.Sql);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }

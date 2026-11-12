@@ -12,9 +12,9 @@ function setup(t,view){
  const subjects=[{id:'a',reference:'A1',name:'Alicia',collection:'2026',status:'Photographed',imageCount:3},{id:'b',reference:'B1',name:'David',collection:'2026',status:'Absent',imageCount:0},{id:'c',reference:'C1',name:'Maya',collection:'2026',status:'Needs Retake',imageCount:1}];
  roster.rows=subjects.map(r=>({subjectId:r.id,reference:r.reference,name:r.name,collection:r.collection,pickupNotification:'None'}));
  const jobs=[{id:'j',conversationId:'cv',title:'Campion Graduation',clientName:'Campion College',clientId:'client',status:'Ready for Delivery'},{id:'j2',title:'Carter Wedding',clientName:'Carter',status:'Published'}];
- w.json=async(url,options)=>{calls.push({url,options});if(options?.method==='PUT')return {...roster,revision:8};if(url==='/api/jobs')return jobs;if(url==='/api/jobs/j')return jobs[0];if(url.endsWith('/session-plan'))return subjects;if(url.endsWith('/access'))return {permissions:{editJob:true}};if(url.endsWith('/session-plan/roster')||url.includes('/intake/')&&url.endsWith('/roster'))return roster;if(url.endsWith('/finance-release')){if(url.includes('j2'))throw Error('Accounts unavailable');return {decision:{balance:12500}};}if(url==='/api/auth/me')return {user:{isAdministrator:true}};return [];};
+ w.json=async(url,options)=>{calls.push({url,options});if(options?.method==='PUT')return {...roster,revision:8};if(url==='/api/jobs')return jobs;if(url==='/api/jobs/j')return jobs[0];if(url.endsWith('/session-plan'))return subjects;if(url.endsWith('/session-plan/structure'))return null;if(url.endsWith('/access'))return {permissions:{editJob:true}};if(url.endsWith('/session-plan/roster')||url.includes('/intake/')&&url.endsWith('/roster'))return roster;if(url.endsWith('/finance-release')){if(url.includes('j2'))throw Error('Accounts unavailable');return {decision:{balance:12500}};}if(url==='/api/auth/me')return {user:{isAdministrator:true}};return [];};
  w.fetch=async()=>({ok:true,json:async()=>[]});
- for(const file of ['studio-page.js','management.js','frontdesk.js','session-plan.js','studio-workflow-views.js','studio-shell-nav.js'])w.eval(read(file)+(file==='frontdesk.js'?'\nwindow.configureFrontDesk=rows=>{frontDeskDate="2026-10-30";frontDeskTab="today";frontDeskRequests=rows;renderFrontDesk();};':''));
+ for(const file of ['studio-page.js','management.js','frontdesk.js','session-plan-templates.js','session-plan.js','studio-workflow-views.js','studio-shell-nav.js'])w.eval(read(file)+(file==='frontdesk.js'?'\nwindow.configureFrontDesk=rows=>{frontDeskDate="2026-10-30";frontDeskTab="today";frontDeskRequests=rows;renderFrontDesk();};':''));
  w.eval(fs.readFileSync(path.resolve(root,'../../Aegis.Studio.PublicSite/public/roster-editor.js'),'utf8'));
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
  return {w,calls,navigation,roster,subjects,jobs};
@@ -258,4 +258,17 @@ test('partial bulk saves retain approvals and retry only subjects that have not 
  const form=f.w.document.querySelector('dialog form');form.elements.category.value='Campaign';form.elements.path.value='Region: East / Team: A';form.elements.shots.value='Profile\nAction';
  await form.onsubmit({preventDefault(){}});assert.match(form.querySelector('[role=alert]').textContent,/1 of 3 saved/);
  await form.onsubmit({preventDefault(){}});assert.equal(writes.filter(x=>x.endsWith('/a')).length,1);assert.equal(writes.filter(x=>x.endsWith('/b')).length,2);assert.equal(writes.filter(x=>x.endsWith('/c')).length,1);
+});
+
+test('optional photographs do not block approved required coverage',t=>{
+ const {w}=setup(t,'session-plan');const r={plan:{identityConfirmed:true,shots:[{name:'Main',status:'Approved',assetIds:['a'],approvedVersionId:'v'},{name:'Optional',required:false,status:'Needs retake',assetIds:[]}]},activeVersionIds:['v']};
+ assert.equal(w.StudioSessionPlan.coverage(r),'Approved');
+});
+
+test('subject editor retains copied identification fields and optional photo instructions',async t=>{
+ const {w,subjects,calls}=setup(t,'session-plan');subjects[0].plan={revision:2,category:'Performers',groups:[],role:'',identityConfirmed:false,identificationFields:[{name:'Permit',required:true}],identification:{Permit:'OLD'},shots:[{name:'Creative',required:false,instructions:'Campaign lighting',status:'Pending',assetIds:[],note:''}]};
+ await w.StudioWorkflowViews.showSessionPlan('j');
+ w.genericView.querySelector('[data-sp-category="Performers"]').click();w.genericView.querySelector('[data-sp-person="A1"]').click();await settle();await settle();w.genericView.querySelector('[data-sp-configure]').click();
+ const form=w.document.querySelector('.sp-editor');form.querySelector('[data-identification]').value='P-123';form.querySelector('[type=submit]').click();await settle();await settle();
+ const saved=JSON.parse(calls.find(c=>c.options?.method==='PUT').options.body);assert.equal(saved.identification.Permit,'P-123');assert.equal(saved.identificationFields[0].required,true);assert.equal(saved.shots[0].required,false);assert.equal(saved.shots[0].instructions,'Campaign lighting');
 });

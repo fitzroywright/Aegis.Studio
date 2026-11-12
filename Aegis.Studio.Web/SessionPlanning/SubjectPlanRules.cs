@@ -25,6 +25,8 @@ public static class SubjectPlanRules
     }
     public static void Validate(SubjectPlan plan)
     {
+        if (plan.SubjectKind is not ("Individual" or "Group" or "Item") || plan.Identification is { Count: > 20 } || plan.Identification?.Any(p => string.IsNullOrWhiteSpace(p.Key) || p.Key.Length > 100 || p.Value is null || p.Value.Length > 500) == true)
+            throw new ArgumentException("Supply valid identification values of at most 500 characters.");
         if (plan.Revision < 0 || string.IsNullOrWhiteSpace(plan.Category) || plan.Category.Length > 100)
             throw new ArgumentException("Supply a category of at most 100 characters.");
         if (plan.Role is null || plan.Role.Length > 200 || plan.Groups is null || plan.Groups.Length > 8 || plan.Groups.Any(g => g is null || string.IsNullOrWhiteSpace(g.Name) || string.IsNullOrWhiteSpace(g.Value) || g.Name.Length > 100 || g.Value.Length > 100))
@@ -38,7 +40,7 @@ public static class SubjectPlanRules
         {
             if (string.IsNullOrWhiteSpace(shot.Name) || shot.Name.Length > 100 || !names.Add(shot.Name.Trim()))
                 throw new ArgumentException("Required shot names must be nonempty and unique.");
-            if (shot.Status is not ("Pending" or "Awaiting review" or "Approved" or "Needs retake") || shot.AssetIds is null || shot.AssetIds.Length > 100 || shot.AssetIds.Any(id => id == Guid.Empty) || shot.AssetIds.Distinct().Count() != shot.AssetIds.Length || shot.Note is null || shot.Note.Length > 2000)
+            if (shot.Status is not ("Pending" or "Awaiting review" or "Approved" or "Needs retake") || shot.AssetIds is null || shot.AssetIds.Length > 100 || shot.AssetIds.Any(id => id == Guid.Empty) || shot.AssetIds.Distinct().Count() != shot.AssetIds.Length || shot.Note is null || shot.Note.Length > 2000 || shot.Instructions is null || shot.Instructions.Length > 2000)
                 throw new ArgumentException("Correct the shot status, files or reviewer note.");
             if (shot.Status == "Approved" && (!plan.IdentityConfirmed || shot.ApprovedVersionId is null || shot.AssetIds.Length == 0))
                 throw new ArgumentException("Confirm identity and select a photograph version before approving a required shot.");
