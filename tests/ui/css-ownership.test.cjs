@@ -1,7 +1,8 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),path=require('path'),css=require('css-tree');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-test('shared CSS has one declaration for each selector, property and responsive scope',()=>{
- const ast=css.parse(fs.readFileSync(path.join(root,'studio.css'),'utf8')),seen=new Set();
+test('shared and Media CSS have one declaration for each selector, property and responsive scope',()=>{
+ for(const file of ['studio.css','css/pages/media-review.css']){
+ const ast=css.parse(fs.readFileSync(path.join(root,file),'utf8')),seen=new Set();
  function visit(list,scope=[]){list.forEach(node=>{
   if(node.type==='Atrule'&&node.block&&!/keyframes|font-face|property/.test(node.name))visit(node.block.children,[...scope,node.name+':'+(node.prelude?css.generate(node.prelude):'')]);
   if(node.type!=='Rule'||node.prelude.type!=='SelectorList')return;
@@ -12,6 +13,7 @@ test('shared CSS has one declaration for each selector, property and responsive 
   }));
  });}
  visit(ast.children);
+ }
 });
 test('retired inbox filter rail and obsolete Media controls have no presentation rules',()=>{
  const source=fs.readFileSync(path.join(root,'studio.css'),'utf8');

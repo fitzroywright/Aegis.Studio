@@ -81,8 +81,8 @@ body[data-theme="fluent-dark"] :is(.smc-note-job select,.smc-note-form textarea)
 body[data-theme="fluent-dark"] :is(.smc-actions button,.smc-footer>button,.smc-note-open,.smc-note button,.smc-note-form button,.smc-notes [data-notes-retry]) {background:transparent;color:var(--theme-accent);}
 body[data-theme="fluent-dark"] :is(.smc-actions button,.smc-footer>button,.smc-note-open,.smc-note button):hover {background:#52354b;}
 
-/* Tables, Media headings and secondary bars share the dark blue treatment. */
-body[data-theme="fluent-dark"] :is(.mw-today-job-columns,.management-workload-head,.sj-table th,.operational-grid th,.op-table th,.workspace-table th,.fd-table th,.studio-media-panel h2,.studio-media-detail>h3,.studio-media-gallery-header>div:first-child) {
+/* Tables and secondary bars share the dark blue treatment. */
+body[data-theme="fluent-dark"] :is(.mw-today-job-columns,.management-workload-head,.sj-table th,.operational-grid th,.op-table th,.workspace-table th,.fd-table th) {
   background:var(--studio-grid-header-bg)!important;
   color:var(--studio-grid-header-text)!important;
   border-color:var(--studio-grid-header-border)!important;
