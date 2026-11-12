@@ -14,7 +14,7 @@ function setup(t,view){
  const jobs=[{id:'j',conversationId:'cv',title:'Campion Graduation',clientName:'Campion College',clientId:'client',status:'Ready for Delivery'},{id:'j2',title:'Carter Wedding',clientName:'Carter',status:'Published'}];
  w.json=async(url,options)=>{calls.push({url,options});if(options?.method==='PUT')return {...roster,revision:8};if(url==='/api/jobs')return jobs;if(url==='/api/jobs/j')return jobs[0];if(url.endsWith('/session-plan'))return subjects;if(url.endsWith('/access'))return {permissions:{editJob:true}};if(url.endsWith('/session-plan/roster')||url.includes('/intake/')&&url.endsWith('/roster'))return roster;if(url.endsWith('/finance-release')){if(url.includes('j2'))throw Error('Accounts unavailable');return {decision:{balance:12500}};}if(url==='/api/auth/me')return {user:{isAdministrator:true}};return [];};
  w.fetch=async()=>({ok:true,json:async()=>[]});
- for(const file of ['studio-page.js','management.js','frontdesk.js','studio-workflow-views.js','studio-shell-nav.js'])w.eval(read(file)+(file==='frontdesk.js'?'\nwindow.configureFrontDesk=rows=>{frontDeskDate="2026-10-30";frontDeskTab="today";frontDeskRequests=rows;renderFrontDesk();};':''));
+ for(const file of ['studio-page.js','management.js','frontdesk.js','session-plan.js','studio-workflow-views.js','studio-shell-nav.js'])w.eval(read(file)+(file==='frontdesk.js'?'\nwindow.configureFrontDesk=rows=>{frontDeskDate="2026-10-30";frontDeskTab="today";frontDeskRequests=rows;renderFrontDesk();};':''));
  w.eval(fs.readFileSync(path.resolve(root,'../../Aegis.Studio.PublicSite/public/roster-editor.js'),'utf8'));
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
  return {w,calls,navigation,roster,subjects,jobs};
@@ -146,12 +146,12 @@ test('Session Plan opens a job without intake and filters subjects by name, grou
  const {w,jobs,roster}=setup(t,'session-plan');jobs[0].conversationId=null;roster.rows[1].collection='Other';
  await w.StudioWorkflowViews.showSessionPlan('j');
  const search=w.genericView.querySelector('[data-session-search]');search.value='David';search.dispatchEvent(new w.Event('input'));
- assert.match(w.genericView.querySelector('tbody').textContent,/David/);assert.doesNotMatch(w.genericView.querySelector('tbody').textContent,/Alicia/);
+ assert.match(w.genericView.querySelector('.sp-roster tbody').textContent,/David/);assert.doesNotMatch(w.genericView.querySelector('.sp-roster tbody').textContent,/Alicia/);
  const fresh=w.genericView.querySelector('[data-session-search]');fresh.value='';fresh.dispatchEvent(new w.Event('input'));
  const group=w.genericView.querySelector('[data-session-group]');group.value='2026';group.dispatchEvent(new w.Event('change'));
- assert.doesNotMatch(w.genericView.querySelector('tbody').textContent,/David/);
- const status=w.genericView.querySelector('[data-session-outcome]');status.value='Reshoot';status.dispatchEvent(new w.Event('change'));
- assert.match(w.genericView.querySelector('tbody').textContent,/Maya/);assert.doesNotMatch(w.genericView.querySelector('tbody').textContent,/Alicia/);
+ assert.doesNotMatch(w.genericView.querySelector('.sp-roster tbody').textContent,/David/);
+ const status=w.genericView.querySelector('[data-session-outcome]');status.value='Needs Retake';status.dispatchEvent(new w.Event('change'));
+ assert.match(w.genericView.querySelector('.sp-roster tbody').textContent,/Maya/);assert.doesNotMatch(w.genericView.querySelector('.sp-roster tbody').textContent,/Alicia/);
 });
 test('direct subject editing preserves identity and untouched subjects and retains the form after conflict',async t=>{
  const {w,calls}=setup(t,'session-plan');await w.StudioWorkflowViews.showSessionPlan('j');
@@ -190,7 +190,7 @@ test('planned arrivals preview and save only selected people without altering ou
 });
 test('paging keeps selections across pages without rendering thousands of subject rows',async t=>{
  const {w,roster}=setup(t,'session-plan');roster.rows=Array.from({length:250},(_,i)=>({subjectId:String(i),reference:'P'+i,name:'Person '+String(i).padStart(3,'0'),collection:'Group'}));
- await w.StudioWorkflowViews.showSessionPlan('j');assert.equal(w.genericView.querySelectorAll('tbody tr').length,100);
+ await w.StudioWorkflowViews.showSessionPlan('j');assert.equal(w.genericView.querySelectorAll('.sp-roster tbody tr').length,100);
  w.genericView.querySelector('[data-session-all]').click();w.genericView.querySelector('[data-session-next]').click();
  assert.equal(w.genericView.querySelector('[data-session-all]').checked,false);assert.match(w.genericView.querySelector('[data-session-plan]').textContent,/100/);
  w.genericView.querySelector('[data-session-all]').click();w.genericView.querySelector('[data-session-prev]').click();assert.equal(w.genericView.querySelector('[data-session-all]').checked,true);assert.match(w.genericView.querySelector('[data-session-plan]').textContent,/200/);
@@ -209,3 +209,53 @@ test('assignment and remainder actions use the existing workflow editor and sche
 });
 
 
+
+test('configurable categories and three hierarchy levels filter without school-specific page logic',async t=>{
+ const f=setup(t,'session-plan');
+ for(let i=0;i<f.subjects.length;i++)f.subjects[i].plan={revision:2,category:i===2?'Products':'Performers',groups:[{name:'Region',value:'East'},{name:'Venue',value:i?'Harbour':'Town'},{name:'Cast',value:'A'}],role:'Participant',identityConfirmed:false,shots:[{name:'Programme portrait',status:'Pending',assetIds:[],approvedVersionId:null,note:''}]};
+ await f.w.StudioWorkflowViews.showSessionPlan('j');
+ assert.match(f.w.genericView.textContent,/Performers.*Products/s);assert.match(f.w.genericView.querySelector('[aria-label="Region"]').textContent,/East/);
+ const venue=[...f.w.genericView.querySelectorAll('[data-sp-level="1"]')].find(b=>b.dataset.spValue==='Harbour');venue.click();
+ assert.match(f.w.genericView.querySelector('.sp-roster tbody').textContent,/David/);assert.doesNotMatch(f.w.genericView.querySelector('.sp-roster tbody').textContent,/Alicia/);
+ f.w.genericView.querySelector('[data-sp-category="Products"]').click();assert.match(f.w.genericView.querySelector('.sp-roster tbody').textContent,/Maya/);
+});
+test('shot coverage requires confirmed identity and a surviving approved version, independently of upload counts',async t=>{
+ const f=setup(t,'session-plan');const p={revision:1,category:'Subjects',groups:[],role:'',identityConfirmed:true,shots:[{name:'Custom pose',status:'Approved',assetIds:['asset'],approvedVersionId:'version',note:''}]};
+ f.subjects[0].plan=p;f.subjects[0].activeVersionIds=['version'];f.subjects[0].imageCount=18;
+ assert.equal(f.w.StudioSessionPlan.coverage(f.subjects[0]),'Approved');
+ f.subjects[0].activeVersionIds=[];assert.equal(f.w.StudioSessionPlan.coverage(f.subjects[0]),'Awaiting review');
+ p.identityConfirmed=false;f.subjects[0].activeVersionIds=['version'];assert.equal(f.w.StudioSessionPlan.coverage(f.subjects[0]),'Awaiting review');
+ p.shots[0].status='Needs retake';assert.equal(f.w.StudioSessionPlan.coverage(f.subjects[0]),'Needs retake');
+});
+test('subject detail loads every media page using the stable identity rather than the display name',async t=>{
+ const f=setup(t,'session-plan'),read=f.w.json;
+ f.w.json=async(url,options)=>{if(url.includes('/media?')){f.calls.push({url});const u=new URL(url,'https://studio.test');assert.equal(u.searchParams.get('subjectId'),'a');return u.searchParams.has('after')?{assets:[{id:'last',fileName:'last.jpg'}],hasMore:false}:{assets:Array.from({length:200},(_,i)=>({id:'asset'+i,fileName:'photo'+i+'.jpg'})),hasMore:true};}return read(url,options);};
+ await f.w.StudioWorkflowViews.showSessionPlan('j');await f.w.genericView.querySelector('[data-sp-person="A1"]').onclick();
+ assert.match(f.w.genericView.querySelector('.sp-identity').textContent,/Alicia.*A1/s);assert.equal(f.w.genericView.querySelectorAll('.sp-photos article').length,201);
+});
+test('imports carry configurable category and hierarchy columns without changing stable IDs',async t=>{
+ const f=setup(t,'session-plan');await f.w.StudioWorkflowViews.showSessionPlan('j');await f.w.StudioWorkflowViews.run('import');
+ f.w.genericView.querySelector('[data-session-paste]').value='Name,Reference,Category,Group path\nAlicia,A1,Performers,Region: East / Cast: A';
+ f.w.genericView.querySelector('[data-session-pasted]').click();f.w.genericView.querySelector('[data-session-preview]').click();
+ f.w.genericView.querySelector('[data-session-commit]').click();await settle();await settle();
+ const payload=JSON.parse(f.calls.find(c=>c.options?.method==='PUT').options.body);
+ assert.equal(payload.rows[0].subjectId,'a');assert.equal(payload.rows[0].planCategory,'Performers');assert.equal(payload.rows[0].planGroups,'Region: East / Cast: A');
+});
+
+test('the requirement editor saves configurable labels with the subject revision and version evidence',async t=>{
+ const f=setup(t,'session-plan'),read=f.w.json;
+ f.subjects[0].plan={revision:3,category:'Performers',groups:[{name:'Production',value:'Autumn'}],role:'Cast',identityConfirmed:true,shots:[{name:'Programme photograph',status:'Approved',assetIds:['asset-a'],approvedVersionId:'version-a',note:'Checked'}]};f.subjects[0].activeVersionIds=['version-a'];
+ f.w.json=async(url,o)=>url.includes('/media?')?{assets:[{id:'asset-a',versionId:'version-a',fileName:'A1.jpg'}],hasMore:false}:read(url,o);
+ await f.w.StudioWorkflowViews.showSessionPlan('j');f.w.genericView.querySelector('[data-sp-category="Performers"]').click();await f.w.genericView.querySelector('[data-sp-person="A1"]').onclick();await f.w.genericView.querySelector('[data-sp-configure]').onclick();
+ const form=f.w.document.querySelector('dialog form');form.elements.groups.value='Production: Autumn\nCast: A';await form.onsubmit({preventDefault(){}});
+ const write=f.calls.find(c=>c.url.endsWith('/session-plan/people/a'));assert.ok(write);const data=JSON.parse(write.options.body);
+ assert.equal(data.revision,3);assert.equal(data.category,'Performers');assert.equal(data.groups[1].name,'Cast');assert.equal(data.shots[0].approvedVersionId,'version-a');assert.deepEqual(data.shots[0].assetIds,['asset-a']);
+});
+test('partial bulk saves retain approvals and retry only subjects that have not saved',async t=>{
+ const f=setup(t,'session-plan'),read=f.w.json,writes=[];let fail=true;
+ f.w.json=async(url,o)=>{if(o?.method==='PUT'&&url.includes('/session-plan/people/')){writes.push(url);if(url.endsWith('/b')&&fail){fail=false;throw Error('Offline');}return {};}return read(url,o);};
+ await f.w.StudioWorkflowViews.showSessionPlan('j');f.w.genericView.querySelector('[data-session-all]').click();await f.w.genericView.querySelector('[data-sp-bulk]').onclick();
+ const form=f.w.document.querySelector('dialog form');form.elements.category.value='Campaign';form.elements.path.value='Region: East / Team: A';form.elements.shots.value='Profile\nAction';
+ await form.onsubmit({preventDefault(){}});assert.match(form.querySelector('[role=alert]').textContent,/1 of 3 saved/);
+ await form.onsubmit({preventDefault(){}});assert.equal(writes.filter(x=>x.endsWith('/a')).length,1);assert.equal(writes.filter(x=>x.endsWith('/b')).length,2);assert.equal(writes.filter(x=>x.endsWith('/c')).length,1);
+});

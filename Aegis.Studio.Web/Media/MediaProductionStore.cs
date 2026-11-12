@@ -230,7 +230,10 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         using var cmd=new NpgsqlCommand("""
             select coalesce(jsonb_agg(jsonb_build_object(
               'id',s.id,'name',s.name,'reference',s.reference,'collection',s.collection_name,
-              'status',coalesce(p.status,s.production_status),'imageCount',coalesce(m.photos,0))
+              'status',coalesce(p.status,s.production_status),'imageCount',coalesce(m.photos,0),
+              'plan',s.attributes->'sessionPlan',
+              'previewVersionId',(select v.id from studio_media_asset_subjects x join studio_media_assets a on a.id=x.asset_id join studio_asset_versions v on v.job_id=a.job_id and v.asset_key=a.asset_key where x.subject_id=s.id and a.deleted_at_utc is null order by v.version_number desc limit 1),
+              'activeVersionIds',coalesce((select jsonb_agg(v.id) from studio_media_asset_subjects x join studio_media_assets a on a.id=x.asset_id join studio_asset_versions v on v.job_id=a.job_id and v.asset_key=a.asset_key where x.subject_id=s.id and a.deleted_at_utc is null),'[]'::jsonb))
               order by s.collection_name,s.name,s.id),'[]'::jsonb)::text
             from studio_job_subjects s
             left join studio_workday_roster_progress p on p.id=s.id

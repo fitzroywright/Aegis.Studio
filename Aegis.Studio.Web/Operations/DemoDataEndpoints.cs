@@ -120,6 +120,7 @@ public static class DemoDataEndpoints
         DemoBookingCatalog.Seed(database);
         DemoAutomationSeed.Seed(database,report);
         DemoJobPhotoPopulation.Seed(database,storage,login,report);
+        DemoSessionPlans.Seed(database,login,report);
         DemoDatasetFinalizer.Complete(database,storage,login,report);
         Aegis.Studio.Web.Crm.CrmDemo.Seed(database,login);
         SeedDistinctStaffPhotos(database,report);

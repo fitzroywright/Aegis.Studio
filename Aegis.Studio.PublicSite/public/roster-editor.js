@@ -3,7 +3,14 @@
  const fields=['name','reference','collection','contactName','contactEmail','contactPhone','scheduledAtUtc','scheduleLocation','notes','pickupNotification'];
  const labels=['Name','Reference','Collection','Contact name','Email','Phone','Schedule ISO timestamp','Location','Notes','Pickup notification'];
  function csv(text){const rows=[];let row=[],value='',quote=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quote&&text[i+1]==='"'){value+='"';i++;}else quote=!quote;}else if(!quote&&[',','\n','\r','\t'].includes(c)){row.push(value);value='';if(c==='\n'||c==='\r'){if(row.some(Boolean))rows.push(row);row=[];if(c==='\r'&&text[i+1]==='\n')i++;}}else value+=c;}if(quote)throw Error('Unclosed quoted field.');row.push(value);if(row.some(Boolean))rows.push(row);return rows;}
- function validate(rows){const seen=new Set();return rows.flatMap((r,i)=>{const e=[];if(!r.name?.trim())e.push('Name required');if(!r.reference?.trim())e.push('Reference required');if(r.name?.toLowerCase()==='unclassified')e.push('Unclassified is reserved');if(seen.has(r.reference?.toLowerCase()))e.push('Duplicate reference');seen.add(r.reference?.toLowerCase());if(r.contactEmail&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.contactEmail))e.push('Invalid email');if(r.pickupNotification==='Email'&&!r.contactEmail)e.push('Email required for notifications');if(r.pickupNotification==='WhatsApp'&&!/^\+\d{8,15}$/.test(r.contactPhone||''))e.push('International phone required');return e.map(x=>`Row ${i+1}: ${x}`);});}
+ function hierarchy(value,separator=' / '){
+  if(String(value).length>2000)throw Error('Group path is too long.');
+  const text=String(value).trim();if(!text)return [];
+  const groups=text.startsWith('[')?JSON.parse(text):text.split(separator).filter(part=>part.trim()).map(part=>{const at=part.indexOf(':');if(at<1)throw Error('Use Level: Value for hierarchy entries.');return {name:part.slice(0,at).trim(),value:part.slice(at+1).trim()};});
+  if(!Array.isArray(groups)||groups.length>8||groups.some(g=>!g||typeof g.name!=='string'||typeof g.value!=='string'||!g.name.trim()||!g.value.trim()||g.name.length>100||g.value.length>100)||new Set(groups.map(g=>g.name.trim().toLowerCase())).size!==groups.length)throw Error('Supply up to eight uniquely named hierarchy levels.');
+  return groups;
+ }
+ function validate(rows){const seen=new Set();return rows.flatMap((r,i)=>{const e=[];if(!r.name?.trim())e.push('Name required');if(!r.reference?.trim())e.push('Reference required');if(r.name?.toLowerCase()==='unclassified')e.push('Unclassified is reserved');if(seen.has(r.reference?.toLowerCase()))e.push('Duplicate reference');seen.add(r.reference?.toLowerCase());if(r.contactEmail&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.contactEmail))e.push('Invalid email');if(r.pickupNotification==='Email'&&!r.contactEmail)e.push('Email required for notifications');if(r.pickupNotification==='WhatsApp'&&!/^\+\d{8,15}$/.test(r.contactPhone||''))e.push('International phone required');if(r.planCategory&&r.planCategory.length>100)e.push('Category is too long');if(r.planGroups)try{hierarchy(r.planGroups);}catch(error){e.push(error.message);}return e.map(x=>`Row ${i+1}: ${x}`);});}
  function mapRows(cells,mapping){return cells.slice(1).filter(r=>r.some(Boolean)).map(c=>{const r={};for(const k of fields)if(mapping[k]!==undefined&&mapping[k]!=='')r[k]=String(c[Number(mapping[k])]??'');r.reference||=crypto.randomUUID();r.pickupNotification||='None';return r;});}
  function mergeRows(existing,incoming){const rows=existing.map(r=>({...r})),seen=new Set(),index=new Map();for(const row of rows){const key=row.reference.toLowerCase();if(!index.has(key))index.set(key,row);}for(const r of incoming){const key=r.reference.toLowerCase(),old=index.get(key);if(old&&!seen.has(key))Object.assign(old,r);else{const row={...r};rows.push(row);if(!index.has(key))index.set(key,row);}seen.add(key);}return rows;}
  function open(host,options={}){
@@ -29,8 +36,9 @@
   render();return {getRows:()=>{const e=errors();if(e.length)throw Error(e.join(' · '));return rows.map(r=>({...r}));},isDirty:()=>dirty};
  }
  // Session Plan imports keep unmapped fields, match stable identities, and expose ambiguous matches.
- const sessionFields=[...fields,'scheduleDate','scheduleTime'];
- const sessionLabels=[...labels,'Session date','Session time'];
+ const planFields=[...fields,'planCategory','planGroups'];
+ const sessionFields=[...planFields,'scheduleDate','scheduleTime'];
+ const sessionLabels=[...labels,'Category','Group path','Session date','Session time'];
  const identity=value=>String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase();
  function plannedTime(value,time='',order='DMY'){
   value=String(value||'').trim();time=String(time||'').trim();
@@ -91,6 +99,6 @@
   errors.push(...validate(rows));if(rows.length>5000)errors.push('Maximum 5000 subjects.');
   return {rows,changes,errors};
  }
- root.StudioRosterEditor={open,csv,fields,labels,validate,mapRows,mergeRows,sessionFields,sessionLabels,plannedTime,planImport};
+ root.StudioRosterEditor={open,csv,hierarchy,fields,labels,validate,mapRows,mergeRows,planFields,sessionFields,sessionLabels,plannedTime,planImport};
 })(window);
 

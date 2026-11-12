@@ -1,0 +1,41 @@
+/* Session Plan owns its workspace, roster and person detail. No side rails. */
+.sp-page{display:flex;flex-direction:column;gap:12px;min-width:0;color:var(--theme-text);font-size:13px}
+.sp-page :is(button,input,select,textarea),.sp-editor :is(button,input,select,textarea){font:inherit;box-sizing:border-box}
+.sp-page :where(button),.sp-editor :where(button){cursor:pointer;border:1px solid var(--studio-control-border);border-radius:5px;padding:7px 12px;background:var(--studio-card-surface);color:var(--theme-text)}
+.sp-page button:disabled,.sp-editor button:disabled{opacity:.5;cursor:default}
+.sp-page button.primary,.sp-editor button.primary{background:var(--studio-page-brown,#946033);color:#fff}
+.sp-job{display:flex;align-items:center;justify-content:space-between;gap:20px;border:1px solid var(--studio-control-border);border-radius:8px;background:var(--theme-surface-2);padding:14px 18px}
+.sp-job>div{min-width:0}.sp-job h1{font:bold 27px/1.15 Georgia,serif;margin:4px 0 8px}.sp-job small{font-weight:700}
+.sp-actions,.sp-tabs,.sp-pager{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.sp-tabs{margin-right:auto}.sp-tabs button[aria-pressed=true]{background:var(--theme-header,#183653);color:#fff}
+.sp-chips{display:flex;align-items:center;gap:9px;flex-wrap:nowrap;overflow:auto;scrollbar-width:thin;padding-bottom:3px}
+.sp-chips button{border-radius:24px;white-space:nowrap;flex:none;background:var(--theme-accent-soft)}
+.sp-chips button[aria-pressed=true]{background:#197f81;color:#fff}.sp-chips span,.sp-tabs span{font-weight:700;margin-left:8px}
+.sp-summary{font-weight:600;margin:0;padding:6px 2px}.sp-schedule,.sp-conflicts{border:1px solid var(--studio-grid-border);border-radius:7px;padding:8px 10px;background:var(--studio-card-surface)}
+.sp-schedule>summary{font-weight:700;cursor:pointer;margin:4px 0 8px}.sp-scroll{overflow:auto;min-width:0;border:1px solid var(--studio-grid-border);border-radius:6px}
+.sp-page table{width:100%;border-collapse:collapse;background:var(--studio-card-surface)}
+.sp-page th,.sp-page td{text-align:left;border-bottom:1px solid var(--studio-grid-border);padding:9px 12px;vertical-align:middle}
+.sp-page th{background:var(--studio-grid-header-bg,var(--theme-surface-2));color:var(--studio-grid-header-text,var(--theme-text));white-space:nowrap}
+.sp-page tr.selected{background:var(--theme-accent-soft)}.sp-page td small,.sp-page th small{display:block;color:var(--theme-muted);font-weight:400;margin-top:4px}
+.sp-page .sp-link{border:0;background:transparent;color:var(--theme-link,#124e92);padding:0;text-align:left;font-weight:600}
+.sp-tools{display:flex;align-items:end;flex-wrap:wrap;gap:10px;padding:8px 0}
+.sp-tools label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;flex:1;min-width:150px}
+.sp-tools input,.sp-tools select,.sp-editor input,.sp-editor select,.sp-editor textarea{max-width:100%;padding:8px;border:1px solid var(--studio-control-border);border-radius:5px;background:var(--theme-surface);color:var(--theme-text)}
+.sp-person{display:flex;align-items:center;gap:12px;border:0;background:transparent;text-align:left;padding:0;min-width:180px}
+.sp-person img,.sp-person>.sp-photo-empty{width:58px;height:60px;object-fit:cover;border-radius:5px;flex:none}
+.sp-photo-empty{display:grid;place-items:center;background:var(--theme-surface-2);color:var(--theme-muted);font-size:11px}
+.sp-pill{display:inline-block;white-space:nowrap;border-radius:24px;padding:5px 12px;background:var(--theme-accent-soft);font-size:12px}
+.sp-pill[data-state=Approved],.sp-pill[data-state="Identity confirmed"]{background:#d2eee3;color:#12624c}
+.sp-pill[data-state="Needs retake"],.sp-pill[data-state="Identity needs confirmation"]{background:#ffe4b3;color:#835018}
+.sp-pill[data-state=Absent]{background:#dfe3eb;color:#35425a}
+.sp-pager{padding:10px 0}.sp-pager>span{margin-right:auto}.sp-note{font-size:12px;color:var(--theme-muted);margin:4px 0}
+.sp-identity{display:flex;align-items:center;gap:24px;padding:14px;border:1px solid var(--studio-control-border);background:var(--theme-surface-2);border-radius:8px}
+.sp-identity>div{min-width:0;flex:1}.sp-identity>.sp-identity-photo{flex:0 0 150px;height:155px;border-radius:7px;overflow:hidden}
+.sp-identity-photo img,.sp-identity-photo>.sp-photo-empty{width:100%;height:100%;object-fit:cover}.sp-identity h2{font:bold 28px/1.1 Georgia,serif;margin:0 0 12px}.sp-identity small{display:block;margin-top:10px}
+.sp-shot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px}.sp-shot{display:flex;gap:14px;border:1px solid var(--studio-control-border);border-radius:8px;padding:12px;background:var(--studio-card-surface)}
+.sp-shot>div{flex:1;min-width:0}.sp-shot>div:first-child{flex:0 0 42%;height:180px}.sp-shot img,.sp-shot .sp-photo-empty{width:100%;height:100%;object-fit:contain;border-radius:5px}.sp-shot h3{margin:0 0 10px;font-size:18px}.sp-shot p{overflow-wrap:anywhere}
+.sp-photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px}.sp-photos article{display:flex;flex-direction:column;gap:5px;min-width:0;border:1px solid var(--studio-grid-border);border-radius:6px;padding:6px;background:var(--studio-card-surface)}
+.sp-photos img{width:100%;aspect-ratio:1.2;object-fit:cover;border-radius:4px}.sp-photos strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sp-photos small{color:var(--theme-muted)}
+.sp-editor{display:flex;flex-direction:column;gap:12px;max-width:900px}.sp-editor label{display:flex;flex-direction:column;gap:5px}.sp-editor fieldset{display:grid;grid-template-columns:1fr 1fr;gap:10px;border:1px solid var(--studio-grid-border);border-radius:6px;margin-bottom:12px}.sp-editor legend{font-weight:700}
+.sp-editor [role=alert]{color:var(--studio-warning,#a15a12)}
+@media(max-width:800px){.sp-job,.sp-identity{align-items:stretch;flex-direction:column;gap:12px}.sp-job h1{font-size:23px}.sp-identity>.sp-identity-photo{flex-basis:120px;width:120px;height:120px}.sp-shot-grid{grid-template-columns:1fr}.sp-tools label{flex-basis:45%}.sp-editor fieldset{grid-template-columns:1fr}.sp-actions button{font-size:12px}.sp-page td,.sp-page th{padding:7px 9px}}

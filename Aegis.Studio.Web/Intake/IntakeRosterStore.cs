@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Aegis.Studio.Web.SessionPlanning;
 using System.Text.Json;
 using Aegis.Studio.Web.Media;
 using Aegis.Studio.Web.Operations;
@@ -11,12 +12,12 @@ public sealed record IntakeRosterView(string? IntakeReference,long Revision,Json
 public sealed record RosterCommit(long Revision,JsonElement Rows,bool ResolveConflict=false,Guid? ConflictConversationId=null);
 public sealed class IntakeRosterStore(StudioDatabase database)
 {
-    static readonly string[] Fields=["name","reference","collection","contactName","contactEmail","contactPhone","scheduledAtUtc","scheduleLocation","notes","pickupNotification"];
+    static readonly string[] Fields=["name","reference","collection","planCategory","planGroups","contactName","contactEmail","contactPhone","scheduledAtUtc","scheduleLocation","notes","pickupNotification"];
     public static void Validate(JsonElement rows)
     {
         if(rows.ValueKind!=JsonValueKind.Array||rows.GetArrayLength()>5000)throw new ArgumentException("Supply at most 5000 subject rows.");
         var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var limits=new Dictionary<string,int>{{"name",200},{"reference",200},{"collection",100},{"contactName",200},{"contactEmail",320},{"contactPhone",100},{"scheduledAtUtc",50},{"scheduleLocation",300},{"notes",4000},{"pickupNotification",8}};
+        var limits=new Dictionary<string,int>{{"planCategory",100},{"planGroups",2000},{"name",200},{"reference",200},{"collection",100},{"contactName",200},{"contactEmail",320},{"contactPhone",100},{"scheduledAtUtc",50},{"scheduleLocation",300},{"notes",4000},{"pickupNotification",8}};
         foreach(var row in rows.EnumerateArray())
         {
             if(row.ValueKind!=JsonValueKind.Object)throw new ArgumentException("Invalid roster row.");
@@ -26,6 +27,7 @@ public sealed class IntakeRosterStore(StudioDatabase database)
             if(string.IsNullOrWhiteSpace(name)||name.Equals("Unclassified",StringComparison.OrdinalIgnoreCase)||string.IsNullOrWhiteSpace(reference)||!seen.Add(reference))throw new ArgumentException("Each subject needs a name and a unique stable reference. Unclassified is reserved.");
             if(!string.IsNullOrEmpty(email)&&!System.Net.Mail.MailAddress.TryCreate(email,out _))throw new ArgumentException("Correct the contact email.");
             if(preference is not ("None" or "Email" or "WhatsApp")||preference=="Email"&&string.IsNullOrWhiteSpace(email)||preference=="WhatsApp"&&!System.Text.RegularExpressions.Regex.IsMatch(phone,@"^\+\d{8,15}$"))throw new ArgumentException("Notification preferences require a valid supported contact channel.");
+            if(row.TryGetProperty("planGroups",out var groupPath))SubjectPlanRules.ParseHierarchy(groupPath.GetString()!);
             var time=WebsiteIntakeStore.Text(row,"scheduledAtUtc");if(time!=""&&!DateTimeOffset.TryParse(time,out _))throw new ArgumentException("Invalid subject schedule.");
         }
     }
@@ -68,7 +70,8 @@ public sealed class IntakeRosterStore(StudioDatabase database)
           select jsonb_build_object(
             'rows',coalesce((select jsonb_agg(jsonb_build_object(
               'subjectId',s.id,'name',s.name,'reference',case when s.reference='' then s.id::text else s.reference end,
-              'collection',s.collection_name,'contactName',s.contact_name,'contactEmail',s.contact_email,
+              'collection',s.collection_name,'planCategory',coalesce(s.attributes#>>'{sessionPlan,category}',''),
+              'planGroups',coalesce((s.attributes#>'{sessionPlan,groups}')::text,''),'contactName',s.contact_name,'contactEmail',s.contact_email,
               'contactPhone',s.contact_phone,'scheduledAtUtc',coalesce(to_char(s.scheduled_at_utc at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),''),
               'scheduleLocation',s.schedule_location,'notes',s.notes,'pickupNotification',s.pickup_notification,
               '_updatedAt',s.updated_at_utc) order by s.id) from studio_job_subjects s where s.job_id=j.id and not s.is_system),'[]'::jsonb),
@@ -107,6 +110,7 @@ public sealed class IntakeRosterStore(StudioDatabase database)
                         throw new UnauthorizedAccessException("Scheduling permission is required to change planned times or locations.");
             }
             WorkflowStore.Sql(c,tx,"select studio_apply_job_roster($1,$2::jsonb,$3)",job,request.Rows.GetRawText(),actor);
+            foreach(var row in incoming)SubjectPlanStore.SaveStructure(c,tx,job,row);
             // Mark linked intake as staff-edited so later website updates require review.
             WorkflowStore.Sql(c,tx,"""
               insert into studio_intake_rosters(conversation_id,revision,rows,updated_by)
@@ -138,6 +142,7 @@ public sealed class IntakeRosterStore(StudioDatabase database)
             return Results.Text(reader.ReadToEnd(),"text/javascript; charset=utf-8");
         }).AllowAnonymous();
         var plans=app.MapGroup("/api/jobs/{job:guid}/session-plan").RequireAuthorization();
+        plans.MapSubjectPlanning();
         plans.MapGet("/roster",(Guid job,ClaimsPrincipal user,StudioDatabase db,JobAccessService access)=>
         {
             if(!access.HasPermission(user,job,"ViewJob"))return Results.Forbid();

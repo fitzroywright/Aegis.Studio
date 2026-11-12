@@ -39,3 +39,11 @@ test('a full 5000-person re-import preserves every identity and contact without 
  const cells=[['Name','Reference'],...people.map(r=>[r.name,r.reference])],result=engine.planImport(cells,{name:0,reference:1},people);
  assert.equal(result.rows.length,5000);assert.equal(result.errors.length,0);assert.equal(result.changes.filter(c=>c.kind==='New').length,0);assert.equal(result.rows[4999].contactEmail,'parent4999@example.com');
 });
+
+test('hierarchy parsing supports arbitrary labels, punctuation and lossless exported JSON',()=>{
+ const groups=[{name:'Programme / stream',value:'Arts / Music'},{name:'Set',value:'A: morning'}];
+ assert.deepEqual(plain(engine.hierarchy(JSON.stringify(groups))),groups);
+ assert.deepEqual(plain(engine.hierarchy('Region: East / Venue: Harbour')),[{name:'Region',value:'East'},{name:'Venue',value:'Harbour'}]);
+ assert.throws(()=>engine.hierarchy('Level: A / level: B'),/uniquely/);
+ const result=engine.planImport([['Name','ID','Group path'],['One','S1','Missing separator']],{name:0,reference:1,planGroups:2},[]);assert.match(result.errors.join(' '),/Level: Value/);
+});
