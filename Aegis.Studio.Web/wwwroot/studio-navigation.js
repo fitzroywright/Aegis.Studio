@@ -346,8 +346,9 @@
     }
 
 
-    const routeAliases={today:'dashboard',admin:'about','studio-management':'about','demo-data':'about','api-site-key':'about','booking-sessions':'catalog','job-templates':'templates','work-order-templates':'templates','workflows-admin':'templates','staff-admin':'staff-roles','roles-admin':'staff-roles'};
-    const canonicalRoute=view=>routeAliases[view]||view;
+    const routeAliases={today:'dashboard',admin:'about','studio-management':'about','demo-data':'about','api-site-key':'about','booking-sessions':'catalog','workflows-admin':'workflow-automation','staff-admin':'staff-roles','roles-admin':'staff-roles'};
+    const templatePagePaths={'job-templates':'/admin/job-templates','work-order-templates':'/admin/work-order-templates','workflow-automation':'/admin/workflow-automation'};
+    const canonicalRoute=(view,kind)=>view==='templates'?({Job:'job-templates',WorkOrder:'work-order-templates',Automation:'workflow-automation'})[kind||'Job']||'job-templates':routeAliases[view]||view;
     const routes={
         'access-pending':()=>window.StudioAccess.page({kind:'pending'}),
         dashboard:()=>window.StudioDashboard.render(),
@@ -365,7 +366,9 @@
         catalog:()=>showCommercialCatalog({tab:window.history.state?.studioCatalogTab}),
         'opening-hours':()=>showCommercialOpeningHours(),
         'session-plan-templates':()=>window.StudioPlanTemplates.render(),
-        templates:()=>showCommercialTemplates(window.history.state?.studioTemplateKind||'Job'),
+        'job-templates':()=>window.StudioJobTemplates.render(),
+        'work-order-templates':()=>window.StudioWorkOrderTemplates.render(),
+        'workflow-automation':()=>window.StudioWorkflowAutomation.render(),
         media:()=>showMediaReview(),
         frontdesk:()=>showFrontDesk({queue:window.history.state?.studioDashboardQueue,workspaceId:window.history.state?.studioWorkspaceId}),
         'session-plan':()=>StudioWorkflowViews.showSessionPlan(window.history.state?.studioJobId),
@@ -377,10 +380,10 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'dashboard';
-    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Products and Services','opening-hours':'Opening Hours','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',dashboard:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
+    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Products and Services','opening-hours':'Opening Hours','job-templates':'Job Templates','workflow-automation':'Workflow Automation','work-order-templates':'Work Order Templates',clients:'Client Management',dashboard:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
-        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioDashboardQueue:options.queue||null,studioWorkspaceId:['jobs','frontdesk','production','delivery','schedule'].includes(view)?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioTemplateKind:view==='templates'?(['Job','WorkOrder','Automation'].includes(options.kind)?options.kind:'Job'):null,studioCatalogTab:view==='catalog'?(['products','hours'].includes(options.tab)?options.tab:'booking-sessions'):null,studioJobId:['workspaces','session-plan','session-plan-import','media'].includes(view)&&options.jobId?String(options.jobId):null};
+        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioDashboardQueue:options.queue||null,studioWorkspaceId:['jobs','frontdesk','production','delivery','schedule'].includes(view)?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioCatalogTab:view==='catalog'?(['products','hours'].includes(options.tab)?options.tab:'booking-sessions'):null,studioJobId:['workspaces','session-plan','session-plan-import','media'].includes(view)&&options.jobId?String(options.jobId):null};
     }
     function recordNavigation(view,options={}){
         const next=navigationContext(view,options),previous=window.history.state;
@@ -393,13 +396,13 @@
         if(next.studioClientId)params.set('client',next.studioClientId);
         if(next.studioClientTab)params.set('tab',next.studioClientTab);
         if(next.studioCatalogTab)params.set('tab',next.studioCatalogTab);
-        if(next.studioTemplateKind)params.set('kind',next.studioTemplateKind);
         if(next.studioWorkspaceId)params.set('workspace',next.studioWorkspaceId);
         if(next.studioJobId)params.set('job',next.studioJobId);
         if(next.studioDashboardQueue)params.set('queue',next.studioDashboardQueue);
-        const same=previous?.studioDashboardQueue===next.studioDashboardQueue&&previous?.studioView===next.studioView&&['studioSchedulePanel','studioPhotographer','studioScheduleResource','studioScheduleDate','studioScheduleView','studioCatalogTab','studioTemplateKind'].every(key=>(previous[key]||'')===(next[key]||''))&&(previous.studioClientId||null)===(next.studioClientId||null)&&(previous.studioWorkspaceId||null)===(next.studioWorkspaceId||null)&&(previous.studioJobId||null)===next.studioJobId&&(previous.studioClientTab||'')===(next.studioClientTab||'');
-        if(options.replaceHistory)window.history.replaceState(next,'','#'+params);
-        else if(!options.browserHistory&&options.history!==false&&!same)window.history.pushState(next,'','#'+params);
+        const same=previous?.studioDashboardQueue===next.studioDashboardQueue&&previous?.studioView===next.studioView&&['studioSchedulePanel','studioPhotographer','studioScheduleResource','studioScheduleDate','studioScheduleView','studioCatalogTab'].every(key=>(previous[key]||'')===(next[key]||''))&&(previous.studioClientId||null)===(next.studioClientId||null)&&(previous.studioWorkspaceId||null)===(next.studioWorkspaceId||null)&&(previous.studioJobId||null)===next.studioJobId&&(previous.studioClientTab||'')===(next.studioClientTab||'');
+        const url=templatePagePaths[view]||'/#'+params;
+        if(options.replaceHistory)window.history.replaceState(next,'',url);
+        else if(!options.browserHistory&&options.history!==false&&!same)window.history.pushState(next,'',url);
         currentNavigationView=view;
         if(view==='jobs')jobsWorkspaceFilter=next.studioWorkspaceId;
         return next;
@@ -436,10 +439,8 @@
         }
         if(window.StudioAccess?.pending()&&view!=='about')view='access-pending';
         else if(view==='access-pending'&&!window.StudioAccess?.pending())view='dashboard';
-        if(view==='workflows-admin')options={...options,kind:'Automation'};
-        if(view==='job-templates'||view==='work-order-templates')options={...options,kind:view==='work-order-templates'?'WorkOrder':'Job'};
         if(view==='booking-sessions')options={...options,tab:'booking-sessions'};
-        view=canonicalRoute(view);
+        view=canonicalRoute(view,options.kind);
         const route=routes[view];
         if(!route) throw new Error('Unknown Studio navigation view: '+view);
         const {context,revision}=beginNavigation(view,options);
@@ -447,10 +448,10 @@
         window.studioShellMountContext?.([],view==='workspaces'&&context.studioJobId?'job-detail':view);
         if(studioPageTools)studioPageTools.innerHTML='';
         if(view!=='dashboard'){
-            window.studioSetBreadcrumb?.([{label:(view==='templates'?({Job:'Job Templates',WorkOrder:'Work Order Templates',Automation:'Workflow Automation'})[context.studioTemplateKind]:navigationLabels[view])||view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
+            window.studioSetBreadcrumb?.([{label:navigationLabels[view]||view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
         }
         try{
-            if(['catalog','opening-hours','templates'].includes(view)){
+            if(['catalog','opening-hours','job-templates','work-order-templates','workflow-automation','session-plan-templates'].includes(view)){
                 const me=await json('/api/auth/me');
                 if(revision!==navigationRevision)return;
                 if((me?.user||me)?.isAdministrator!==true){window.StudioAccess.page({title:navigationLabels[view]});window.StudioShell?.sync(view);return;}
@@ -475,8 +476,9 @@
 
     function destinationFromLocation(state){
         const params=new URLSearchParams(window.location.hash.replace(/^#/,''));
-        const view=canonicalRoute(state?.studioView&&routes[canonicalRoute(state.studioView)]?state.studioView:params.get('studio'));
-        return {view:view&&routes[view]?view:'dashboard',kind:(state?.studioView==='workflows-admin'||(!state?.studioView&&params.get('studio')==='workflows-admin'))?'Automation':(state?.studioView==='work-order-templates'||(!state?.studioView&&params.get('studio')==='work-order-templates'))?'WorkOrder':state?.studioTemplateKind||params.get('kind')||'Job',panel:state?.studioView?(state.studioSchedulePanel||'workers'):(params.get('panel')||'workers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),tab:(state?.studioView==='booking-sessions'||(!state?.studioView&&params.get('studio')==='booking-sessions'))?'booking-sessions':state?.studioView?(state.studioView==='catalog'?(state.studioCatalogTab||'booking-sessions'):(state.studioClientTab||'')):(params.get('tab')||''),clientId:state?.studioView?(state.studioClientId||''):(params.get('client')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),queue:state?.studioDashboardQueue||params.get('queue')||'',jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
+        const rawView=state?.studioView||params.get('studio')||Object.keys(templatePagePaths).find(view=>templatePagePaths[view]===window.location.pathname);
+        const view=canonicalRoute(rawView,state?.studioTemplateKind||params.get('kind'));
+        return {view:view&&routes[view]?view:'dashboard',panel:state?.studioView?(state.studioSchedulePanel||'workers'):(params.get('panel')||'workers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),tab:(state?.studioView==='booking-sessions'||(!state?.studioView&&params.get('studio')==='booking-sessions'))?'booking-sessions':state?.studioView?(state.studioView==='catalog'?(state.studioCatalogTab||'booking-sessions'):(state.studioClientTab||'')):(params.get('tab')||''),clientId:state?.studioView?(state.studioClientId||''):(params.get('client')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),queue:state?.studioDashboardQueue||params.get('queue')||'',jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
     }
     window.addEventListener('popstate',event=>{
         const destination=destinationFromLocation(event.state);

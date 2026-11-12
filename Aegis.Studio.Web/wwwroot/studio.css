@@ -8638,8 +8638,9 @@ body .topbar {
   color: #422a1d;
   box-shadow: 0 14px 32px rgba(12,30,50,.25);
 }
-.studio-admin-popover :is(button,.studio-admin-submenu > summary) {
+.studio-admin-popover :is(button,a.studio-admin-item,.studio-admin-submenu > summary) {
   display: flex;
+  box-sizing: border-box;
   align-items: center;
   gap: 8px;
   min-height: 32px;
@@ -8653,8 +8654,9 @@ body .topbar {
   font-size: 12px;
   cursor: pointer;
   list-style: none;
+  text-decoration: none;
 }
-.studio-admin-popover [hidden] { display: none; }
+.studio-admin-menu .studio-admin-popover [hidden] { display: none; }
 .studio-admin-submenu > summary::-webkit-details-marker { display: none; }
 .studio-admin-submenu > div { margin: 2px 0 4px 12px; border-inline-start: 1px solid #bdc9d5; padding-inline-start: 5px; }
 .studio-admin-chevron { margin-inline-start: auto; }

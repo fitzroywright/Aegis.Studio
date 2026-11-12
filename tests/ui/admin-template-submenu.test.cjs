@@ -1,20 +1,22 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{JSDOM}=require('jsdom');
 const source=fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/studio-admin.js'),'utf8');
+const css=fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/studio.css'),'utf8');
+const menuCss=css.slice(css.indexOf('.studio-admin-menu {'),css.indexOf('.studio-navigation-account {'));
 const settle=()=>new Promise(r=>setImmediate(r));
 async function setup(t,{admin=true,pending=false}={}){
- const dom=new JSDOM('<div id="host"></div>',{runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window,navigation=[];
+ const dom=new JSDOM('<style>'+menuCss+'</style><div id="host"></div>',{runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window,navigation=[];
  w.studioSignedInUserReady=Promise.resolve({isAdministrator:admin});w.StudioAccess={pending:()=>pending};w.studioNavigate=(view,options)=>navigation.push({view,options});w.eval(source);const host=w.document.getElementById('host');w.StudioAdmin.mountMenu(host);await settle();return {w,host,navigation,menu:host.querySelector('.studio-admin-menu'),group:host.querySelector('.studio-admin-submenu')};
 }
 test('Admin Templates contains exactly three template destinations; automation is a separate entry',async t=>{
  const {host,group,navigation}=await setup(t);
  assert.deepEqual([...host.querySelector('.studio-admin-popover').children].map(node=>node.tagName==='HR'?'Separator':node.tagName==='DETAILS'?node.querySelector('summary span').textContent:node.textContent),['Opening Hours','Staff and Roles','Products and Services','Workspaces','Templates','Workflow Automation','Separator','About']);
  assert.equal(host.querySelector('hr').hidden,false);assert.equal(group.querySelector('summary span').textContent,'Templates');
- assert.deepEqual([...group.querySelectorAll('button')].map(b=>b.textContent),['Job Templates','Work Order Templates','Session Plan Templates']);
- assert.equal(host.querySelector('[data-studio-admin-view="workflows-admin"]').closest('.studio-admin-submenu'),null);
- const job=group.querySelector('[data-studio-admin-view="templates"]');job.click();assert.equal(navigation.at(-1).view,'templates');assert.equal(navigation.at(-1).options.kind,'Job');
- group.querySelector('[data-studio-admin-view="work-order-templates"]').click();assert.equal(navigation.at(-1).view,'work-order-templates');
+ assert.deepEqual([...group.querySelectorAll('[data-studio-admin-view]')].map(b=>b.textContent),['Job Templates','Work Order Templates','Session Plan Templates']);
+ assert.equal(host.querySelector('[data-studio-admin-view="workflow-automation"]').closest('.studio-admin-submenu'),null);
+ const job=group.querySelector('[data-studio-admin-view="job-templates"]');assert.equal(job.tagName,'A');assert.equal(job.getAttribute('href'),'/admin/job-templates');
+ assert.equal(group.querySelector('[data-studio-admin-view="work-order-templates"]').getAttribute('href'),'/admin/work-order-templates');
  group.querySelector('[data-studio-admin-view="session-plan-templates"]').click();assert.equal(navigation.at(-1).view,'session-plan-templates');
- host.querySelector('[data-studio-admin-view="workflows-admin"]').click();assert.equal(navigation.at(-1).view,'workflows-admin');
+ assert.equal(host.querySelector('[data-studio-admin-view="workflow-automation"]').getAttribute('href'),'/admin/workflow-automation');
 });
 test('keyboard opens, traverses and closes the nested group without closing Admin first',async t=>{
  const {w,menu,group}=await setup(t);menu.open=true;await settle();const summary=group.querySelector('summary');summary.focus();
@@ -23,7 +25,7 @@ test('keyboard opens, traverses and closes the nested group without closing Admi
  key('ArrowDown');assert.equal(w.document.activeElement.textContent,'Workflow Automation');key('Escape');assert.equal(menu.open,false);
 });
 test('non-administrators and pending accounts cannot see the template group or automation',async t=>{
- for(const pending of [false,true]){const {host,group}=await setup(t,{admin:false,pending});assert.equal(group.hidden,true);assert.equal(host.querySelector('[data-studio-admin-view="workflows-admin"]').hidden,true);assert.equal(host.querySelector('[data-studio-admin-view="about"]').hidden,false);assert.equal(host.querySelector('[data-studio-admin-view="workspace-management"]').hidden,pending);assert.equal(host.querySelector('hr').hidden,pending);}
+ for(const pending of [false,true]){const {w,host,group}=await setup(t,{admin:false,pending});assert.equal(group.hidden,true);assert.equal(host.querySelector('[data-studio-admin-view="workflow-automation"]').hidden,true);assert.equal(w.getComputedStyle(host.querySelector('[data-studio-admin-view="workflow-automation"]')).display,'none');assert.equal(host.querySelector('[data-studio-admin-view="about"]').hidden,false);assert.equal(host.querySelector('[data-studio-admin-view="workspace-management"]').hidden,pending);assert.equal(host.querySelector('hr').hidden,pending);}
 });
 test('navigation and outside clicks collapse both levels',async t=>{
  const {w,menu,group}=await setup(t);menu.open=true;group.open=true;await settle();w.dispatchEvent(new w.Event('studio-view-changed'));assert.equal(menu.open,false);assert.equal(group.open,false);menu.open=true;group.open=true;await settle();w.document.body.click();assert.equal(menu.open,false);assert.equal(group.open,false);

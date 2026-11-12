@@ -4,10 +4,10 @@
         {view:'staff-roles',icon:'i-people',label:'Staff and Roles'},
         {view:'catalog',icon:'i-pos',label:'Products and Services'},
         {view:'workspace-management',icon:'i-grid',label:'Workspaces',staff:true},
-        {view:'templates',icon:'i-jobs',label:'Job Templates',parent:'templates',kind:'Job'},
-        {view:'work-order-templates',icon:'i-jobs',label:'Work Order Templates',parent:'templates'},
+        {view:'job-templates',icon:'i-jobs',label:'Job Templates',parent:'templates',href:'/admin/job-templates'},
+        {view:'work-order-templates',icon:'i-jobs',label:'Work Order Templates',parent:'templates',href:'/admin/work-order-templates'},
         {view:'session-plan-templates',icon:'i-calendar',label:'Session Plan Templates',parent:'templates'},
-        {view:'workflows-admin',icon:'i-grid',label:'Workflow Automation'},
+        {view:'workflow-automation',icon:'i-grid',label:'Workflow Automation',href:'/admin/workflow-automation'},
         {view:'about',icon:'i-info',label:'About',staff:true,separatorBefore:true}
     ];
     function mountMenu(host){
@@ -23,8 +23,8 @@
         const close=()=>{templates.open=false;menu.open=false;};
         for(const entry of entries){
             if(entry.separatorBefore)body.append(separator);
-            const button=document.createElement('button');button.type='button';button.className='studio-admin-item';const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('class','studio-navigation-icon');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('fill','none');icon.setAttribute('stroke','currentColor');icon.setAttribute('stroke-width','1.6');icon.setAttribute('stroke-linecap','round');icon.setAttribute('stroke-linejoin','round');icon.setAttribute('aria-hidden','true');icon.setAttribute('focusable','false');const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#'+entry.icon);icon.append(use);const label=document.createElement('span');label.textContent=entry.label;button.append(icon,label);button.dataset.studioAdminView=entry.view;button.hidden=!entry.staff;
-            button.onclick=()=>{close();window.studioNavigate?.(entry.view,entry.kind?{kind:entry.kind}:{});};
+            const button=document.createElement(entry.href?'a':'button');if(entry.href)button.href=entry.href;else button.type='button';button.className='studio-admin-item';const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('class','studio-navigation-icon');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('fill','none');icon.setAttribute('stroke','currentColor');icon.setAttribute('stroke-width','1.6');icon.setAttribute('stroke-linecap','round');icon.setAttribute('stroke-linejoin','round');icon.setAttribute('aria-hidden','true');icon.setAttribute('focusable','false');const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#'+entry.icon);icon.append(use);const label=document.createElement('span');label.textContent=entry.label;button.append(icon,label);button.dataset.studioAdminView=entry.view;button.hidden=!entry.staff;
+            button.onclick=()=>{close();if(!entry.href)window.studioNavigate?.(entry.view);};
             if(entry.parent==='templates'){if(!templates.parentElement)body.append(templates);templateItems.append(button);}else body.append(button);
             buttons.set(entry.view,button);
         }
@@ -39,11 +39,11 @@
         menu.addEventListener('keydown',event=>{
             const inside=templates.contains(document.activeElement),summary=templates.querySelector('summary');
             if(event.key==='Escape'){event.preventDefault();if(inside&&templates.open){templates.open=false;summary.focus();}else{close();menu.querySelector('summary').focus();}}
-            if(event.key==='ArrowRight'&&document.activeElement===summary){event.preventDefault();templates.open=true;templateItems.querySelector('button:not([hidden])')?.focus();}
+            if(event.key==='ArrowRight'&&document.activeElement===summary){event.preventDefault();templates.open=true;templateItems.querySelector('button:not([hidden]),a:not([hidden])')?.focus();}
             if(event.key==='ArrowLeft'&&inside){event.preventDefault();templates.open=false;summary.focus();}
             if(event.key==='ArrowDown'||event.key==='ArrowUp'){
                 event.preventDefault();menu.open=true;
-                const visible=[...body.querySelectorAll('button,summary')].filter(el=>!el.hidden&&!el.closest('[hidden]')&&(!templateItems.contains(el)||templates.open));
+                const visible=[...body.querySelectorAll('button,a[href],summary')].filter(el=>!el.hidden&&!el.closest('[hidden]')&&(!templateItems.contains(el)||templates.open));
                 const index=visible.indexOf(document.activeElement),direction=event.key==='ArrowDown'?1:-1;
                 visible[index<0?(direction>0?0:visible.length-1):(index+direction+visible.length)%visible.length]?.focus();
             }

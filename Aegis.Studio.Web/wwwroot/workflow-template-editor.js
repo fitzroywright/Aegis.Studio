@@ -2,15 +2,6 @@
  'use strict';
  const esc=StudioGraph.esc,copy=x=>JSON.parse(JSON.stringify(x)),send=(url,body,method='POST')=>json(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
  const empty=()=>({nodes:[{id:'start',label:'Start',kind:'Start'},{id:'end',label:'Complete',kind:'End',join:'All'}],edges:[{id:crypto.randomUUID(),from:'start',to:'end'}]});
- async function list(){
-  const current=StudioPage.begin('templates');
-  const [templates,drafts]=await Promise.all([json('/api/admin/commercial/templates/Job'),json('/api/admin/workflow-templates/drafts')]);if(!current())return;
-  const rows=templates.map(t=>({...t,draft:drafts.find(d=>d.templateId===t.id)}));
-  rows.push(...drafts.filter(d=>!templates.some(t=>t.id===d.templateId)).map(d=>({id:d.templateId,version:0,definition:d.definition,draft:d,active:d.active})));
-  commercialTemplatePage('Job',`<div class="commercial-grid"><table class="pos-grid"><thead><tr><th>Job Template</th><th>Published</th><th>Draft</th><th>Status</th></tr></thead><tbody>${rows.map(t=>`<tr tabindex="0" data-template="${t.id}"><td><b>${esc(t.definition.name)}</b><small>${esc(t.definition.description)}</small></td><td>${t.version?'v'+t.version:'Not published'}</td><td>${t.draft?'Revision '+t.draft.revision:'No draft'}</td><td>${t.active?'Active':'Retired'}</td></tr>`).join('')||'<tr><td colspan="4">Create your first Job Template.</td></tr>'}</tbody></table></div>`,`<button class="primary" data-create>Create Job Template</button>`);
-  genericView.querySelector('[data-create]').onclick=()=>edit(null);
-  genericView.querySelectorAll('[data-template]').forEach(el=>{el.onclick=()=>edit(rows.find(t=>t.id===el.dataset.template));el.onkeydown=e=>{if(e.key==='Enter')el.click();};});StudioPage.setCount(rows.length+' templates');
- }
  async function edit(current){
   const [drafts,products,employees]=await Promise.all([json('/api/admin/workflow-templates/drafts'),json('/api/admin/pos/catalog/'),json('/api/studio-employees?assignable=true&limit=100')]);
   const draft=current?drafts.find(d=>d.templateId===current.id):null;
@@ -66,7 +57,7 @@
   field('[data-publish]').onclick=async()=>{const b=field('[data-publish]');b.disabled=true;try{await save();const result=await send(`/api/admin/workflow-templates/${id}/publish`,{expectedRevision:revision});baseVersion=result.version;revision=0;errors.textContent='Published v'+baseVersion+'. Existing jobs retain their workflows.';}catch(e){fail(e);}finally{b.disabled=false;}};
   field('[data-validate]').onclick=async()=>{try{const issues=await send('/api/admin/workflow-templates/validate',definition.workflow);errors.textContent=issues.length?issues.map(i=>`${i.nodeId}: ${i.message}`).join('\n'):'Workflow is valid.';}catch(e){fail(e);}};
   field('[data-preview]').onclick=()=>preview(definition,products);
-  field('[data-list]').onclick=()=>list();
+  field('[data-list]').onclick=()=>StudioJobTemplates.render();
   field('[data-versions]').onclick=async()=>{try{const versions=await json(`/api/admin/workflow-templates/${id}/versions`);const d=studioDialog('Published versions',versions.map(v=>`<p><button data-version="${v.version}">v${v.version} · ${esc(v.definition.name)}</button> · ${esc(v.createdBy)}</p>`).join('')||'<p>No published versions yet.</p>');d.querySelectorAll('[data-version]').forEach(b=>b.onclick=()=>preview(versions.find(v=>v.version===Number(b.dataset.version)).definition,products));}catch(e){fail(e);}};
   render();
  }
@@ -76,7 +67,7 @@
   const render=async()=>{try{const evaluation=await send('/api/workflow-graphs/preview',{graph,catalogItemIds:[...selected]});StudioGraph.canvas(d.querySelector('[data-preview-canvas]'),graph,{evaluation});}catch(e){d.querySelector('[role=alert]').textContent=e.message;}};
   d.querySelectorAll('[data-service]').forEach(el=>el.onchange=()=>{el.checked?selected.add(el.dataset.service):selected.delete(el.dataset.service);render();});await render();return d;
  }
- root.StudioGraphTemplates={list,edit,preview};
+ root.StudioGraphTemplates={edit,preview};
 })(window);
 
 
