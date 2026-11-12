@@ -5,3 +5,13 @@ test('check-in is persisted and start session opens the existing authorized repo
 test('inquiries remain a separate task and date controls load a Jamaica-local reception day',async t=>{const {w,fixture,render}=setup(t);await render();assert.ok(fixture.calls.some(c=>c.url.includes('from=2026-10-29T05%3A00%3A00.000Z')));w.document.querySelector('[data-fd-tab="enquiries"]').click();assert.equal(w.document.querySelectorAll('[data-fd-row-open]').length,1);assert.ok(w.document.querySelector('[data-fd-prepare]'));});
 
 test('an unauthorized account cannot request reception or job data',async t=>{const {w,fixture,render}=setup(t);fixture.role=false;await render();assert.match(w.genericView.textContent,/not assigned/);assert.equal(fixture.calls.some(call=>call.url==='/api/jobs'||call.url.startsWith('/api/frontdesk/reception?')),false);});
+
+
+test('Appointments and Enquiries have four focused columns and enquiries omit arrival and finance controls',async t=>{
+ const {w,fixture,render}=setup(t);fixture.enquiries[0].body='Please quote for our wedding.';await render();
+ assert.deepEqual([...w.document.querySelectorAll('thead th')].map(th=>th.textContent),['Time','Client','Session','Arrival']);
+ assert.equal(w.document.querySelector('.fd-filter-disclosure').open,false);assert.equal(w.document.querySelector('[data-fd-order]').value,'time');
+ w.document.querySelector('[data-fd-tab=enquiries]').click();assert.deepEqual([...w.document.querySelectorAll('thead th')].map(th=>th.textContent),['Name','Summary','Received','Follow-up']);
+ assert.equal(w.document.querySelector('.fd-arrival-strip').hidden,true);assert.equal(w.document.querySelector('.fd-grid-actions').hidden,true);assert.match(w.document.querySelector('.fd-enquiry-message').textContent,/quote for our wedding/);
+ assert.ok(w.document.querySelector('[data-fd-prepare]'));assert.equal(w.document.querySelector('.fd-selected-request [data-fd-payment]'),null);
+});

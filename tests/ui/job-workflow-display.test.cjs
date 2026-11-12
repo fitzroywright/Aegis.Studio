@@ -49,7 +49,7 @@ test('Job Details shows one status-colored display and never opens the workflow 
  assert.ok(host.querySelector('.jd-workflow-stage.inprogress'));
  assert.ok(host.querySelector('.jd-workflow-stage.available'));
  assert.ok(host.querySelector('.jd-workflow-stage.pending'));
- host.querySelectorAll('.jd-workflow-stage-label').forEach(label=>assert.equal(label.textContent.trim().split(/\s+/).length,1));
+ assert.deepEqual(Array.from(host.querySelectorAll('.jd-workflow-stage-label'),label=>label.textContent),view.graph.nodes.filter(node=>!['Start','End'].includes(node.kind)).map(node=>node.label));
  assert.equal(host.querySelector('.jd-workflow-stage.blocked .jd-workflow-stage-icon').textContent,'!');
  host.querySelectorAll('.jd-workflow-stage[role="listitem"]').forEach(node=>node.click());
  assert.equal(editorOpens,0);assert.equal(canvasCalls,0);
@@ -70,3 +70,4 @@ test('subflow appears only after its stage is clicked and matches the Start/End 
  host.querySelector('[data-endpoint="start"]').click();
  assert.equal(host.querySelector('.jd-subflow-diagram'),null);
 });
+

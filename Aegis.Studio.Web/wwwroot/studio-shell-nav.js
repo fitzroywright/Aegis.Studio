@@ -301,8 +301,6 @@
         for(const node of document.querySelectorAll('.studio-navigation-scroll,#studioAttentionTrigger,#studioSessionsTrigger,#notificationButton,#studioContentSearch,#profileButton,[data-studio-avatar-notifications]'))node.classList.toggle('hidden',pending);
         const view = document.body.dataset.studioView || currentView;
         const isToday = view === 'dashboard';
-        const announcement = document.getElementById('studioLoginAnnouncements');
-        if(announcement) announcement.hidden = isToday;
 
         const main = shell?.querySelector('main');
         const masthead = document.querySelector('.topbar');
@@ -624,5 +622,6 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })()
+
 
 

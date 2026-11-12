@@ -47,3 +47,16 @@ test('customizing a job copies the definition and keeps the source template unmo
 test('new subject controls use the selected category hierarchy without rewriting existing subject structure',t=>{
  const {w}=setup(t);w.StudioRosterEditor={hierarchy:()=>[]};const s={structure:{definition:definition()},category:'Performers'},form=w.document.createElement('form');form.innerHTML=w.StudioPlanTemplates.subjectFields(s,{});w.StudioPlanTemplates.bindSubjectFields(form,s,{});form.querySelectorAll('[data-template-level]').forEach((input,i)=>input.value=['East','A'][i]);const updated={};w.StudioPlanTemplates.captureSubject(form,s,updated);assert.equal(updated.planCategory,'Performers');assert.deepEqual(JSON.parse(updated.planGroups),[{name:'Region',value:'East'},{name:'Cast',value:'A'}]);assert.equal(w.StudioPlanTemplates.subjectFields(s,{subjectId:'existing'}),'');
 });
+
+
+test('category context, bottom save and live preview follow unsaved hierarchy changes',async t=>{
+ const {w,workspaces}=setup(t);let saved;
+ w.StudioPlanTemplates.edit(w.genericView,{active:true,definition:definition()},{workspaces,cancel:()=>{},save:async d=>saved=d});
+ const host=w.genericView;assert.equal(host.querySelector('[data-category]').textContent,'Configure');
+ const name=host.querySelector('[data-category-name]');name.value='Cast';name.dispatchEvent(new w.Event('input',{bubbles:true}));
+ assert.match(host.querySelector('.spt-editing-context').textContent,/Editing: Cast/);
+ const preview=host.querySelector('[data-structure-preview]');preview.open=true;preview.dispatchEvent(new w.Event('toggle'));
+ assert.match(preview.textContent,/Cast → Region value → Cast value → Person name/);
+ const level=host.querySelector('[data-level]');level.value='District';level.dispatchEvent(new w.Event('input',{bubbles:true}));assert.match(preview.textContent,/District value/);
+ host.querySelector('footer [type=submit]').click();await tick();assert.equal(saved.definition.categories[0].groupingLevels[0],'District');
+});

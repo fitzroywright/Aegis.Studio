@@ -36,3 +36,12 @@ test('browser back and forward restore the distinct page URL and content',async 
 test('retired combined renderer and its switch do not remain as parallel implementations',()=>{
  const commercial=read('commercial.js');assert.doesNotMatch(commercial,/showCommercialTemplates|commercialTemplatePage/);assert.doesNotMatch(read('workflow-template-editor.js'),/async function list\(/);assert.doesNotMatch(read('css/pages/commercial.css'),/template-guidance|template-postit/);
 });
+
+
+test('When If Then builder saves ordered actions through the existing API and retains failed edits',async t=>{
+ const {w,calls}=setup(t,'https://studio.test/admin/workflow-automation');await boot(w);const q=s=>w.document.querySelector(s);
+ assert.equal(q('#workflowActions'),null);q('#workflowName').value='Follow up';q('#workflowStatusCondition').value='Confirmed';
+ w.addWorkflowAction();const rows=w.document.querySelectorAll('[data-workflow-action]');rows[1].querySelector('select').value='WaitMinutes';w.updateWorkflowAction(rows[1]);rows[1].querySelector('[data-action-minutes]').value='15';
+ const read=w.json;w.json=async(url,options)=>{if(options)throw Error('Offline');return read(url,options);};await w.createWorkflowDefinition();assert.match(q('[data-workflow-error]').textContent,/Offline/);assert.equal(q('#workflowName').value,'Follow up');assert.equal(q('[data-workflow-save]').disabled,false);
+ w.json=read;await w.createWorkflowDefinition();const payload=JSON.parse(calls.find(c=>c.options?.method==='POST').options.body);assert.deepEqual(JSON.parse(payload.conditionsJson),{jobStatus:'Confirmed'});assert.deepEqual(JSON.parse(payload.actionsJson),[{type:'CreateActivity',activityType:'Other',title:'Follow up on job',dueMinutes:120},{type:'WaitMinutes',minutes:15}]);assert.match(q('[data-workflow-saved]').textContent,/Rule created/);
+});

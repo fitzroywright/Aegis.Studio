@@ -6595,7 +6595,18 @@ body[data-studio-view="workspaces"] .generic {
 .subject-drop-target.drag-target:after {
   display: block;
 }
+.studio-announcement-trigger { position:fixed; z-index:92; top:68px; right:20px; padding:7px 12px; border:1px solid #d7b660; border-radius:18px; background:#fff8df; color:#422a1d; font-size:12px; cursor:pointer; }
 .workspace-announcement-banners {
+  position:fixed;
+  z-index:91;
+  top:104px;
+  left:0;
+  right:0;
+  max-height:60vh;
+  transition:transform .24s ease,opacity .24s ease,visibility .24s;
+  transform:translateY(0);
+  opacity:1;
+  visibility:visible;
   grid-column: 1/-1;
   display: flex;
   flex: 0 0 auto;
@@ -6609,6 +6620,8 @@ body[data-studio-view="workspaces"] .generic {
   padding: 10px 16px 0;
   box-sizing: border-box;
 }
+.workspace-announcement-banners[data-collapsed="true"] { transform:translateY(-120%); opacity:0; visibility:hidden; pointer-events:none; }
+@media(prefers-reduced-motion:reduce) { .workspace-announcement-banners { transition:none; } }
 .workspace-announcement-banners::-webkit-scrollbar { display:none; }
 .workspace-announcement-banners[data-multiple="true"] .workspace-announcement { cursor:pointer; }
 .workspace-announcement-banners[hidden] {
@@ -6625,7 +6638,10 @@ body[data-studio-view="workspaces"] .generic {
   width: 100%;
   padding: 14px 18px 14px 12px;
   box-sizing: border-box;
-  background: #fff8df;
+  background: rgba(255,248,223,.96);
+  backdrop-filter: blur(10px);
+  max-height:55vh;
+  overflow-y:auto;
   color: #422a1d;
   border: 1px solid #d7b660;
   border-left: 5px solid #d6a627;
@@ -9435,3 +9451,4 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 .api-key-form textarea{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px}
 .api-key-actions{display:flex;gap:6px;flex-wrap:wrap}
 .api-key-warning{color:#70421e;font-size:11px}
+

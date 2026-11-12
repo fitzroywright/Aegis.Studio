@@ -18,9 +18,19 @@
             if (results.every(result=>result.status==='fulfilled')) sessionStorage.setItem('studio-announcements-login', identity);
             if (!items.length) return;
             const host = document.createElement('section');
-            host.hidden = document.body.dataset.studioView === 'dashboard';
             host.id = 'studioLoginAnnouncements';host.className = 'workspace-announcement-banners';
             host.setAttribute('aria-label','Staff announcements. Click an announcement or use arrow keys to move between announcements.');host.tabIndex = 0;
+            const launcher=document.createElement('button');launcher.type='button';launcher.className='studio-announcement-trigger';launcher.textContent='Announcements';launcher.setAttribute('aria-controls',host.id);launcher.setAttribute('aria-expanded','true');
+            let hideTimer;
+            const pause=()=>clearTimeout(hideTimer);
+            const hide=()=>{pause();host.dataset.collapsed='true';host.inert=true;launcher.setAttribute('aria-expanded','false');};
+            const schedule=()=>{pause();if(!host.matches(':hover')&&!host.contains(document.activeElement))hideTimer=setTimeout(hide,8000);};
+            const show=()=>{pause();host.dataset.collapsed='false';host.inert=false;launcher.setAttribute('aria-expanded','true');schedule();};
+            const remove=()=>{pause();host.remove();launcher.remove();};
+            launcher.onclick=()=>{if(host.dataset.collapsed==='true'){show();host.focus();}else hide();};
+            launcher.onpointerenter=()=>{show();pause();};launcher.onpointerleave=schedule;
+            host.onpointerenter=pause;host.onpointerleave=schedule;host.onfocusin=pause;host.onfocusout=()=>queueMicrotask(schedule);
+            host.addEventListener('keydown',event=>{if(event.key==='Escape'){hide();launcher.focus();}});
             const updatePositions=()=>{host.dataset.multiple=String(host.children.length>1);[...host.children].forEach((article,index)=>{article.querySelector('.workspace-announcement-position').textContent=(index+1)+' of '+host.children.length+(host.children.length>1?' · Click for next':'');});};
             const advance=(article,direction=1)=>{
                 const slides=[...host.children];if(slides.length<2)return;
@@ -52,8 +62,8 @@
                 const context=document.createElement('small');context.className='workspace-announcement-context';context.textContent=item.workspaceName;
                 copy.append(kicker,title,body,context,error);
                 const controls=document.createElement('div');controls.className='workspace-announcement-controls';
-                const close=document.createElement('button');close.type='button';close.className='action';close.textContent='×';close.title='Close announcement banner for this session';close.setAttribute('aria-label','Close announcement banner without dismissing notifications');
-                close.onclick=()=>{host.remove();};
+                const close=document.createElement('button');close.type='button';close.className='action';close.textContent='×';close.title='Hide announcement banner';close.setAttribute('aria-label','Close announcement banner without dismissing notifications');
+                close.onclick=()=>{hide();launcher.focus();};
                 const position=document.createElement('small');position.className='workspace-announcement-position';
                 const button=document.createElement('button');button.type='button';button.className='action';button.textContent='Dismiss';button.setAttribute('aria-label','Dismiss announcement: '+item.title);
                 button.onclick=async()=>{
@@ -62,13 +72,13 @@
                         await json('/api/workspaces/'+encodeURIComponent(item.workspaceId)+'/announcements/'+encodeURIComponent(item.id)+'/dismiss',{method:'POST'});
                         const next=article.nextElementSibling||article.previousElementSibling;
                         article.remove();updatePositions();
-                        if (!host.children.length) host.remove();
+                        if (!host.children.length) remove();
                         else next?.querySelector('button')?.focus();
                     } catch {error.textContent='Could not dismiss. Please try again.';button.disabled=false;}
                 };
                 controls.append(position,close,button);article.append(symbol,copy,controls);host.append(article);
             }
-            updatePositions();main.prepend(host);
+            updatePositions();main.prepend(host);main.prepend(launcher);show();
         } catch(error) { console.error('Announcements could not be loaded.', error); }
     }
     async function attachComposer(toolbar,current) {
@@ -106,5 +116,6 @@
     window.StudioAnnouncements = {showAtLogin,attachComposer};
     window.studioSignedInUserReady?.then(showAtLogin).catch(error=>console.error('Announcement sign-in check failed.',error));
 })();
+
 
 

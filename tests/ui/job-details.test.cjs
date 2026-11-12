@@ -151,7 +151,7 @@ test('approved layout uses twelve photos, real collection counts and cursor pagi
  assert.notEqual(w.document.querySelector('.jd-photo').dataset.jdAsset,first);
  await w.document.querySelector('[data-previous]').onclick();assert.equal(w.document.querySelector('.jd-photo').dataset.jdAsset,first);
  assert.ok(fixture.calls.some(c=>c.url.includes('after=')));
- await w.document.querySelector('[data-filter=Unclassified]').onclick();assert.equal(w.document.querySelectorAll('.jd-photo').length,0);
+ w.document.querySelector('[data-collection]').value='Unclassified';await w.document.querySelector('[data-collection]').onchange({target:w.document.querySelector('[data-collection]')});assert.equal(w.document.querySelectorAll('.jd-photo').length,0);
  assert.match(w.document.querySelector('#studioFooterRate').textContent,/40 files/);
 });
 test('Selected File saves collection and subjects while preserving production metadata',async t=>{
@@ -189,7 +189,7 @@ test('gallery search and list controls operate on the displayed page',async t=>{
 
 test('upload selection queues files immediately into the current collection',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
- await w.document.querySelector('[data-filter=Selections]').onclick();
+ w.document.querySelector('[data-collection]').value='Selections';await w.document.querySelector('[data-collection]').onchange({target:w.document.querySelector('[data-collection]')});
  const input=w.document.querySelector('[data-files]');Object.defineProperty(input,'files',{value:[new w.File(['image'],'photo.jpg',{type:'image/jpeg'})]});
  await input.onchange();const upload=fixture.calls.find(c=>c.url.endsWith('/media/uploads'));assert.ok(upload);const batch=fixture.calls.find(c=>c.url.endsWith('/media/upload-batches'));assert.equal(JSON.parse(batch.options.body).collection,'Selections');assert.ok(upload.options.body.get('uploadId'));
  assert.match(w.document.querySelector('[data-media-result]').textContent,/1\/1 stored/);
@@ -241,4 +241,5 @@ test('a failure after replacing the loading header reports the original error an
  await w.openWorkspaceJob('job');assert.match(w.detailPane.querySelector('[role=alert]').textContent,/Composer initialization failed/);assert.equal(w.detailPane.getAttribute('aria-busy'),null);
  w.StudioMessageCard.bind=bind;await w.detailPane.querySelector('button').onclick();await settle();assert.ok(w.document.querySelector('.jd-workflow-display'));assert.equal(w.detailPane.querySelector('[role=alert]')?.textContent.includes('Composer initialization failed'),false);
 });
+
 

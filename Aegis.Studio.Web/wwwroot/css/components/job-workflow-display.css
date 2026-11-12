@@ -1,6 +1,6 @@
 /* Job Details owns one standalone workflow summary and its click-to-expand subflow. */
-.jd-workflow-display{position:relative;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:4px;width:100%;min-width:0;overflow:visible}
-.jd-workflow-stage{position:relative;display:flex;flex:1 1 0;min-width:24px;align-items:center;flex-direction:column;margin:0;padding:2px;border:0;background:transparent;color:var(--theme-text,#162b50)}
+.jd-workflow-display{position:relative;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:4px;width:100%;min-width:0;overflow-x:auto;padding-bottom:4px}
+.jd-workflow-stage{position:relative;display:flex;flex:1 1 0;min-width:90px;align-items:center;flex-direction:column;margin:0;padding:2px;border:0;background:transparent;color:var(--theme-text,#162b50)}
 .jd-workflow-stage[data-subflow-stage]{cursor:pointer}
 .jd-workflow-connector{position:relative;flex:1 1 20px;min-width:10px;height:24px}
 .jd-workflow-connector::after{content:"";position:absolute;top:13px;left:0;right:0;border-top:2px solid #c5cad3}
@@ -9,15 +9,15 @@
 .jd-workflow-stage.skipped .jd-workflow-stage-icon{color:#fff;background:#618071;border-color:#618071}
 .jd-workflow-stage.inprogress .jd-workflow-stage-icon,.jd-workflow-stage.available .jd-workflow-stage-icon{color:#fff;background:#d99416;border-color:#d99416}
 .jd-workflow-stage.blocked .jd-workflow-stage-icon{color:#fff;background:#bd3040;border-color:#bd3040}
-.jd-workflow-stage-label{position:absolute;left:50%;top:29px;transform:rotate(45deg);transform-origin:top left;font-size:10px;white-space:nowrap}
+.jd-workflow-stage-label{display:block;margin-top:5px;font-size:12px;line-height:1.3;text-align:center;overflow-wrap:anywhere}
 .jd-workflow-stage[data-subflow-stage]:focus-visible,.jd-workflow-endpoint:focus-visible{outline:2px solid #d97827;outline-offset:2px}
-.jd-workflow-subflow-main{position:relative;display:flex;flex:1.5 1 150px;align-items:flex-start;min-width:132px;height:24px}
-.jd-workflow-endpoint{position:relative;z-index:1;display:flex;flex:none;align-items:flex-start;justify-content:center;width:28px;height:24px;margin:0;padding:0;border:0;background:transparent;color:#b47712;cursor:pointer}
+.jd-workflow-subflow-main{position:relative;display:flex;flex:1.5 1 210px;align-items:flex-start;min-width:210px;min-height:55px}
+.jd-workflow-endpoint{position:relative;z-index:1;display:flex;flex:none;justify-content:flex-start;width:80px;min-height:55px;flex-direction:column;align-items:center;margin:0;padding:0;border:0;background:transparent;color:#b47712;cursor:pointer}
 .jd-workflow-endpoint .jd-workflow-stage-icon{width:24px;height:24px;color:#b47712;border-color:#d99416}
 .jd-workflow-subflow-main.completed .jd-workflow-stage-icon{color:#fff;background:#318348;border-color:#318348}
 .jd-workflow-subflow-main.inprogress .jd-workflow-stage-icon,.jd-workflow-subflow-main.available .jd-workflow-stage-icon{color:#fff;background:#d99416;border-color:#d99416}
 .jd-workflow-subflow-main.blocked .jd-workflow-stage-icon{color:#fff;background:#bd3040;border-color:#bd3040}
-.jd-workflow-endpoint-label{position:absolute;top:29px;left:50%;transform:rotate(45deg);transform-origin:top left;font-size:10px;white-space:nowrap}
+.jd-workflow-endpoint-label{display:block;margin-top:5px;font-size:12px;line-height:1.3;text-align:center}
 .jd-workflow-main-dashes{position:relative;flex:1 1 20px;height:24px;min-width:14px}
 .jd-workflow-main-dashes::after{content:"";position:absolute;top:12px;left:0;right:0;border-top:2px dashed #788393}
 .jd-workflow-expansion{position:absolute;z-index:1;top:0;left:0;width:100%;height:170px;min-width:0;overflow:visible;pointer-events:none}
@@ -35,3 +35,4 @@
 .jd-subflow-step.inprogress .jd-subflow-glyph,.jd-subflow-step.available .jd-subflow-glyph{fill:#fff}
 .jd-subflow-step.blocked circle{fill:#bd3040;stroke:#bd3040}
 .jd-subflow-step.blocked .jd-subflow-glyph{fill:#fff}
+

@@ -22,20 +22,17 @@ function environment(t,{edit=true}={}){
  let live=true;const mount=()=>w.StudioJobDetails.media(job,host,null,()=>live,()=>{}),q=s=>w.document.querySelector(s);
  return {w,host,brief,job,assets,people,calls,navigation,mount,q,stop:()=>live=false};
 }
-test('Session Plan uses real collections, includes empty planned groups and opens the full job plan',async t=>{
- const f=environment(t);await f.mount();
- assert.equal(f.q('.jd-collections'),null);assert.match(f.q('.jd-plan-nav header').textContent,/Session Plan3 subjects/);
- assert.deepEqual(Array.from(f.host.querySelectorAll('[data-filter]'),b=>b.dataset.filter),['','Family group','Parents','Children','Unclassified']);
- assert.match(f.q('[data-filter="Children"]').textContent,/Children0/);
+test('one toolbar filters real collections, includes empty groups and opens the full plan',async t=>{
+ const f=environment(t);await f.mount();assert.equal(f.q('.jd-plan-nav'),null);
+ assert.deepEqual(Array.from(f.q('[data-collection]').options,o=>o.value),['','Family group','Parents','Children','Unclassified']);
  await f.q('[data-job-session-plan]').onclick();assert.deepEqual(JSON.parse(JSON.stringify(f.navigation)),[['session-plan',{jobId:'job'}]]);
- await f.q('[data-filter="Children"]').onclick();assert.match(f.q('.jd-contact-sheet').textContent,/No media here/);
- assert.match(f.q('.jd-plan-subjects').textContent,/Child portrait/);
- assert.equal(f.q('[data-filter="Children"]').getAttribute('aria-pressed'),'true');
+ f.q('[data-collection]').value='Children';await f.q('[data-collection]').onchange({target:f.q('[data-collection]')});assert.match(f.q('.jd-contact-sheet').textContent,/No media here/);
+ assert.equal(f.q('[data-collection]').value,'Children');assert.match(f.q('[data-job-subject]').textContent,/Child portrait/);
 });
 test('collection and subject navigation share the gallery filters and clear an incompatible subject',async t=>{
- const f=environment(t);await f.mount();await f.q('[data-plan-subject="family"]').onclick();
+ const f=environment(t);await f.mount();f.q('[data-job-subject]').value='family';await f.q('[data-job-subject]').onchange();
  assert.match(f.calls.filter(c=>c.url.includes('/media?')).at(-1).url,/subjectId=family/);
- await f.q('[data-filter="Parents"]').onclick();
+ f.q('[data-collection]').value='Parents';await f.q('[data-collection]').onchange({target:f.q('[data-collection]')});
  const request=new URL(f.calls.filter(c=>c.url.includes('/media?')).at(-1).url,'https://studio.test');
  assert.equal(request.searchParams.get('collection'),'Parents');assert.equal(request.searchParams.has('subjectId'),false);
  assert.deepEqual(Array.from(f.host.querySelectorAll('[data-jd-asset]'),b=>b.dataset.jdAsset),['b']);
@@ -59,12 +56,12 @@ test('partial selection edits report progress and retry only the unsaved photo',
 });
 test('read-only staff retain browsing and the full plan link without mutation controls',async t=>{
  const f=environment(t,{edit:false});await f.mount();assert.equal(f.q('[data-add],[data-assign-selected],[data-move-selected]'),null);
- await f.q('[data-filter="Parents"]').onclick();assert.equal(f.q('[data-jd-asset]').dataset.jdAsset,'b');await f.q('[data-job-session-plan]').onclick();assert.equal(f.navigation.length,1);assert.equal(f.calls.some(c=>c.options?.method==='PUT'),false);
+ f.q('[data-collection]').value='Parents';await f.q('[data-collection]').onchange({target:f.q('[data-collection]')});assert.equal(f.q('[data-jd-asset]').dataset.jdAsset,'b');await f.q('[data-job-session-plan]').onclick();assert.equal(f.navigation.length,1);assert.equal(f.calls.some(c=>c.options?.method==='PUT'),false);
 });
 test('unfinished upload batches keep their original destination when gallery filters change',async t=>{
  const f=environment(t),read=f.w.json;f.w.json=async(url,options)=>{if(url.endsWith('/uploads'))throw Error('Offline');return read(url,options);};await f.mount();
  const input=f.q('[data-files]');Object.defineProperty(input,'files',{value:[new f.w.File(['photo'],'family.jpg')]});await input.onchange();
- await f.q('[data-filter="Parents"]').onclick();assert.equal(f.q('[data-collection]').value,'');assert.match(f.q('[data-media-result]').textContent,/current upload/);assert.equal(f.q('[data-assign-selected]').disabled,true);assert.match(f.q('[data-media-result] button').textContent,/Retry original batch/);
+ f.q('[data-collection]').value='Parents';await f.q('[data-collection]').onchange({target:f.q('[data-collection]')});assert.equal(f.q('[data-collection]').value,'');assert.match(f.q('[data-media-result]').textContent,/current upload/);assert.equal(f.q('[data-assign-selected]').disabled,true);assert.match(f.q('[data-media-result] button').textContent,/Retry original batch/);
 });
 test('compact instructions start collapsed, reveal the editor on demand and save through job notes',async t=>{
  const f=environment(t);await f.w.StudioJobBrief.mount(f.job,f.brief,()=>true);
@@ -88,3 +85,4 @@ test('disposing a job closes the selection editor and prevents changes to the pr
  const f=environment(t),controller=await f.mount();f.q('[data-assign-selected]').click();const form=f.q('dialog form');form.elements.target.options[2].selected=true;
  f.stop();controller.dispose();assert.equal(f.q('dialog'),null);await form.onsubmit({preventDefault(){}});assert.equal(f.calls.some(c=>c.options?.method==='PUT'),false);
 });
+

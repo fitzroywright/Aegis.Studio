@@ -14,12 +14,12 @@ test('login announcements use one horizontal banner, persist dismissals and do n
  const host=w.document.getElementById('studioLoginAnnouncements');assert.ok(host);assert.equal(host.children.length,2);assert.equal(host.parentElement,w.document.querySelector('.shell>main'));assert.match(host.textContent,/First <notice>/);assert.equal(host.querySelector('notice'),null);assert.equal(calls.some(x=>x.includes('denied')),false);
  await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});assert.equal(w.document.querySelectorAll('#studioLoginAnnouncements').length,1);
  assert.ok(host.querySelector('.workspace-announcement-symbol svg'));assert.equal(host.querySelector('.workspace-announcement-kicker').textContent,'Staff announcement');assert.equal(host.querySelector('h2').textContent,'First <notice>');assert.match(host.querySelector('.workspace-announcement-position').textContent,/1 of 2.*Click for next/);
- const button=host.querySelector('button');setFail(true);await button.onclick();assert.equal(host.children.length,2);assert.equal(button.disabled,false);assert.match(host.textContent,/Could not dismiss/);
+ const button=host.querySelector('.workspace-announcement-controls button:last-child');setFail(true);await button.onclick();assert.equal(host.children.length,2);assert.equal(button.disabled,false);assert.match(host.textContent,/Could not dismiss/);
  setFail(false);await button.onclick();assert.ok(dismissed.has('a'));assert.equal(host.children.length,1);assert.equal(host.querySelector('.workspace-announcement-position').textContent,'1 of 1');
  host.remove();w.eval(read('announcements.js'));await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});assert.equal(w.document.getElementById('studioLoginAnnouncements'),null);
  w.sessionStorage.removeItem('studio-announcements-login');w.eval(read('announcements.js'));await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});
  const next=w.document.getElementById('studioLoginAnnouncements');assert.equal(next.children.length,1);assert.match(next.textContent,/Second/);assert.doesNotMatch(next.textContent,/First/);
- await next.querySelector('button').onclick();assert.equal(w.document.getElementById('studioLoginAnnouncements'),null);
+ await next.querySelector('.workspace-announcement-controls button:last-child').onclick();assert.equal(w.document.getElementById('studioLoginAnnouncements'),null);
  const css=read('studio.css'),rules=css.match(/\.workspace-announcement-banners \{([^}]+)\}/)[1];assert.match(rules,/display: flex/);assert.match(rules,/overflow-x: auto/);assert.match(rules,/flex: 0 0 auto/);assert.match(css,/\.workspace-announcement \{[^}]*flex: 0 0 100%/s);
 });
 test('announcement startup waits for authenticated identity',async t=>{
@@ -72,8 +72,21 @@ test('clicking announcements scrolls their strip, wraps around and keeps dismiss
  slides[1].querySelector('p').click();assert.equal(moves.at(-1).left,0);
  host.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));assert.equal(moves.at(-1).left,600);
  w.matchMedia=()=>({matches:true});host.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true}));assert.equal(moves.at(-1).left,0);assert.equal(moves.at(-1).behavior,'auto');
- const before=moves.length;slides[0].querySelector('button').click();await new Promise(resolve=>setImmediate(resolve));assert.equal(host.children.length,1);assert.equal(moves.length,before);assert.equal(host.dataset.multiple,'false');
+ const before=moves.length;slides[0].querySelector('.workspace-announcement-controls button:last-child').click();await new Promise(resolve=>setImmediate(resolve));assert.equal(host.children.length,1);assert.equal(moves.length,before);assert.equal(host.dataset.multiple,'false');
  host.querySelector('h2').click();assert.equal(moves.length,before);
  const css=read('studio.css');assert.match(css,/\.workspace-announcement-banners \{[^}]*overflow-x: auto;[^}]*scrollbar-width: none;/s);assert.match(css,/\.workspace-announcement-banners::-webkit-scrollbar \{ display:none; \}/);
 });
 
+
+
+test('automatic hiding preserves announcements, hover pauses, tap reopens and only Dismiss writes',async t=>{
+ const {w,calls}=fixture(t);let scheduled=null,delay;
+ w.setTimeout=(callback,ms)=>{scheduled=callback;delay=ms;return 1;};w.clearTimeout=()=>{scheduled=null;};
+ await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});const host=w.document.getElementById('studioLoginAnnouncements'),trigger=w.document.querySelector('.studio-announcement-trigger');
+ assert.equal(delay,8000);scheduled();assert.equal(host.dataset.collapsed,'true');assert.equal(trigger.getAttribute('aria-expanded'),'false');assert.equal(host.children.length,2);
+ trigger.click();assert.equal(host.dataset.collapsed,'false');assert.equal(w.document.activeElement,host);host.dispatchEvent(new w.Event('pointerenter'));assert.equal(scheduled,null);
+ host.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(host.dataset.collapsed,'true');assert.equal(w.document.activeElement,trigger);
+ trigger.dispatchEvent(new w.Event('pointerenter'));assert.equal(host.dataset.collapsed,'false');
+ host.querySelector('.workspace-announcement-controls button').click();assert.equal(host.dataset.collapsed,'true');assert.equal(calls.some(x=>x.endsWith('/dismiss')),false);
+ trigger.click();await host.querySelector('.workspace-announcement-controls button:last-child').onclick();assert.equal(calls.filter(x=>x.endsWith('/dismiss')).length,1);
+});

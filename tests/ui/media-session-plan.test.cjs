@@ -155,13 +155,14 @@ test('explicit inbox uploads keep failures visible and retry the original upload
  assert.equal(f.writes[0].body.get('uploadId'),f.writes[1].body.get('uploadId'));assert.equal(f.q('[data-transfer]').hidden,true);
 });
 
-test('planned-group pills select the photo filter and the captured upload destination together',async t=>{
- const f=fixture(t);await f.w.showMediaReview();await f.chooseJob();
- f.q('[data-photo-groups] [data-planned-person="missing"]').click();
+test('searchable grouped subjects select the photo filter and upload destination together',async t=>{
+ const f=fixture(t);await f.w.showMediaReview();await f.chooseJob();await settle();
+ f.q('[data-find-person]').click();const wrap=f.q('[data-subject]').parentElement,input=wrap.querySelector('[role=combobox]');
+ input.value='Sabrina';input.dispatchEvent(new f.w.Event('input'));wrap.querySelector('[role=option]').click();
  assert.equal(f.q('[data-subject]').value,'missing');assert.equal(f.q('[data-person]').value,'missing');assert.equal(f.q('[data-collection]').value,'Class 6A');
  assert.match(f.q('[data-destination-session]').textContent,/Graduation.*Morning.*Sabrina/);
- f.q('[data-photo-groups] [data-group-all]').click();assert.equal(f.w.document.querySelectorAll('[data-asset]').length,2);assert.equal(f.q('[data-person]').value,'');
- f.q('[data-planned-groups] [data-group-unclassified]').click();assert.equal(f.w.document.querySelectorAll('[data-asset]').length,1);assert.equal(f.q('[data-asset]').dataset.asset,'b');
+ f.q('[data-collection-name=""]').click();assert.equal(f.w.document.querySelectorAll('[data-asset]').length,2);assert.equal(f.q('[data-person]').value,'');
+ f.q('[data-collection-name="Unclassified"]').click();assert.equal(f.w.document.querySelectorAll('[data-asset]').length,1);assert.equal(f.q('[data-asset]').dataset.asset,'b');
 });
 
 test('job and destination popovers close and cannot reopen during a captured transfer',async t=>{
@@ -172,3 +173,4 @@ test('job and destination popovers close and cannot reopen during a captured tra
  for(const key of ['data-job-chooser','data-destination-chooser']){const chooser=f.q('['+key+']');assert.equal(chooser.open,false);const e=new f.w.MouseEvent('click',{bubbles:true,cancelable:true});chooser.querySelector('summary').dispatchEvent(e);assert.equal(e.defaultPrevented,true);}
  finish();await settle();assert.equal(f.q('[data-job-chooser] summary').getAttribute('aria-disabled'),'false');
 });
+
