@@ -40,7 +40,7 @@ Hierarchy syntax is `Level: Value / Level: Value`, with up to eight uniquely nam
 
 ## Demo generation
 
-The existing administrator demo recreation flow now runs `DemoSessionPlans.Seed` after photograph population and before final validation. It selects only the demo jobs identified by the existing demo ID prefixes or demo Front Desk source records. Every selected job receives configurable subjects, group deliverables and required photographs. Final validation rejects a generated demo job with no required shots.
+The existing administrator demo recreation flow now runs `DemoSessionPlans.Seed` after photograph population and before final validation. Photo population, Session Plan seeding and final photo validation use the same `DemoJobScope`: demo job IDs, demo conversation IDs, explicitly seeded Front Desk requests and demo booking references. A job produced by normal conversion can have a random ID and still retain its demo provenance. Unrelated jobs are excluded from these three operations. Every selected job receives configurable subjects, group deliverables and required photographs. Final validation rejects a generated demo job with no required shots.
 
 The first school example includes 1,200 new fictional students across six grades and forty classes, 96 new fictional staff across eight departments, forty class group subjects and eight department group subjects. Existing photographed school subjects are retained as additional participants; their IDs and photograph links are not replaced. Other jobs use smaller school examples, wedding parties, families, corporate teams or product ranges as appropriate.
 

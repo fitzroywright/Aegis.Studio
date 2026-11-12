@@ -156,12 +156,12 @@ internal static class DemoDatasetFinalizer
             command.Parameters.AddWithValue(WorkflowRules.Stages);
             if ((long)command.ExecuteScalar()! != 0) throw new InvalidOperationException("Demo contains unsupported Job stages.");
         }
-        Check("select count(*) from studio_jobs j where (j.id::text like 'de000000-%' or j.id::text like 'de100000-%' or exists(select 1 from studio_frontdesk_requests r where r.job_id=j.id and r.created_by='demo-seed')) and not exists(select 1 from studio_job_subjects s where s.job_id=j.id and not s.is_system and jsonb_array_length(coalesce(s.attributes#>'{sessionPlan,shots}','[]'::jsonb))>0)", "A demo job has no Session Plan requirements.");
+        Check("select count(*) from studio_jobs j where " + DemoJobScope.Predicate + " and not exists(select 1 from studio_job_subjects s where s.job_id=j.id and not s.is_system and jsonb_array_length(coalesce(s.attributes#>'{sessionPlan,shots}','[]'::jsonb))>0)", "A demo job has no Session Plan requirements.");
         Check("select count(*) from studio_jobs j where j.job_lead is not null and not exists(select 1 from studio_job_owner_assignments a where a.id=j.owner_assignment_id and a.job_id=j.id)", "Demo ownership is incomplete.");
         Check("select count(*) from studio_jobs j where not exists(select 1 from studio_job_template_instances t where t.job_id=j.id)", "Demo template coverage is incomplete.");
         Check("select count(*) from studio_jobs where status='Changes Requested' and correction_kind not in ('Source','Production') or status='Changes Requested' and correction_kind is null", "Demo correction actions are incomplete.");
         Check("select count(*) from studio_job_subjects s where not s.is_system and nullif(trim(s.collection_name),'') is not null and not exists(select 1 from studio_media_collections c where c.job_id=s.job_id and c.name=s.collection_name)", "A Session Plan collection is missing from the demo gallery.");
-        using (var command=new NpgsqlCommand("select j.id,j.title,count(m.asset_key)::int from studio_jobs j left join studio_media_assets m on m.job_id=j.id group by j.id,j.title order by j.id",connection))
+        using (var command=new NpgsqlCommand("select j.id,j.title,count(m.asset_key)::int from studio_jobs j left join studio_media_assets m on m.job_id=j.id where " + DemoJobScope.Predicate + " group by j.id,j.title order by j.id",connection))
         using (var reader=command.ExecuteReader())
             while(reader.Read())
             {

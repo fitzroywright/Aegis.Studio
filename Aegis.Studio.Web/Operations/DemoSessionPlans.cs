@@ -12,9 +12,7 @@ internal static class DemoSessionPlans
     internal static void Seed(StudioDatabase database, string actor, Action<DemoSeedProgress>? report)
     {
         using var connection = database.OpenConnection();
-        var jobs = new List<(Guid Id, string Title)>();
-        using (var read = new NpgsqlCommand("select id,title from studio_jobs j where id::text like 'de000000-%' or id::text like 'de100000-%' or exists(select 1 from studio_frontdesk_requests r where r.job_id=j.id and r.created_by='demo-seed') order by id", connection))
-        using (var reader = read.ExecuteReader()) while (reader.Read()) jobs.Add((reader.GetGuid(0), reader.GetString(1)));
+        var jobs = DemoJobScope.Read(connection);
         bool schoolCreated = false;
         foreach (var job in jobs)
         {

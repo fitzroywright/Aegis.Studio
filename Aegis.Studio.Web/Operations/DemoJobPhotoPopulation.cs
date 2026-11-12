@@ -12,9 +12,7 @@ internal static class DemoJobPhotoPopulation
     internal static void Seed(StudioDatabase database,IFileStorage storage,string login,Action<DemoSeedProgress>? report=null)
     {
         using var connection=database.OpenConnection();
-        var jobs=new List<(Guid Id,string Title)>();
-        using(var query=new NpgsqlCommand("select id,title from studio_jobs j where id::text like 'de000000-%' or id::text like 'de100000-%' or exists(select 1 from studio_frontdesk_requests r where r.job_id=j.id and r.created_by='demo-seed') order by id",connection))
-        using(var reader=query.ExecuteReader())while(reader.Read())jobs.Add((reader.GetGuid(0),reader.GetString(1)));
+        var jobs=DemoJobScope.Read(connection);
         var versions=new PrefixedFileStorage(storage,"VersionStore");
         for(int ordinal=0;ordinal<jobs.Count;ordinal++)
         {
