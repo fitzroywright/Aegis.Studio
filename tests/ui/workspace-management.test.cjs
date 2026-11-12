@@ -25,7 +25,7 @@ test('Admin menu exposes Workspaces and ends with About',async t=>{
  const {w,navigation}=setup(t);w.fetch=async()=>({ok:true,json:async()=>[]});w.eval(read('studio-admin.js'));w.eval(read('studio-shell-nav.js'));w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await settle();
  assert.equal(w.document.querySelector('[data-studio-avatar-workspaces],[data-studio-profile-management]'),null);
  const menu=w.document.querySelector('.studio-admin-menu');assert.ok(menu);assert.equal(menu.previousElementSibling.className,'studio-navigation-scroll');
- const link=menu.querySelector('[data-studio-admin-view="workspace-management"]');assert.equal(menu.querySelector('div').lastElementChild.textContent,'About');assert.equal(link.nextElementSibling.textContent,'About');menu.open=true;link.click();assert.equal(navigation.at(-1).view,'workspace-management');assert.equal(menu.open,false);
+ const link=menu.querySelector('[data-studio-admin-view="workspace-management"]');assert.equal(menu.querySelector('div').lastElementChild.textContent,'About');assert.equal(link.nextElementSibling.className,'studio-admin-submenu');menu.open=true;link.click();assert.equal(navigation.at(-1).view,'workspace-management');assert.equal(menu.open,false);
  menu.open=true;menu.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.open,false);
 });
 test('dedicated Session Plan Import preserves the job in its route and browser history',async t=>{
@@ -55,7 +55,7 @@ test('Admin entries use shared restrained icons and speed-bump rows while icon c
  const buttons=[...host.querySelectorAll('[data-studio-admin-view]')];assert.equal(buttons.length,9);
  for(const button of buttons){assert.ok(button.classList.contains('studio-admin-item'));const svg=button.querySelector('svg');assert.equal(svg.getAttribute('aria-hidden'),'true');assert.equal(svg.getAttribute('focusable'),'false');assert.ok(w.document.querySelector(svg.querySelector('use').getAttribute('href')));}
  const workspace=buttons.find(button=>button.dataset.studioAdminView==='workspace-management');workspace.querySelector('svg').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));assert.equal(navigation.at(-1).view,'workspace-management');
- assert.deepEqual(buttons.map(button=>button.textContent),['Products and Services','Job Templates','Work Order Templates','Session Plan Templates','Workflow Automation','Staff and Roles','Opening Hours','Workspaces','About']);
+ assert.deepEqual(buttons.map(button=>button.textContent),['Opening Hours','Staff and Roles','Products and Services','Workspaces','Job Templates','Work Order Templates','Session Plan Templates','Workflow Automation','About']);
  const shared=read('css/components/studio-rows.css');assert.match(shared,/studio-admin-item.*transition:/);assert.match(shared,/@media\(prefers-reduced-motion:reduce\).*studio-admin-item/);
 });
 

@@ -8658,6 +8658,7 @@ body .topbar {
 .studio-admin-submenu > summary::-webkit-details-marker { display: none; }
 .studio-admin-submenu > div { margin: 2px 0 4px 12px; border-inline-start: 1px solid #bdc9d5; padding-inline-start: 5px; }
 .studio-admin-chevron { margin-inline-start: auto; }
+.studio-admin-separator { border: 0; border-block-start: 1px solid #bdc9d5; margin: 5px 8px; }
 .studio-navigation-account {
   position: relative;
   display: flex;

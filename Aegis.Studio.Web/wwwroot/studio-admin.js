@@ -1,14 +1,14 @@
 (() => {
     const entries = [
+        {view:'opening-hours',icon:'i-calendar',label:'Opening Hours'},
+        {view:'staff-roles',icon:'i-people',label:'Staff and Roles'},
         {view:'catalog',icon:'i-pos',label:'Products and Services'},
+        {view:'workspace-management',icon:'i-grid',label:'Workspaces',staff:true},
         {view:'templates',icon:'i-jobs',label:'Job Templates',parent:'templates',kind:'Job'},
         {view:'work-order-templates',icon:'i-jobs',label:'Work Order Templates',parent:'templates'},
         {view:'session-plan-templates',icon:'i-calendar',label:'Session Plan Templates',parent:'templates'},
         {view:'workflows-admin',icon:'i-grid',label:'Workflow Automation'},
-        {view:'staff-roles',icon:'i-people',label:'Staff and Roles'},
-        {view:'opening-hours',icon:'i-calendar',label:'Opening Hours'},
-        {view:'workspace-management',icon:'i-grid',label:'Workspaces',staff:true},
-        {view:'about',icon:'i-info',label:'About',staff:true}
+        {view:'about',icon:'i-info',label:'About',staff:true,separatorBefore:true}
     ];
     function mountMenu(host){
         const menu=document.createElement('details');
@@ -18,9 +18,11 @@
         const templates=document.createElement('details');templates.className='studio-admin-submenu';templates.hidden=true;
         templates.innerHTML='<summary class="studio-admin-item"><svg class="studio-navigation-icon" aria-hidden="true"><use href="#i-jobs"></use></svg><span>Templates</span><span class="studio-admin-chevron" aria-hidden="true">⌄</span></summary><div aria-label="Template types"></div>';
         const templateItems=templates.querySelector('div');
+        const separator=document.createElement('hr');separator.className='studio-admin-separator';separator.hidden=true;
         const buttons=new Map();
         const close=()=>{templates.open=false;menu.open=false;};
         for(const entry of entries){
+            if(entry.separatorBefore)body.append(separator);
             const button=document.createElement('button');button.type='button';button.className='studio-admin-item';const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('class','studio-navigation-icon');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('fill','none');icon.setAttribute('stroke','currentColor');icon.setAttribute('stroke-width','1.6');icon.setAttribute('stroke-linecap','round');icon.setAttribute('stroke-linejoin','round');icon.setAttribute('aria-hidden','true');icon.setAttribute('focusable','false');const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#'+entry.icon);icon.append(use);const label=document.createElement('span');label.textContent=entry.label;button.append(icon,label);button.dataset.studioAdminView=entry.view;button.hidden=!entry.staff;
             button.onclick=()=>{close();window.studioNavigate?.(entry.view,entry.kind?{kind:entry.kind}:{});};
             if(entry.parent==='templates'){if(!templates.parentElement)body.append(templates);templateItems.append(button);}else body.append(button);
@@ -30,6 +32,7 @@
             const admin=(payload?.user||payload)?.isAdministrator===true,pending=window.StudioAccess?.pending();
             for(const entry of entries)buttons.get(entry.view).hidden=pending?entry.view!=='about':!admin&&!entry.staff;
             templates.hidden=!entries.some(entry=>entry.parent==='templates'&&!buttons.get(entry.view).hidden);
+            separator.hidden=buttons.get('about').hidden||!entries.some(entry=>entry.view!=='about'&&!buttons.get(entry.view).hidden);
             if(templates.hidden)templates.open=false;
         };
         Promise.resolve(window.studioSignedInUserReady||window.json?.('/api/auth/me')).then(authorize).catch(()=>{});
