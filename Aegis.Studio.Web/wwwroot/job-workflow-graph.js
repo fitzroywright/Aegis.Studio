@@ -1,7 +1,7 @@
 (function(root){
  'use strict';
  const esc=StudioGraph.esc,send=(url,body,method='POST')=>json(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- async function launchTask(job,taskId=null){
+ async function launchTask(job,taskId=null,anchor=null){
   const [access,identity,globalRole,view]=await Promise.all([json(`/api/jobs/${job}/access`),json('/api/auth/me'),json('/api/security/global-role-me'),json(`/api/jobs/${job}/workflow-graph`)]);
   const permissions=access.permissions||access,user=identity.user||identity,actor=user.userName||user.loginName||'';
   const canAct=!!(permissions.editJob||permissions.manageProduction||globalRole.frontDesk);
@@ -18,10 +18,24 @@
   d.innerHTML=`<div class="sg-next-action-bar"><strong>Next required action</strong><button type="button" data-close aria-label="Close next required action">×</button></div><div class="sg-next-action-content"><div class="sg-next-action-summary"><strong>${esc(task.description||task.title)}</strong><span>${esc(task.title)}</span><span class="sg-next-action-status">Status: ${esc(task.eligibility)}</span>${task.reason||task.dependencyLabels?.length?`<span>${esc(task.reason||task.dependencyLabels.join(', '))}</span>`:''}</div><div class="sg-next-action-controls">${allowed&&task.eligibility==='Available'?'<button type="button" data-start class="primary">Start action</button>':''}${allowed&&task.eligibility==='InProgress'?'<button type="button" data-complete class="primary">Complete action</button>':''}<button type="button" data-close>Close</button></div><p role="alert" class="sg-next-action-error"></p></div>`;
   const previousFocus=document.activeElement;
   let disposed=false;
+  const position=()=>{
+   if(!d.isConnected||!anchor?.isConnected)return;
+   const rect=anchor.getBoundingClientRect();
+   const gap=4,margin=12;
+   const width=Math.min(660,window.innerWidth-margin*2);
+   // Align the slide with the clicked link, but keep the whole panel on screen.
+   const left=Math.max(margin,Math.min(rect.left,window.innerWidth-width-margin));
+   d.style.setProperty('--sg-next-top',Math.max(margin,rect.bottom+gap)+'px');
+   d.style.setProperty('--sg-next-left',left+'px');
+   d.style.setProperty('--sg-next-width',width+'px');
+   d.style.setProperty('--sg-next-max-height',Math.max(100,window.innerHeight-Math.max(margin,rect.bottom+gap)-margin)+'px');
+  };
   const dismiss=()=>{
    if(disposed)return;disposed=true;
    document.removeEventListener('keydown',onKey);
    document.removeEventListener('pointerdown',onOutside);
+   window.removeEventListener('resize',position);
+   window.removeEventListener('scroll',position,true);
    d.remove();
    if(previousFocus?.isConnected)previousFocus.focus();
   };
@@ -29,6 +43,9 @@
   const onOutside=event=>{if(!d.contains(event.target))dismiss();};
   d.close=dismiss;
   document.body.append(d);
+  position();
+  window.addEventListener('resize',position);
+  window.addEventListener('scroll',position,true);
   document.addEventListener('keydown',onKey);
   // Delay outside-click binding until after the opening click has finished.
   queueMicrotask(()=>{if(!disposed)document.addEventListener('pointerdown',onOutside);});
