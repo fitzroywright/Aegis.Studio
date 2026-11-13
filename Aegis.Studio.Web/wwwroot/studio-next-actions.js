@@ -32,7 +32,7 @@
  }
  function bind(host,row){
   const fail=error=>{const node=host.querySelector('[data-next-error]');if(node)node.textContent=error.message||String(error);};
-  host.querySelector('[data-next-activate]')?.addEventListener('click',event=>{event.stopPropagation();activate(row).catch(fail);});
+  host.querySelector('[data-next-activate]')?.addEventListener('click',event=>{event.stopPropagation();activate(row,event.currentTarget).catch(fail);});
   host.querySelector('[data-next-edit]')?.addEventListener('click',event=>{event.stopPropagation();edit(row).catch(fail);});
  }
  function mount(host,row,options={}){
@@ -40,7 +40,7 @@
   host.innerHTML=markup(row,options);bind(host,row);
   const button=host.querySelector('[data-next-edit]');if(editHost&&button)editHost.append(button);
  }
- async function activate(row){
+ async function activate(row,trigger=null){
   if(!row)throw Error('Refresh to load the current action.');
   // Re-read before opening: a queued task may have changed in another user's session.
   const current=await get(row.kind,row.entityId);
@@ -62,7 +62,7 @@
   }
   if(a.route==='session-plan')return root.studioNavigate('session-plan',{jobId:row.jobId});
   if(a.route==='media')return root.studioNavigate('workspaces',{jobId:row.jobId});
-  if(a.route==='task')return StudioJobGraph.launchTask(row.jobId,a.taskId);
+  if(a.route==='task')return StudioJobGraph.launchTask(row.jobId,a.taskId,trigger);
   const dialog=await StudioWorkflow.open(row.jobId,a.selector||null);
   dialog?.addEventListener('close',()=>changed(),{once:true});return dialog;
  }
