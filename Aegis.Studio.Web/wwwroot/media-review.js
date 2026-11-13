@@ -172,7 +172,11 @@
     state.canEdit=Boolean((access.permissions||access).manageProduction);state.ready=true;
     if(state.collection&&!state.collections.includes(state.collection)&&state.collection!=='Unclassified')state.collection='';
     if(state.subject&&!subjects.some(s=>String(s.id)===state.subject))state.subject='';
-    if(!sessions.some(s=>String(s.id)===state.session))state.session=sessions.length===1?String(sessions[0].id):'';
+    // The API returns only sessions belonging to this job in workflow order.
+    // Preserve an explicit/in-progress session; otherwise select the job's first
+    // associated session instead of leaving the dropdown on a placeholder.
+    if(!sessions.some(s=>String(s.id)===state.session))
+     state.session=sessions.length?String(sessions[0].id):'';
     q('[data-session]').innerHTML=(sessions.length?'<option value="">Choose session before uploading</option>':'<option value="">No photography sessions planned</option>')+options(sessions.map(s=>[s.id,s.title||'Photography session']),state.session);q('[data-session]').value=state.session;
     q('[data-person]').innerHTML='<option value="">All people / groups</option>'+(window.StudioSubjectPicker?StudioSubjectPicker.options(subjects,state.subject):options(subjects.map(s=>[s.id,s.name]),state.subject));
     const uploader=q('[data-photographer]').value;q('[data-photographer]').innerHTML='<option value="">All uploaders</option>'+options([...new Set(assets.map(a=>a.uploadedBy).filter(Boolean))].map(v=>[v,v]),uploader);
