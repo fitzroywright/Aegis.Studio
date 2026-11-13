@@ -9,9 +9,32 @@
   if(!task)throw Error('There is no available next action for this job.');
   const assigned=task.assignedTo&&task.assignedTo.toLowerCase()===actor.toLowerCase();
   const allowed=(canAct||assigned)&&['Available','InProgress'].includes(task.eligibility);
-  const d=studioDialog('Next required action',`<h3>${esc(task.description||task.title)}</h3><p>${esc(task.title)}</p><p><strong>Status:</strong> ${esc(task.eligibility)}</p><p>${esc(task.reason||task.dependencyLabels?.join(', ')||'')}</p><div class="dialog-actions">${allowed&&task.eligibility==='Available'?'<button data-start class="primary">Start action</button>':''}${allowed&&task.eligibility==='InProgress'?'<button data-complete class="primary">Complete action</button>':''}<button type="button" data-close>Close</button></div><p role="alert"></p>`);
-  d.querySelector('[data-close]').onclick=()=>d.close();
-  const transition=async(action,button)=>{button.disabled=true;try{await send(`/api/jobs/${job}/workflow-graph/tasks`,{nodeId:task.nodeId,action,operationId:crypto.randomUUID(),expectedRevision:view.revision});d.close();document.dispatchEvent(new CustomEvent('studio-workflow-changed',{detail:{jobId:job}}));}catch(error){d.querySelector('[role=alert]').textContent=error.message||String(error);button.disabled=false;}};
+  // A task preview is a lightweight slide-down, not a blocking full-height modal.
+  document.querySelectorAll('.sg-next-action-slide').forEach(panel=>panel.close?.());
+  const d=document.createElement('section');
+  d.className='sg-next-action-slide';
+  d.setAttribute('role','region');
+  d.setAttribute('aria-label','Next required action');
+  d.innerHTML=`<div class="sg-next-action-bar"><strong>Next required action</strong><button type="button" data-close aria-label="Close next required action">×</button></div><div class="sg-next-action-content"><div class="sg-next-action-summary"><strong>${esc(task.description||task.title)}</strong><span>${esc(task.title)}</span><span class="sg-next-action-status">Status: ${esc(task.eligibility)}</span>${task.reason||task.dependencyLabels?.length?`<span>${esc(task.reason||task.dependencyLabels.join(', '))}</span>`:''}</div><div class="sg-next-action-controls">${allowed&&task.eligibility==='Available'?'<button type="button" data-start class="primary">Start action</button>':''}${allowed&&task.eligibility==='InProgress'?'<button type="button" data-complete class="primary">Complete action</button>':''}<button type="button" data-close>Close</button></div><p role="alert" class="sg-next-action-error"></p></div>`;
+  const previousFocus=document.activeElement;
+  let disposed=false;
+  const dismiss=()=>{
+   if(disposed)return;disposed=true;
+   document.removeEventListener('keydown',onKey);
+   document.removeEventListener('pointerdown',onOutside);
+   d.remove();
+   if(previousFocus?.isConnected)previousFocus.focus();
+  };
+  const onKey=event=>{if(event.key==='Escape'){event.preventDefault();dismiss();}};
+  const onOutside=event=>{if(!d.contains(event.target))dismiss();};
+  d.close=dismiss;
+  document.body.append(d);
+  document.addEventListener('keydown',onKey);
+  // Delay outside-click binding until after the opening click has finished.
+  queueMicrotask(()=>{if(!disposed)document.addEventListener('pointerdown',onOutside);});
+  d.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',dismiss));
+  d.querySelector('[data-close]').focus();
+  const transition=async(action,button)=>{button.disabled=true;try{await send(`/api/jobs/${job}/workflow-graph/tasks`,{nodeId:task.nodeId,action,operationId:crypto.randomUUID(),expectedRevision:view.revision});dismiss();document.dispatchEvent(new CustomEvent('studio-workflow-changed',{detail:{jobId:job}}));}catch(error){d.querySelector('[role=alert]').textContent=error.message||String(error);button.disabled=false;}};
   d.querySelector('[data-start]')?.addEventListener('click',e=>transition('start',e.currentTarget));
   d.querySelector('[data-complete]')?.addEventListener('click',e=>transition('complete',e.currentTarget));
   return d;
