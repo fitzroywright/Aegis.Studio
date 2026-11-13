@@ -120,7 +120,7 @@ const studioReportLayouts={
   ['exceptions','Exceptions',['Exceptions requiring attention']]
  ]
 };
-const studioReportActive={finance:'overview',management:'overview'};
+const studioReportActive={finance:'daily',management:'overview'};
 function studioOrganizeReports(type){
  const root=genericView.querySelector('.studio-report-sheet');
  if(!root)return;
