@@ -64,6 +64,33 @@
         pageTools?.querySelector('[data-studio-persistent-tools]')?.remove();
     }
 
+    function mountReportsMenu(host) {
+        const menu=document.createElement('details');
+        menu.className='studio-admin-menu studio-reports-menu';
+        menu.innerHTML='<summary aria-label="Reports menu"><svg class="studio-navigation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10m5 10V5m5 15v-8m5 8V8"/><path d="M2 20h20"/></svg>Reports <span aria-hidden="true">⌄</span></summary><div class="studio-admin-popover" aria-label="Reports"></div>';
+        const body=menu.querySelector('.studio-admin-popover');
+        for(const [view,label] of [['finance','Finance Reports'],['reports','Management Reports']]){
+            const button=document.createElement('button');
+            button.type='button';
+            button.className='studio-admin-item';
+            button.dataset.studioReportView=view;
+            button.textContent=label;
+            button.addEventListener('click',()=>{menu.open=false;window.studioNavigate?.(view);});
+            body.append(button);
+        }
+        menu.addEventListener('keydown',event=>{
+            if(event.key==='Escape'){event.preventDefault();menu.open=false;menu.querySelector('summary').focus();}
+            if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+                event.preventDefault();menu.open=true;
+                const buttons=[...body.querySelectorAll('button')],index=buttons.indexOf(document.activeElement);
+                buttons[index<0?(event.key==='ArrowDown'?0:buttons.length-1):(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();
+            }
+        });
+        document.addEventListener('click',event=>{if(!menu.contains(event.target))menu.open=false;});
+        window.addEventListener('studio-view-changed',()=>{menu.open=false;});
+        host.append(menu);
+    }
+
     function ensureNavigationToolstrip() {
         const banner = document.querySelector('.topbar');
         if (!banner) return;
@@ -86,7 +113,7 @@
                 if (control) account.append(control);
             }
             host.append(scroll);
-            window.StudioAdmin?.mountMenu(host);
+            mountReportsMenu(host);\n            window.StudioAdmin?.mountMenu(host);
             host.append(account);
             banner.append(host);
             tools.addEventListener('click', event => {
@@ -298,7 +325,7 @@
     // The Today route is deliberately excluded from these structural changes.
     function syncPageFrame() {
         const pending=!!window.StudioAccess?.pending();
-        for(const node of document.querySelectorAll('.studio-navigation-scroll,#studioAttentionTrigger,#studioSessionsTrigger,#notificationButton,#studioContentSearch,#profileButton,[data-studio-avatar-notifications]'))node.classList.toggle('hidden',pending);
+        for(const node of document.querySelectorAll('.studio-navigation-scroll,.studio-reports-menu,#studioAttentionTrigger,#studioSessionsTrigger,#notificationButton,#studioContentSearch,#profileButton,[data-studio-avatar-notifications]'))node.classList.toggle('hidden',pending);
         const view = document.body.dataset.studioView || currentView;
         const isToday = view === 'dashboard';
 
