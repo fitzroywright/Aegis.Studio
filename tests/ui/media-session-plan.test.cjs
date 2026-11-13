@@ -35,9 +35,14 @@ test('plan collections, coverage and missing-media destinations use real job sub
  assert.equal(f.writes[1].body.get('uploadId'),f.writes[0].body.files[0].uploadId);
  assert.equal(f.writes.filter(x=>x.options.method==='PUT').length,0);assert.match(f.q('[data-progress]').textContent,/1 of 1 uploaded/);
 });
-test('multiple sessions require a choice, while a job without sessions permits unclassified upload',async t=>{
- const f=fixture(t,{sessions:[{id:'am',title:'Morning'},{id:'pm',title:'Afternoon'}]});await f.w.showMediaReview();await f.chooseJob();await f.files(['raw.CR3']);assert.equal(f.writes.length,0);assert.match(f.q('[data-feedback]').textContent,/Choose the upload session/);
- f.q('[data-session]').value='pm';f.q('[data-session]').onchange();await f.files(['raw.CR3']);assert.equal(f.writes[0].body.sessionId,'pm');assert.equal(f.writes[0].body.collection,'Unclassified');
+test('opening a job selects its first associated session and lets staff change it',async t=>{
+ const f=fixture(t,{sessions:[{id:'am',title:'Morning'},{id:'pm',title:'Afternoon'}]});await f.w.showMediaReview();await f.chooseJob();
+ assert.equal(f.q('[data-session]').value,'am');
+ assert.match(f.q('[data-destination-session]').textContent,/Morning/);
+ f.q('[data-session]').value='pm';f.q('[data-session]').onchange();
+ await f.files(['raw.CR3']);
+ assert.equal(f.writes[0].body.sessionId,'pm');
+ assert.equal(f.writes[0].body.collection,'Unclassified');
 });
 test('a failed file retries with its original receipt, skips successful files and freezes destination',async t=>{
  const f=fixture(t),read=f.w.json;let fail=true;
@@ -174,3 +179,14 @@ test('job and destination popovers close and cannot reopen during a captured tra
  finish();await settle();assert.equal(f.q('[data-job-chooser] summary').getAttribute('aria-disabled'),'false');
 });
 
+
+test('Media chooses an associated session on navigation to a job and respects a previously chosen session',async t=>{
+ const f=fixture(t,{sessions:[{id:'first',title:'Primary session'},{id:'second',title:'Additional session'}]});
+ f.w.history.replaceState({studioJobId:'j'},'');
+ await f.w.showMediaReview();
+ assert.equal(f.q('[data-job]').value,'j');
+ assert.equal(f.q('[data-session]').value,'first');
+ f.q('[data-session]').value='second';f.q('[data-session]').onchange();
+ await f.w.showMediaReview();
+ assert.equal(f.q('[data-session]').value,'second');
+});
