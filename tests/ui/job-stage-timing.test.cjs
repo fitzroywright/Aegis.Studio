@@ -21,7 +21,7 @@ function setup(t){
 test('Job Details shows stage time without any task start time and refreshes from window and document events',async t=>{
  const {w}=setup(t),read=w.json;let enteredAt='2026-10-30T17:15:00Z';
  w.json=async(url,options)=>url.endsWith('/connected-workflow')?{data:{stage:'Awaiting Upload',enteredAt}}:read(url,options);
- await w.openWorkspaceJob('job');await settle();assert.equal(w.document.querySelector('[data-stage-age]').textContent,'45m');assert.match(w.document.querySelector('#jobIdentityMenu').textContent,/Time in Stage/);
+ await w.openWorkspaceJob('job');await settle();assert.equal(w.document.querySelector('[data-stage-age]').textContent,'45m');assert.match(w.document.querySelector('.jd-job-stage-meta').textContent,/Time in Stage/);assert.equal(w.document.querySelector('#jobIdentityMenu [data-stage-age]'),null);
  enteredAt='2026-10-30T17:59:45Z';w.dispatchEvent(new w.CustomEvent('studio-workflow-changed',{detail:{jobId:'job'}}));await settle();assert.equal(w.document.querySelector('[data-stage-age]').textContent,'Less than a minute');
  enteredAt='2026-10-28T17:00:00Z';w.document.dispatchEvent(new w.CustomEvent('studio-workflow-changed',{detail:{jobId:'job'}}));await settle();assert.equal(w.document.querySelector('[data-stage-age]').textContent,'2d 1h');
 });
@@ -46,3 +46,4 @@ test('the clock advances each minute and leaving the job stops the displayed clo
  await w.openWorkspaceJob('job');await settle();clock+=60000;ticks.forEach(fn=>fn());assert.equal(w.document.querySelector('[data-stage-age]').textContent,'46m');
  w.document.body.dataset.studioView='media';await settle();clock+=60000;ticks.forEach(fn=>fn());assert.equal(w.document.querySelector('[data-stage-age]').textContent,'46m');
 });
+

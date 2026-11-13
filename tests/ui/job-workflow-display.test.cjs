@@ -43,7 +43,7 @@ test('horizontal progress reflects completed stages, with no workflow changes',t
  w.json=()=>writes++;w.StudioJobGraph={open:()=>writes++};w.StudioJobWorkflowDisplay.render(host,view);
  const bar=host.querySelector('[role=progressbar]');assert.equal(bar.getAttribute('aria-valuenow'),'17');assert.match(bar.getAttribute('aria-valuetext'),/1 of 6 stages completed/);
  assert.equal(host.querySelector('.jd-workflow-progress-fill').style.width,'17%');assert.match(host.querySelector('.jd-workflow-progress-trigger').textContent,/17% complete.*1 of 6/s);
- assert.equal(host.querySelector('.jd-workflow-progress-trigger').getAttribute('aria-expanded'),'false');assert.equal(host.querySelector('.jd-workflow-drawer').getAttribute('aria-hidden'),'true');
+ assert.equal(host.querySelector('.jd-workflow-progress-trigger').getAttribute('aria-expanded'),'false');assert.equal(host.querySelector('.jd-workflow-drawer').getAttribute('aria-hidden'),'true');assert.equal(host.querySelector('.jd-workflow-drawer header'),null);assert.doesNotMatch(host.querySelector('.jd-workflow-drawer').textContent,/Job workflow|Hides after/);
  host.querySelector('.jd-workflow-progress-trigger').click();assert.equal(host.querySelector('.jd-workflow-drawer').getAttribute('aria-hidden'),'false');
  assert.ok(host.querySelector('.jd-workflow-stage.completed'));assert.ok(host.querySelector('.jd-workflow-stage.inprogress'));assert.ok(host.querySelector('.jd-workflow-stage.blocked'));assert.ok(host.querySelectorAll('.jd-workflow-connector').length);
  assert.equal(writes,0);assert.equal(JSON.stringify(view),before);

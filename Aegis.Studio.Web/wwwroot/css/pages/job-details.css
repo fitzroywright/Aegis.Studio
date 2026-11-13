@@ -39,16 +39,20 @@
 .jd-job-name-chevron { flex:none; color:#a45a17; transition:transform .18s ease; }
 .jd-job-name-toggle[aria-expanded=true] .jd-job-name-chevron { transform:rotate(180deg); }
 .jd-job-name-toggle:focus-visible { outline:2px solid #d97827; outline-offset:3px; }
-.jd-job-identity-menu { position:absolute; z-index:60; top:31px; left:0; width:min(410px,calc(100vw - 32px)); max-height:min(60vh,420px); overflow:auto; padding:10px 13px; border:0; background:var(--theme-surface,#fff); }
+.jd-job-identity-menu { position:absolute; z-index:60; top:31px; left:0; width:min(410px,calc(100vw - 32px)); max-height:min(60vh,420px); overflow:auto; padding:10px 13px; border:1px solid var(--theme-border,#d4dbe4); border-radius:6px; background:var(--theme-surface,#fff); }
 .jd-job-identity-menu[hidden] { display:none; }
 .jd-job-identity-menu dl { display:grid; grid-template-columns:1fr 1fr; gap:0 18px; margin:0; }
 .jd-job-identity-menu dl > div { min-width:0; padding:7px 0; }
 .jd-job-identity-menu dt { margin:0 0 3px; color:var(--theme-muted,#69758b); font-size:9px; font-weight:800; letter-spacing:.055em; text-transform:uppercase; }
 .jd-job-identity-menu dd { margin:0; color:var(--theme-text,#162b50); font-size:12px; font-weight:650; overflow-wrap:anywhere; }
-.jd-job-identity-menu .jd-status-pill { max-width:100%; padding:3px 9px; font-size:10px; }
-.jd-job-identity-menu .jd-status-label { cursor:default; }
-.jd-job-identity-menu .jd-status-label::after { content:none; }
-.jd-job-identity-menu [data-stage-age] { color:var(--theme-text,#162b50); font-size:12px; font-weight:650; }
+.jd-job-stage-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px 18px; margin:7px 0 0; min-width:0; }
+.jd-job-stage-meta > div { min-width:0; }
+.jd-job-stage-meta dt { margin:0 0 4px; color:var(--theme-muted,#69758b); font-size:9px; font-weight:750; text-transform:uppercase; }
+.jd-job-stage-meta dd { margin:0; font-size:12px; }
+.jd-job-stage-meta .jd-status-pill { max-width:100%; padding:3px 9px; font-size:10px; }
+.jd-job-stage-meta .jd-status-label { cursor:default; }
+.jd-job-stage-meta .jd-status-label::after { content:none; }
+.jd-job-stage-meta [data-stage-age] { color:var(--theme-text,#162b50); font-size:12px; font-weight:650; }
 @media(max-width:900px) {
  .job-detail-title.jd-job-identity { gap:clamp(6px,1vw,14px); }
 }
