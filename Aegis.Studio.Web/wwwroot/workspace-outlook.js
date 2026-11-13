@@ -181,7 +181,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     </div>
                     </div>
                 </div>
-                <div class="jd-flow-overview"><div class="jd-workflow-track" aria-label="Job workflow" aria-live="polite"></div><dl class="jd-job-stage-meta"><div><dt>Current Job Stage</dt><dd><span class="jd-status-pill jd-status-label">${esc(job.status)}</span></dd></div><div><dt>Time in Stage</dt><dd data-stage-age>Loading…</dd></div></dl></div>
+                <div class="jd-flow-overview"><div class="jd-workflow-track" aria-label="Job workflow" aria-live="polite"><dl class="jd-job-stage-meta"><div><dt>Current Job Stage</dt><dd><span class="jd-status-pill jd-status-label">${esc(job.status)}</span></dd></div><div><dt>Time in Stage</dt><dd data-stage-age>Loading…</dd></div></dl></div></div>
                 <div class="jd-job-status"><small>${job.jobCode||job.code?'Job Code · '+esc(job.jobCode||job.code):''}</small></div>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
             const identityToggle=header.querySelector('.jd-job-name-toggle'),identityMenu=header.querySelector('.jd-job-identity-menu');
@@ -362,6 +362,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(validDue)dueField.setAttribute('datetime',dueDate.toISOString());else dueField.removeAttribute('datetime');
                     const overdue=validDue&&StudioNextActions.due(nextRow).overdue;dueField.classList.toggle('is-overdue',!!overdue);dueField.title=overdue?'Overdue':'';
                     header.querySelector('.jd-status-pill').textContent=task?.title||(graphView.tasks?.length?'Workflow complete':'Workflow unavailable');
+                    header.querySelector('.jd-status-pill').title=header.querySelector('.jd-status-pill').textContent;
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(task?.assignedTo?studioFirstName(task.assignedTo):job.jobLead?studioFirstName(job.jobLead):'Unassigned');
                     const responsible=graphView.tasks?.find(item=>item.role&&item.assignedTo);
                     const worker=responsible?.assignedTo||job.assignedTo||'Unassigned';

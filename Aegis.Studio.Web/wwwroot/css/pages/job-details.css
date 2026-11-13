@@ -15,7 +15,7 @@
 #conversationView.has-open-job > .workspace-announcement-banners { display:none; }
 #conversationView > .job-detail-page { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); flex:1; min-width:0; min-height:0; padding:0; gap:8px; overflow:hidden; color:var(--theme-text,#162b50); background:var(--theme-surface,#faf9f6); }
 .job-detail-page [hidden] { display:none; }
-.job-detail-heading { --jd-workflow-drawer-overlap:6px; grid-column:1; min-height:0; overflow:visible; display:grid; grid-template-columns:minmax(160px,1.3fr) minmax(100px,.8fr) minmax(100px,.7fr) minmax(220px,1.6fr) minmax(140px,1fr) minmax(70px,.5fr); align-items:start; gap:6px 14px; padding:6px 10px; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); position:relative; isolation:isolate; z-index:5; }
+.job-detail-heading { --jd-workflow-drawer-overlap:6px; grid-column:1; min-height:0; overflow:visible; display:grid; grid-template-columns:minmax(180px,300px) minmax(110px,150px) minmax(100px,120px) minmax(0,1fr); align-items:start; gap:6px 14px; padding:6px 10px; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); position:relative; isolation:isolate; z-index:5; }
 .job-detail-title { display:contents; }
 .job-detail-title h1 { min-width:0; margin:0; font-size:20px; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .jd-client-name { display:flex; align-items:baseline; gap:5px; min-width:0; max-width:40%; padding-left:12px; border-left:1px solid var(--theme-border,#dedbd4); font-size:12px; white-space:nowrap; }
@@ -45,13 +45,11 @@
 .jd-job-identity-menu dl > div { min-width:0; padding:7px 0; }
 .jd-job-identity-menu dt { margin:0 0 3px; color:var(--theme-muted,#69758b); font-size:9px; font-weight:800; letter-spacing:.055em; text-transform:uppercase; }
 .jd-job-identity-menu dd { margin:0; color:var(--theme-text,#162b50); font-size:12px; font-weight:650; overflow-wrap:anywhere; }
-.jd-job-stage-meta { display:contents; }
-.jd-job-stage-meta > div { min-width:0; }
-.jd-job-stage-meta > div:first-child { grid-column:5; grid-row:2; }
-.jd-job-stage-meta > div:last-child { grid-column:6; grid-row:2; }
-.jd-job-stage-meta dt { margin:0 0 4px; color:var(--theme-muted,#69758b); font-size:9px; font-weight:750; line-height:1.2; letter-spacing:.08em; text-transform:uppercase; }
-.jd-job-stage-meta dd { margin:0; font-size:12px; }
-.jd-job-stage-meta .jd-status-pill { max-width:100%; padding:3px 9px; font-size:10px; }
+.jd-job-stage-meta { display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:6px 14px;margin:0 0 0 auto;min-width:0; }
+.jd-job-stage-meta > div { display:inline-flex;align-items:center;gap:5px;white-space:nowrap;min-width:0; }
+.jd-job-stage-meta dt { flex:none;margin:0; color:var(--theme-muted,#69758b); font-size:9px; font-weight:750; line-height:1.2; letter-spacing:.08em; text-transform:uppercase; }
+.jd-job-stage-meta dd { min-width:0;margin:0;font-size:12px;white-space:nowrap; }
+.jd-job-stage-meta .jd-status-pill { display:inline-block;vertical-align:middle;max-width:100%;padding:2px 7px;font-size:10px;white-space:normal;overflow-wrap:anywhere; }
 .jd-job-stage-meta .jd-status-label { cursor:default; }
 .jd-job-stage-meta .jd-status-label::after { content:none; }
 .jd-job-stage-meta [data-stage-age] { color:var(--theme-text,#162b50); font-size:12px; font-weight:650; }
@@ -208,8 +206,9 @@
 .job-detail-workflow-dialog .workflow-panel { margin:0; overflow:visible; }
 @media(max-width:760px) { .jd-photo-viewer { --studio-dialog-width:calc(100vw - 20px); --studio-dialog-height:calc(100dvh - 20px); --studio-dialog-max-height:calc(100dvh - 20px); } .job-detail-selected-content { flex-direction:column; } .jd-photo-inspector { flex:0 1 40%; border-inline-start:0; border-top:1px solid var(--theme-border,#d6dbe4); padding:14px; } .jd-preview-mode { white-space:normal; } .jd-popup-footer { padding:10px 16px; } .jd-gallery-browser { padding:0 12px 12px; } .jd-gallery-mosaic { columns:2 120px; } .jd-gallery-actions button,.jd-gallery-actions a { padding:6px 8px; } .jd-selected-preview { padding:10px; } }
 @media(max-width:1200px) { .jd-drop-hint { display:none; }  .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media(max-width:900px) { .job-detail-heading { grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); } .jd-workflow-track { grid-column:1; grid-row:3; } .jd-job-stage-meta > div:first-child { grid-column:2; grid-row:3; } .jd-job-stage-meta > div:last-child { grid-column:3; grid-row:3; } #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } }
-@media(max-width:650px) { .jd-next-action { grid-column:1/-1; grid-row:2; } .jd-action-due > div:first-child { grid-column:1; grid-row:3; } .jd-action-due > div:last-child { grid-column:2; grid-row:3; } .jd-workflow-track { grid-column:1/-1; grid-row:4; } .jd-job-stage-meta > div:first-child { grid-column:1; grid-row:5; } .jd-job-stage-meta > div:last-child { grid-column:2; grid-row:5; } #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); } .job-detail-heading { --jd-workflow-drawer-overlap:7px; grid-template-columns:repeat(2,minmax(0,1fr)); padding:7px; gap:8px 12px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } .jd-gallery-workspace { flex-direction:column; } .jd-media-selection { gap:8px; } }
+@media(max-width:1200px) { .job-detail-heading { grid-template-columns:repeat(3,minmax(0,1fr)); } .jd-workflow-track { grid-column:1/-1;grid-row:3; } }
+@media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } }
+@media(max-width:650px) { .jd-next-action { grid-column:1/-1; grid-row:2; } .jd-action-due > div:first-child { grid-column:1; grid-row:3; } .jd-action-due > div:last-child { grid-column:2; grid-row:3; } .jd-workflow-track { grid-column:1/-1; grid-row:4; } #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); } .job-detail-heading { --jd-workflow-drawer-overlap:7px; grid-template-columns:repeat(2,minmax(0,1fr)); padding:7px; gap:8px 12px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } .jd-gallery-workspace { flex-direction:column; } .jd-media-selection { gap:8px; } }
 
 /* Compact instructions and supporting files; editors open on demand. */
 .jd-job-brief{flex:0 0 auto;max-height:30vh;overflow:auto;border:1px solid var(--studio-control-border,#dce4ec);border-radius:6px;margin:0 0 6px;padding:4px 10px;background:var(--studio-card-surface,#fff)}

@@ -42,7 +42,7 @@ test('horizontal progress reflects completed stages, with no workflow changes',t
  const w=setup(t),host=w.document.getElementById('host'),view=makeView(),before=JSON.stringify(view);let writes=0;
  w.json=()=>writes++;w.StudioJobGraph={open:()=>writes++};w.StudioJobWorkflowDisplay.render(host,view);
  const bar=host.querySelector('[role=progressbar]');assert.equal(bar.getAttribute('aria-valuenow'),'17');assert.match(bar.getAttribute('aria-valuetext'),/1 of 6 stages completed/);
- assert.equal(host.querySelector('.jd-workflow-progress-fill').style.width,'17%');assert.match(host.querySelector('.jd-workflow-progress-trigger').textContent,/17% complete.*1 of 6/s);
+ assert.equal(host.querySelector('.jd-workflow-progress-fill').style.width,'17%');assert.match(host.querySelector('.jd-workflow-progress-trigger').textContent,/17% complete/);assert.match(host.querySelector('.jd-workflow-progress-footer>small').textContent,/1 of 6/);
  assert.equal(host.querySelector('.jd-workflow-progress-trigger').getAttribute('aria-expanded'),'false');assert.equal(host.querySelector('.jd-workflow-drawer').getAttribute('aria-hidden'),'true');assert.equal(host.querySelector('.jd-workflow-drawer header'),null);assert.doesNotMatch(host.querySelector('.jd-workflow-drawer').textContent,/Job workflow|Hides after/);
  host.querySelector('.jd-workflow-progress-trigger').click();assert.equal(host.querySelector('.jd-workflow-drawer').getAttribute('aria-hidden'),'false');
  assert.ok(host.querySelector('.jd-workflow-stage.completed'));assert.ok(host.querySelector('.jd-workflow-stage.inprogress'));assert.ok(host.querySelector('.jd-workflow-stage.blocked'));assert.ok(host.querySelectorAll('.jd-workflow-connector').length);
@@ -81,4 +81,11 @@ test('replacing a job cancels old timers and escapes configured stage names',t=>
  w.setTimeout=callback=>{timers.set(++serial,callback);return serial;};w.clearTimeout=id=>timers.delete(id);
  w.StudioJobWorkflowDisplay.render(host,makeView());host.querySelector('.jd-workflow-progress-trigger').click();const oldCallback=[...timers.values()][0];
  w.StudioJobWorkflowDisplay.render(host,{graph:{nodes:[{id:'a',label:'<img src=x>',kind:'Task'}]}});assert.equal(timers.size,0);host.querySelector('.jd-workflow-progress-trigger').click();oldCallback();assert.equal(host.querySelector('.jd-workflow-summary').dataset.open,'true');assert.equal(host.querySelector('img'),null);assert.match(host.querySelector('.jd-workflow-stage').getAttribute('aria-label'),/<img src=x>/);
+});
+
+test('stage metadata stays alongside the completion count and retains live values on redraw',t=>{
+ const w=setup(t),host=w.document.getElementById('host');host.innerHTML='<dl class="jd-job-stage-meta"><div><dt>Current Job Stage</dt><dd>Editing</dd></div><div><dt>Time in Stage</dt><dd data-stage-age>4h</dd></div></dl>';
+ const meta=host.firstElementChild,view=makeView();w.StudioJobWorkflowDisplay.render(host,view);
+ assert.equal(host.querySelector('.jd-workflow-progress-footer').lastElementChild,meta);assert.ok(meta.previousElementSibling.matches('small'));
+ meta.querySelector('[data-stage-age]').textContent='5h';w.StudioJobWorkflowDisplay.render(host,view);assert.equal(host.querySelectorAll('.jd-job-stage-meta').length,1);assert.equal(host.querySelector('.jd-job-stage-meta'),meta);assert.equal(meta.querySelector('[data-stage-age]').textContent,'5h');assert.equal(host.querySelector('.jd-workflow-progress-trigger .jd-job-stage-meta'),null);
 });
