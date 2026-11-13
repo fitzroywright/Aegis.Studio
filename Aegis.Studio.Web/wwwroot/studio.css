@@ -9531,3 +9531,14 @@ body[data-studio-view="finance"] .studio-report-strip {display:flex;flex-wrap:wr
 .studio-report-panel [data-finance-results] .studio-table td,.studio-report-panel [data-finance-results] .studio-table th{padding:5px 8px;}
 @media(max-width:1100px){.studio-report-chart-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.studio-report-data-grid{grid-template-columns:minmax(0,1fr);}}
 @media(max-width:650px){.studio-report-chart-grid{grid-template-columns:minmax(0,1fr);}.studio-report-sheet{padding:7px;}.studio-report-panel>header{align-items:start;flex-direction:column;gap:3px;}}
+
+
+/* Report-section navigation: one concise analytical report visible at a time. */
+.studio-report-nav{display:flex;align-items:center;gap:0;flex-wrap:wrap;border-bottom:2px solid var(--studio-control-border,#cdd7e2);background:var(--theme-surface,#fff);padding:0 4px;}
+.studio-report-nav button{border:0;border-bottom:3px solid transparent;background:transparent;color:var(--theme-text,#24394e);font-size:12px;font-weight:650;padding:10px 14px;cursor:pointer;}
+.studio-report-nav button[aria-current="page"]{border-bottom-color:#bf7d37;background:var(--theme-surface-alt,#eef2f7);font-weight:800;}
+.studio-report-nav button:hover,.studio-report-nav button:focus-visible{background:var(--theme-surface-alt,#eef2f7);outline-offset:-2px;}
+.studio-report-view{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:10px;min-width:0;}
+.studio-report-view[hidden]{display:none!important;}
+.studio-report-view>.studio-report-chart-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));}
+@media(max-width:650px){.studio-report-nav button{flex:1 1 45%;text-align:center;padding:8px 6px;}.studio-report-view>.studio-report-chart-grid{grid-template-columns:minmax(0,1fr);}}
