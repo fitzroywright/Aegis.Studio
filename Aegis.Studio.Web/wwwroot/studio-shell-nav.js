@@ -113,7 +113,8 @@
                 if (control) account.append(control);
             }
             host.append(scroll);
-            mountReportsMenu(host);\n            window.StudioAdmin?.mountMenu(host);
+            mountReportsMenu(host);
+            window.StudioAdmin?.mountMenu(host);
             host.append(account);
             banner.append(host);
             tools.addEventListener('click', event => {
