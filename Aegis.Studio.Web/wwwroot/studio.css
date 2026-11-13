@@ -9492,3 +9492,42 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   .studio-admin-menu > summary { min-height: 30px; }
   .studio-navigation-account .studio-user-display-name { display: none; }
 }
+
+
+/* Reports are compact analytical sheets, not dashboard/Kanban cards. */
+body[data-studio-view="reports"] .studio-report-sheet,
+body[data-studio-view="finance"] .studio-report-sheet {display:grid;gap:10px;padding:10px 14px 20px;min-width:0;align-content:start;}
+body[data-studio-view="reports"] .studio-report-strip,
+body[data-studio-view="finance"] .studio-report-strip {display:flex;flex-wrap:wrap;border:1px solid var(--studio-control-border,#c9d1dd);background:var(--theme-surface,#fff);border-radius:3px;}
+.studio-report-strip>div {flex:1 1 122px;min-width:0;padding:7px 12px;border-right:1px solid var(--studio-control-border,#dce3ec);display:grid;gap:3px;}
+.studio-report-strip>div:last-child{border-right:0;}
+.studio-report-strip small {font-size:10px;font-weight:650;color:var(--theme-muted,#687889);text-transform:uppercase;letter-spacing:.035em;}
+.studio-report-strip strong {font-size:16px;font-variant-numeric:tabular-nums;color:var(--theme-text,#142942);}
+.studio-report-chart-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;min-width:0;}
+.studio-report-data-grid {display:grid;grid-template-columns:2fr 1fr;gap:10px;min-width:0;}
+.studio-report-panel {border:1px solid var(--studio-control-border,#ced8e2);background:var(--theme-surface,#fff);border-radius:3px;min-width:0;overflow:hidden;box-shadow:none;}
+.studio-report-panel>header{display:flex;justify-content:space-between;gap:8px;align-items:center;background:var(--theme-surface-alt,#f3f6f9);border-bottom:1px solid var(--studio-control-border,#dce3ec);padding:7px 10px;}
+.studio-report-panel>header h2{margin:0;font-size:12px;font-weight:750;line-height:1.3;color:var(--theme-text,#142942);}
+.studio-report-panel>header small{font-size:10px;color:var(--theme-muted,#66788a);}
+.studio-report-content {min-width:0;padding:7px 10px;overflow-x:auto;}
+.studio-report-content .op-chart {display:block;width:100%;max-height:145px;}
+.studio-report-bars {display:grid;gap:5px;min-height:48px;}
+.studio-report-bar-row {display:grid;grid-template-columns:minmax(68px,35%) minmax(30px,1fr) minmax(55px,auto);gap:8px;align-items:center;font-size:11px;line-height:1.3;}
+.studio-report-bar-row>span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.studio-report-bar-row strong {text-align:right;font-variant-numeric:tabular-nums;font-size:11px;}
+.studio-report-track {background:var(--theme-surface-alt,#e6edf4);height:10px;border-radius:2px;overflow:hidden;}
+.studio-report-track>i {display:block;height:100%;background:#406b91;}
+.studio-report-track>i.is-negative {background:#b85b4a;}
+.studio-report-table-scroll {width:100%;max-height:300px;overflow:auto;}
+.studio-report-table {border-collapse:collapse;width:100%;font-size:11px;font-variant-numeric:tabular-nums;}
+.studio-report-table th {position:sticky;top:0;background:var(--theme-surface-alt,#f2f5f8);z-index:1;text-align:left;font-weight:700;white-space:nowrap;}
+.studio-report-table td,.studio-report-table th {border-bottom:1px solid var(--studio-control-border,#e2e7ed);padding:6px 8px;}
+.studio-report-table tr:nth-child(even) td {background:rgba(125,142,160,.055);}
+.studio-report-table td button {border:0;background:none;color:var(--theme-accent,#2c669a);padding:0;cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px;}
+.studio-report-panel [data-finance-filter] {display:flex;flex-wrap:wrap;align-items:end;gap:6px;padding-bottom:8px;}
+.studio-report-panel [data-finance-filter] label{font-size:10px;display:grid;gap:3px;}
+.studio-report-panel [data-finance-filter] :is(input,select){min-height:28px;max-width:200px;font-size:11px;}
+.studio-report-panel [data-finance-results] .studio-table{font-size:11px;}
+.studio-report-panel [data-finance-results] .studio-table td,.studio-report-panel [data-finance-results] .studio-table th{padding:5px 8px;}
+@media(max-width:1100px){.studio-report-chart-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.studio-report-data-grid{grid-template-columns:minmax(0,1fr);}}
+@media(max-width:650px){.studio-report-chart-grid{grid-template-columns:minmax(0,1fr);}.studio-report-sheet{padding:7px;}.studio-report-panel>header{align-items:start;flex-direction:column;gap:3px;}}
