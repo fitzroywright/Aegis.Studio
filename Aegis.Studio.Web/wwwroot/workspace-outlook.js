@@ -167,7 +167,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             header.innerHTML=`<div class="job-detail-title jd-job-identity">
                     <div class="jd-job-name-stack">
                     <button type="button" class="jd-job-name-toggle" aria-expanded="false" aria-controls="jobIdentityMenu" title="Show job details"><svg class="jd-job-name-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18m-11 0v2h4v-2"></path></svg><span class="jd-job-name-text">${esc(job.title)}</span><span class="jd-job-name-chevron" aria-hidden="true">⌄</span></button>
-                    <dl class="jd-job-stage-meta"><div><dt>Current Job Stage</dt><dd><span class="jd-status-pill jd-status-label">${esc(job.status)}</span></dd></div><div><dt>Time in Stage</dt><dd data-stage-age>Loading…</dd></div></dl>
+                    <div class="jd-job-action-summary"><div class="jd-next-action" aria-label="Next job action"></div><dl class="jd-action-due" aria-label="Next action responsibility and due date"><div><dt>Responsible Person</dt><dd data-job-responsible>Loading…</dd></div><div><dt>Due date</dt><dd><time data-job-action-due>Loading…</time></dd></div></dl></div>
                     <div id="jobIdentityMenu" class="jd-job-identity-menu" role="region" aria-label="Job details" hidden>
                         <dl>
                             <div><dt>Client</dt><dd>${esc(clientName)}</dd></div>
@@ -181,7 +181,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     </div>
                     </div>
                 </div>
-                <div class="jd-flow-overview"><div class="jd-workflow-track" aria-label="Job workflow" aria-live="polite"></div><div class="jd-next-action" aria-label="Next job action"></div><dl class="jd-action-due" aria-label="Next action responsibility and due date"><div><dt>Responsible Person</dt><dd data-job-responsible>Loading…</dd></div><div><dt>Due date</dt><dd><time data-job-action-due>Loading…</time></dd></div></dl></div>
+                <div class="jd-flow-overview"><div class="jd-workflow-track" aria-label="Job workflow" aria-live="polite"></div><dl class="jd-job-stage-meta"><div><dt>Current Job Stage</dt><dd><span class="jd-status-pill jd-status-label">${esc(job.status)}</span></dd></div><div><dt>Time in Stage</dt><dd data-stage-age>Loading…</dd></div></dl></div>
                 <div class="jd-job-status"><small>${job.jobCode||job.code?'Job Code · '+esc(job.jobCode||job.code):''}</small></div>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
             const identityToggle=header.querySelector('.jd-job-name-toggle'),identityMenu=header.querySelector('.jd-job-identity-menu');

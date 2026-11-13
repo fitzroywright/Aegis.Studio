@@ -62,7 +62,7 @@ test('Job Details shows the same server-projected action used by Front Desk',asy
  w.eval(read('job-workflow-display.js'));w.eval(read('studio-next-actions.js'));const api=w.json;
  w.json=(url,options)=>url.startsWith('/api/work/next-actions')?Promise.resolve([row({entityId:'job',jobId:'job',assignedTo:'Paul',action:{key:'classify-media',title:'Classify uploaded photographs',reason:'23 photographs need subjects.',route:'media'}})]):api(url,options);
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,70));
- const next=w.document.querySelector('.job-detail-heading .studio-next-action');assert.ok(next);assert.match(next.textContent,/Classify uploaded photographs.*23 photographs/s);assert.equal(w.document.querySelector('.jd-flow-overview .jd-action-due [data-job-responsible]').textContent,'Paul');assert.equal(w.document.querySelector('[data-job-action-due]').textContent,'No due date');
+ const next=w.document.querySelector('.job-detail-heading .studio-next-action');assert.ok(next);assert.match(next.textContent,/Classify uploaded photographs.*23 photographs/s);assert.equal(w.document.querySelector('.jd-job-identity .jd-action-due [data-job-responsible]').textContent,'Paul');assert.equal(w.document.querySelector('[data-job-action-due]').textContent,'No due date');
  assert.equal(w.document.querySelectorAll('.job-detail-heading .studio-next-action').length,1);
 });
 
