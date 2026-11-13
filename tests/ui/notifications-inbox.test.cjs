@@ -28,3 +28,24 @@ test('message slide-down contains only its unread feed',async t=>{
  assert.equal(panel.querySelector('footer').parentElement,panel);
  panel.querySelector('[data-bell-close]').click();assert.equal(panel.hidden,true);
 });
+
+
+test('Job Details bell requests only current-job messages, including read messages',async t=>{
+ const dom=new JSDOM('<body data-studio-view="workspaces"><section id="conversationView" class="has-open-job"><div id="detailPane" class="job-detail-page" data-job-id="job-123"></div></section><button id="notificationButton"></button></body>',{runScripts:'outside-only',url:'https://studio.test'}),w=dom.window;t.after(()=>w.close());
+ const requests=[],opened=[];
+ w.fetch=async url=>{requests.push(url);return {ok:true,json:async()=>({items:[
+  {isUnread:false,thread:{scopeType:'Job',scopeId:'job-123'},message:{subject:'Job update',body:'Ready for client'}},
+  {isUnread:true,thread:{scopeType:'Job',scopeId:'other-job'},message:{subject:'Unrelated',body:'Not this job'}}
+ ]})};};
+ w.openStudioJobMessages=async id=>opened.push(id);
+ w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/notifications.js'),'utf8'));
+ await w.document.getElementById('notificationButton').onclick();
+ const panel=w.document.getElementById('studioMessageBellPanel');
+ assert.match(requests[0],/jobId=job-123/);
+ assert.doesNotMatch(requests[0],/unreadOnly/);
+ assert.equal(panel.querySelector('header h2').textContent,'Job Messages');
+ assert.match(panel.textContent,/Job update/);
+ assert.doesNotMatch(panel.textContent,/Unrelated/);
+ panel.querySelector('.studio-message-bell-list button').click();
+ assert.deepEqual(opened,['job-123']);
+});
