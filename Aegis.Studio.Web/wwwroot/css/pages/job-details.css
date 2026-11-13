@@ -69,6 +69,7 @@
 .jd-action-due > div:last-child { grid-column:3; grid-row:2; }
 .jd-action-due dt { margin-bottom:4px; color:var(--theme-muted,#637187); font-size:9px; font-weight:750; line-height:1.2; letter-spacing:.08em; text-transform:uppercase; }
 .jd-action-due dd { margin:0; font-size:12px; font-weight:650; overflow-wrap:anywhere; }
+.jd-action-due [data-job-action-edit] { margin-top:4px; }
 .jd-action-due .is-overdue { color:#a32739; }
 .jd-link { border:0; background:transparent; color:#9c631c; padding:3px; font-size:11px; font-weight:750; cursor:pointer; }
 .jd-tasks-dialog { width:min(900px,92vw); max-height:85vh; overflow:auto; }

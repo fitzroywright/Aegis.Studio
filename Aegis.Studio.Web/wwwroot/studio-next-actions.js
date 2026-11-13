@@ -35,7 +35,11 @@
   host.querySelector('[data-next-activate]')?.addEventListener('click',event=>{event.stopPropagation();activate(row).catch(fail);});
   host.querySelector('[data-next-edit]')?.addEventListener('click',event=>{event.stopPropagation();edit(row).catch(fail);});
  }
- function mount(host,row,options={}){host.innerHTML=markup(row,options);bind(host,row);}
+ function mount(host,row,options={}){
+  const {editHost}=options;editHost?.replaceChildren();
+  host.innerHTML=markup(row,options);bind(host,row);
+  const button=host.querySelector('[data-next-edit]');if(editHost&&button)editHost.append(button);
+ }
  async function activate(row){
   if(!row)throw Error('Refresh to load the current action.');
   // Re-read before opening: a queued task may have changed in another user's session.

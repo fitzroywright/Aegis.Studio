@@ -19,6 +19,13 @@ test('next action shows escaped reason, responsibility, due date and following s
  assert.equal(host.querySelector('script,img'),null);assert.ok(host.querySelector('[data-next-edit]'));
  w.StudioNextActions.mount(host,row({canManage:false}));assert.equal(host.querySelector('[data-next-edit]'),null);
 });
+test('assignment control moves beneath a separate due date and retains its handler and permissions',async t=>{
+ const {w,host}=setup(t),editHost=w.document.createElement('div');w.document.body.append(editHost);
+ w.StudioNextActions.mount(host,row(),{editHost});assert.equal(host.querySelector('[data-next-edit]'),null);assert.equal(editHost.children.length,1);
+ editHost.querySelector('button').click();await settle();assert.match(w.document.querySelector('dialog').textContent,/responsibility and due date/);
+ w.StudioNextActions.mount(host,row({canManage:false}),{editHost});assert.equal(editHost.children.length,0);
+ w.StudioNextActions.mount(host,row(),{editHost});w.StudioNextActions.mount(host,null,{editHost});assert.equal(editHost.children.length,0);
+});
 test('activation refreshes the server projection before opening the current action',async t=>{
  const {w,set,actions}=setup(t),stale=row();set(row({action:{key:'session-plan',route:'session-plan'}}));await w.StudioNextActions.activate(stale);
  assert.equal(actions[0][0],'session-plan');assert.equal(actions[0][1].jobId,'j');

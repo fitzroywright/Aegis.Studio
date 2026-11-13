@@ -20,10 +20,17 @@ test('Job identity opens an overlay and Tasks retains its own dialog without ret
  const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.equal(button(w,'overview'),null);assert.equal(w.document.getElementById('jobDetail-overview'),null);
  const toggle=w.document.querySelector('.jd-job-name-toggle'),facts=w.document.querySelector('#jobIdentityMenu');assert.equal(facts.hidden,true);toggle.click();assert.equal(facts.hidden,false);assert.equal(facts.querySelector('[data-stage-age],.jd-status-pill'),null);assert.deepEqual([...w.document.querySelectorAll('.jd-flow-overview .jd-job-stage-meta dt')].map(e=>e.textContent),['Current Job Stage','Time in Stage']);
- assert.deepEqual([...facts.querySelectorAll('dt')].map(e=>e.textContent),['Client','Owner','Job Type','Event Date','Location','Attending Job Role','Name of Worker']);assert.match(facts.textContent,/Williams & Clarke.*Photography.*Sun Oct 11 2026.*Kingston Studio/s);
+ assert.deepEqual([...facts.querySelectorAll('dt')].map(e=>e.textContent),['Client','Job Owner','Job Type','Event Date','Location','Attending Job Role','Name of Worker']);assert.match(facts.textContent,/Williams & Clarke.*Photography.*Sun Oct 11 2026.*Kingston Studio/s);
  facts.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(facts.hidden,true);
  await w.document.querySelector('[data-job-tasks]').onclick();const tasks=w.document.querySelector('.jd-tasks-dialog');assert.equal(tasks.open,true);assert.match(tasks.textContent,/Job tasks are managed in the configured workflow graph/);assert.ok(tasks.querySelector('[data-open-job-workflow]'));tasks.close();
  assert.equal(w.document.querySelector('#studioFooterJobTools'),null);
+});
+
+test('Job Owner stays separate from the current task assignee and worker',async t=>{
+ const {w,fixture}=environment(t);fixture.jobs[0].jobLead='Lisa';
+ const api=w.json;w.json=async(url,options)=>{const value=await api(url,options);if(url.endsWith('/workflow-graph')){const task=value.tasks.find(item=>item.status==='InProgress');task.assignedTo='Paul';task.role='Photographer';}return value;};
+ await w.openWorkspaceJob('job');await settle();
+ const owner=w.document.querySelector('[data-job-owner]');assert.equal(owner.textContent,'Lisa');assert.equal(owner.previousElementSibling.textContent,'Job Owner');assert.equal(w.document.querySelector('[data-job-photographer]').textContent,'Paul');
 });
 
 test('Notes controller saves, views and edits job notes independently of messages',async t=>{
