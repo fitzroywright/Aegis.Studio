@@ -231,8 +231,8 @@
 
 /* Compact non-modal preview of the next required workflow action. */
 .sg-next-action-slide {
- position:fixed;z-index:120;top:64px;left:50%;transform:translate(-50%,0);
- width:min(660px,calc(100vw - 24px));max-height:min(42dvh,320px);
+ position:fixed;z-index:120;top:var(--sg-next-top,64px);left:var(--sg-next-left,12px);
+ width:var(--sg-next-width,min(660px,calc(100vw - 24px)));max-height:min(42dvh,320px,var(--sg-next-max-height,320px));
  box-sizing:border-box;overflow:auto;margin:0;padding:0;
  background:var(--theme-surface,#fff);color:var(--theme-text,#162b50);
  border:1px solid var(--theme-border,#d8dee6);border-top:3px solid #ed7010;
@@ -249,6 +249,26 @@
 .sg-next-action-controls button {min-height:30px;padding:5px 10px;cursor:pointer}
 .sg-next-action-error {flex-basis:100%;margin:0;color:#b52d3a;font-size:12px}
 .sg-next-action-error:empty {display:none}
-@keyframes sg-next-slide-in {from {opacity:0;transform:translate(-50%,-12px)} to {opacity:1;transform:translate(-50%,0)}}
-@media (max-width:640px) {.sg-next-action-slide {top:54px}.sg-next-action-content {align-items:stretch}.sg-next-action-controls {justify-content:flex-end}}
+@keyframes sg-next-slide-in {from {opacity:0;transform:translateY(-12px)} to {opacity:1;transform:translateY(0)}}
+@media (max-width:640px) {.sg-next-action-content {align-items:stretch}.sg-next-action-controls {justify-content:flex-end}}
 @media (prefers-reduced-motion:reduce) {.sg-next-action-slide {animation:none}}
+
+/* Job Details: make Session Plan a distinct destination without adding toolbar bulk. */
+.jd-gallery-actions [data-job-session-plan] {
+ display:inline-flex;align-items:center;justify-content:center;gap:6px;
+ min-height:32px;padding:5px 12px;
+ border:1px solid #a45b16;border-radius:6px;
+ background:linear-gradient(180deg,#fff2db 0%,#f6d8a5 100%);
+ color:#63330c;font-size:12px;font-weight:750;letter-spacing:.01em;
+ box-shadow:0 1px 3px rgba(78,43,12,.16);
+ cursor:pointer;white-space:nowrap;transition:background .14s ease,box-shadow .14s ease,transform .14s ease;
+}
+.jd-gallery-actions [data-job-session-plan]:hover {
+ background:linear-gradient(180deg,#ffe7bb 0%,#edbd76 100%);
+ box-shadow:0 2px 7px rgba(78,43,12,.23);transform:translateY(-1px);
+}
+.jd-gallery-actions [data-job-session-plan]:focus-visible {
+ outline:2px solid #a45b16;outline-offset:2px;
+}
+.jd-gallery-actions [data-job-session-plan] svg {width:15px;height:15px;flex:none;}
+@media(prefers-reduced-motion:reduce) {.jd-gallery-actions [data-job-session-plan]{transition:none;transform:none!important}}
