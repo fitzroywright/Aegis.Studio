@@ -69,24 +69,48 @@ if(notificationButton){
     panel.innerHTML='<header><h2>Unread Messages</h2><button type="button" data-bell-close aria-label="Close messages">×</button></header><div class="studio-message-bell-content"><div class="studio-message-bell-list" role="status">Open to load unread messages.</div></div><footer><button type="button" data-bell-all>Open Messages →</button></footer>';
     notificationButton.insertAdjacentElement('afterend',panel);
     let requestRevision=0;
+    const activeJobId=()=>{
+        const view=document.getElementById('conversationView');
+        const detail=document.getElementById('detailPane');
+        return document.body.dataset.studioView==='workspaces'
+            && view && !view.classList.contains('hidden')
+            && view.classList.contains('has-open-job')
+            && detail?.classList.contains('job-detail-page')
+            ? detail.dataset.jobId||'' : '';
+    };
+    const openMessages=async jobId=>{
+        close();
+        if(jobId && typeof window.openStudioJobMessages==='function')
+            await window.openStudioJobMessages(jobId);
+        else await window.studioNavigate?.('messages');
+    };
     const close=()=>{panel.hidden=true;notificationButton.setAttribute('aria-expanded','false');requestRevision++;};
     panel.querySelector('[data-bell-close]').onclick=()=>{close();notificationButton.focus();};
-    panel.querySelector('[data-bell-all]').onclick=()=>{close();window.studioNavigate?.('messages');};
+    panel.querySelector('[data-bell-all]').onclick=()=>openMessages(activeJobId());
     notificationButton.onclick=async()=>{
         if(!panel.hidden){close();return;}
         panel.hidden=false;
         notificationButton.setAttribute('aria-expanded','true');
         const revision=++requestRevision;
+        const jobId=activeJobId();
+        panel.querySelector('header h2').textContent=jobId?'Job Messages':'Unread Messages';
+        panel.setAttribute('aria-label',jobId?'Job messages':'Unread messages');
+        panel.querySelector('[data-bell-all]').textContent=jobId?'Open Job Messages →':'Open Messages →';
         const list=panel.querySelector('.studio-message-bell-list');
         list.textContent='Loading messages…';
         try{
-            const messageResponse=await fetch('/api/messages/inbox?offset=0&limit=8&unreadOnly=true',{credentials:'same-origin'});
+            const params=new URLSearchParams({offset:'0',limit:'20'});
+            if(jobId)params.set('jobId',jobId);
+            else params.set('unreadOnly','true');
+            const messageResponse=await fetch('/api/messages/inbox?'+params,{credentials:'same-origin'});
             if(!messageResponse.ok)throw new Error('Message inbox unavailable');
             const payload=await messageResponse.json();
-            const items=(Array.isArray(payload.items)?payload.items:[]).filter(item=>item.isUnread===true).map(item=>({title:item.message?.subject||item.thread?.title||item.message?.senderUserName||'Message',body:item.message?.body||item.message?.text||item.message?.content||''}));
-            if(revision!==requestRevision||panel.hidden)return;
+            const items=(Array.isArray(payload.items)?payload.items:[])
+                .filter(item=>jobId?item.thread?.scopeType==='Job'&&String(item.thread.scopeId).toLowerCase()===jobId.toLowerCase():item.isUnread===true)
+                .map(item=>({title:item.message?.subject||item.thread?.title||item.message?.senderUserName||'Message',body:item.message?.body||item.message?.text||item.message?.content||''}));
+            if(revision!==requestRevision||panel.hidden||activeJobId()!==jobId)return;
             list.replaceChildren();
-            if(!items.length){list.textContent='No unread messages.';return;}
+            if(!items.length){list.textContent=jobId?'No messages for this job.':'No unread messages.';return;}
             for(const item of items){
                 const button=document.createElement('button');
                 button.type='button';
@@ -95,10 +119,7 @@ if(notificationButton){
                 const preview=document.createElement('span');
                 preview.textContent=String(item.body).slice(0,170);
                 button.append(title,preview);
-                button.onclick=()=>{
-                    close();
-                    window.studioNavigate?.('messages');
-                };
+                button.onclick=()=>openMessages(jobId);
                 list.append(button);
             }
         }catch(error){if(revision===requestRevision&&!panel.hidden)list.textContent='Messages could not be loaded. Open Messages to try again.';}
