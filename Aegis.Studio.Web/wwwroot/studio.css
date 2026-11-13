@@ -9452,3 +9452,43 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 .api-key-actions{display:flex;gap:6px;flex-wrap:wrap}
 .api-key-warning{color:#70421e;font-size:11px}
 
+
+
+/* Keep every navigation destination reachable when the banner is narrow. */
+@media (max-width: 1250px) {
+  body .topbar {
+    height: auto;
+    min-height: var(--studio-banner-height);
+    max-height: none;
+    flex-wrap: wrap;
+    row-gap: 0;
+    padding: 6px 14px;
+  }
+  .studio-navigation-toolstrip {
+    order: 20;
+    flex: 1 0 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 4px 0 0;
+    padding-bottom: 3px;
+  }
+  .studio-navigation-scroll {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .studio-navigation-scroll::-webkit-scrollbar { display: block; height: 5px; }
+  .studio-navigation-tools { margin-inline-start: 0; }
+  .studio-navigation-account { flex: 0 0 auto; }
+}
+@media (max-width: 600px) {
+  body .topbar { padding-inline: 8px; gap: 6px; }
+  .studio-today-brand-title small { display: none; }
+  .studio-navigation-toolstrip { gap: 3px; }
+  .studio-navigation-tools button { min-height: 30px; }
+  .studio-admin-menu > summary { min-height: 30px; }
+  .studio-navigation-account .studio-user-display-name { display: none; }
+}
