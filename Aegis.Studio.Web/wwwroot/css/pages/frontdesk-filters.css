@@ -132,3 +132,18 @@
 @media(max-width:760px){.fd-reception{overflow:auto}.fd-topline{grid-template-columns:1fr 1fr}.fd-work-tabs{padding-inline:12px;gap:12px}.fd-arrival-strip{overflow:auto;grid-template-columns:repeat(4,max-content) auto}.fd-service-desk{display:flex;flex-direction:column;overflow:visible;flex:none}.fd-appointment-list{border-right:0;max-height:360px;flex:none}.fd-selected-request{overflow:visible}.fd-grid-actions{flex-wrap:wrap}.fd-customer-bottom{grid-template-columns:1fr}}
 
 
+
+/* Reception-first layout: compact booking context without production controls. */
+.fd-service-desk{grid-template-columns:minmax(360px,57%) minmax(320px,43%)}
+.fd-arrival-strip{grid-template-columns:auto repeat(4,minmax(0,1fr)) auto;padding:8px 20px}
+.fd-strip-label{font-size:12px;font-weight:700;padding:0 14px 0 4px;white-space:nowrap}
+.fd-selected-request{gap:11px;padding:14px 18px}
+.fd-reception-next{display:flex;flex-direction:column;gap:5px;border:1px solid #edcb85;border-radius:6px;background:color-mix(in srgb,var(--fd-surface) 85%,#f1c97c);padding:11px 13px}
+.fd-reception-next>span{font-size:10px;letter-spacing:.07em;text-transform:uppercase;font-weight:700;color:#805213}
+.fd-reception-next>strong{font-size:15px;color:#93530b}
+.fd-booking-card{padding:12px}
+.fd-session-heading h3{font-size:15px}
+.fd-money{margin:10px 0 7px}
+.fd-money dd{font-size:15px}
+.fd-customer-bottom{gap:12px}
+@media(max-width:900px){.fd-service-desk{grid-template-columns:minmax(0,1fr)}.fd-arrival-strip{grid-template-columns:repeat(5,minmax(0,1fr))}.fd-strip-label{display:none}}
