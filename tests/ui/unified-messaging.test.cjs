@@ -109,3 +109,15 @@ test('bell count uses unified inbox total including incoming email and ignores i
  fail=false;total=3;await poll();assert.equal(badge.textContent,'3');
  assert.ok(requests.includes('/api/messages/inbox?offset=0&limit=1&unreadOnly=true'));
 });
+
+test('Opening a specific inbox message preserves its job filter and selects that exact message',async()=>{
+ const f=fixture();try{
+  const w=f.w;
+  w.studioNavigate=async()=>w.showStudioMessages();
+  await w.openStudioInboxMessage('thread-1','message-1','job-1','Thread');
+  assert(f.requests.some(url=>url.includes('jobId=job-1')));
+  assert.equal(w.document.getElementById('studioInboxJobSelect').value,'job-1');
+  assert.equal(w.document.querySelector('[data-inbox-message="message-1"]').classList.contains('selected'),true);
+  assert(w.document.querySelector('#messageConversationPane .studio-chat-message[data-message-id="message-1"]'));
+ }finally{f.dom.window.close();}
+});
