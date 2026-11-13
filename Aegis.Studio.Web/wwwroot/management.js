@@ -107,6 +107,7 @@ function studioReportMethods(receipts){
 /* Each report is its own view; no giant scrolling dashboard of mixed reports. */
 const studioReportLayouts={
  finance:[
+  ['daily','Daily Finance',['Daily Finance Report']],
   ['overview','Financial Overview',['Net receipts over time','Payment methods','Transaction mix']],
   ['transactions','Transactions',['Transactions — search, filter and export']],
   ['receivables','Receivables',['Outstanding by job','Receivables and contractual credit']],
@@ -154,6 +155,100 @@ function studioOrganizeReports(type){
  activate(studioReportActive[type]);
 }
 
+
+const studioDailyFinance={
+ date:null,workspace:''
+};
+function studioJamaicaDate(value){
+ const date=value instanceof Date?value:new Date(value);
+ if(!Number.isFinite(date.getTime()))return '';
+ const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/Jamaica',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return parts.year+'-'+parts.month+'-'+parts.day;
+}
+const studioReceiptKinds=/^(payment|deposit|refund|reversal|POS Sale|POS Refund)$/i;
+function studioDailyFinanceRows(jobs,date,workspace=''){
+ return (jobs||[]).filter(job=>!workspace||job.workspaceId===workspace||(job.participatingWorkspaceIds||[]).includes(workspace)).flatMap(job=>
+  (job.financialEvents||[]).filter(e=>studioJamaicaDate(e.createdAt||e.createdAtUtc)===date).map(e=>({
+   ...e,jobId:job.id,client:job.clientName||'',title:job.title||'',workspaceId:job.workspaceId
+  }))
+ ).sort((a,b)=>new Date(a.createdAt||a.createdAtUtc)-new Date(b.createdAt||b.createdAtUtc));
+}
+function studioDailyFinanceDetail(rows,date){
+ const receipts=rows.filter(e=>studioReceiptKinds.test(e.kind||''));
+ const received=receipts.reduce((n,e)=>n+studioReportNumber(e.amount),0);
+ const gross=receipts.filter(e=>studioReportNumber(e.amount)>0).reduce((n,e)=>n+studioReportNumber(e.amount),0);
+ const reductions=receipts.filter(e=>studioReportNumber(e.amount)<0).reduce((n,e)=>n+Math.abs(studioReportNumber(e.amount)),0);
+ const adjustments=rows.filter(e=>/^(charge|adjustment|discount)$/i.test(e.kind||''));
+ const charges=adjustments.reduce((n,e)=>n+studioReportNumber(e.amount),0);
+ const missingMethod=receipts.filter(e=>!e.paymentMethod);
+ const missingCashier=receipts.filter(e=>!e.recordedBy);
+ const types=new Map(),methods=new Map(),cashiers=new Map();
+ for(const e of rows){const kind=e.kind||'Unclassified';const bucket=types.get(kind)||{label:kind,count:0,value:0};bucket.count++;bucket.value+=studioReportNumber(e.amount);types.set(kind,bucket);}
+ for(const e of receipts){const method=e.paymentMethod||'Not recorded',cashier=e.recordedBy||'Not recorded',amount=studioReportNumber(e.amount);
+  methods.set(method,(methods.get(method)||0)+amount);
+  const staff=cashiers.get(cashier)||{label:cashier,count:0,value:0};staff.count++;staff.value+=amount;cashiers.set(cashier,staff);
+ }
+ const hourly=new Map();
+ for(const e of receipts){const time=new Intl.DateTimeFormat('en-US',{timeZone:'America/Jamaica',hour:'2-digit',hourCycle:'h23'}).format(new Date(e.createdAt||e.createdAtUtc));hourly.set(time,(hourly.get(time)||0)+studioReportNumber(e.amount));}
+ const summary=studioReportStrip([
+  ['Business date',date],['Transactions',rows.length],['Receipt records',receipts.length],
+  ['Gross positive receipts',money(gross)],['Refunds / reversals',money(reductions)],
+  ['Net receipts',money(received)],['Charges / adjustments',money(charges)]
+ ]);
+ const details=studioReportTable(['Time (Jamaica)','Job / client','Type','Method','Cashier','Amount'],
+  rows.map(e=>`<tr><td>${esc(new Date(e.createdAt||e.createdAtUtc).toLocaleTimeString('en-JM',{timeZone:'America/Jamaica',hour:'2-digit',minute:'2-digit'}))}</td>
+  <td><button type="button" data-open-job="${esc(e.jobId)}">${esc(e.title)}</button><small class="studio-report-secondary">${esc(e.client)}</small></td>
+  <td>${esc(e.kind)}</td><td>${esc(e.paymentMethod||'—')}</td><td>${esc(e.recordedBy||'—')}</td><td>${esc(money(e.amount))}</td></tr>`));
+ const exceptions=studioReportTable(['Review item','Count'],[
+  `<tr><td>Receipts without payment method</td><td>${missingMethod.length}</td></tr>`,
+  `<tr><td>Receipts without recording staff</td><td>${missingCashier.length}</td></tr>`,
+  `<tr><td>Negative receipt records</td><td>${receipts.filter(e=>studioReportNumber(e.amount)<0).length}</td></tr>`
+ ]);
+ return summary+'<div class="studio-report-chart-grid">'+
+ studioReportPanel('Daily receipts by hour',studioReportBars([...hourly].sort(([a],[b])=>a.localeCompare(b)).map(([label,value])=>({label:label+':00',value})),{currency:true,limit:24}),'Jamaica local time')+
+ studioReportPanel('Payment methods',studioReportBars([...methods].map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value),{currency:true}),'Net signed amounts')+
+ studioReportPanel('Transaction types',studioReportBars([...types.values()].map(x=>({label:x.label,value:x.count}))),'Record counts')+
+ studioReportPanel('Receipts by cashier',studioReportBars([...cashiers.values()].map(x=>({label:x.label,value:x.value})).sort((a,b)=>b.value-a.value),{currency:true}),'Net signed amounts')+
+ '</div>'+studioReportPanel('Daily reconciliation checks',exceptions,'Flags for Finance review, not a verified cash close')+
+ studioReportPanel('Daily transaction register',details,'Full selected-day register; export available');
+}
+function studioMountDailyFinance(jobs,workspaces){
+ const host=genericView.querySelector('[data-daily-finance]');
+ if(!host)return;
+ const today=studioJamaicaDate(new Date());
+ if(!studioDailyFinance.date)studioDailyFinance.date=today;
+ const validDate=/^\\d{4}-\\d{2}-\\d{2}$/.test(studioDailyFinance.date)?studioDailyFinance.date:today;
+ host.innerHTML=`<div class="studio-daily-finance-tools">
+ <label>Business date (Jamaica)<input data-daily-date type="date" max="${today}" value="${esc(validDate)}"></label>
+ <label>Workspace<select data-daily-workspace><option value="">All workspaces</option>${(workspaces||[]).map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select></label>
+ <button type="button" data-daily-export>Export daily CSV</button>
+ <span data-daily-status role="status"></span></div><div data-daily-result></div>
+ <p class="studio-report-disclaimer">Based on recorded job financial events and their timestamps. This is an operational daily register, not a certified day-end cash or bank reconciliation. Late entries retain their recorded timestamps. Amounts use the application's existing JMD reporting convention.</p>`;
+ const date=host.querySelector('[data-daily-date]'),workspace=host.querySelector('[data-daily-workspace]'),result=host.querySelector('[data-daily-result]'),status=host.querySelector('[data-daily-status]');
+ workspace.value=(workspaces||[]).some(w=>w.id===studioDailyFinance.workspace)?studioDailyFinance.workspace:'';
+ const render=()=>{
+  if(!date.value||date.value>today){status.textContent='Choose a valid business date up to today.';result.replaceChildren();return [];}
+  studioDailyFinance.date=date.value;studioDailyFinance.workspace=workspace.value;
+  const rows=studioDailyFinanceRows(jobs,date.value,workspace.value);
+  result.innerHTML=studioDailyFinanceDetail(rows,date.value);
+  result.querySelectorAll('[data-open-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.openJob).catch(e=>alert(e.message)));
+  status.textContent=rows.length+' recorded events';
+  return rows;
+ };
+ date.onchange=render;workspace.onchange=render;
+ host.querySelector('[data-daily-export]').onclick=()=>{
+  const rows=render();
+  if(!date.value||date.value>today)return;
+  const quote=value=>'"'+String(value??'').replace(/"/g,'""')+'"';
+  const records=[['Business date (Jamaica)','Timestamp UTC','Job','Client','Type','Amount (JMD)','Payment method','Recorded by','Note'],
+   ...rows.map(e=>[date.value,e.createdAt||e.createdAtUtc,e.title,e.client,e.kind,e.amount,e.paymentMethod,e.recordedBy,e.note])];
+  const csv=records.map(row=>row.map(quote).join(',')).join('\\r\\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const link=document.createElement('a');link.href=url;link.download='studio-daily-finance-'+date.value+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ };
+ render();
+}
+
 async function showAccounts(){
     const current=StudioPage.begin('finance');
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -173,11 +268,13 @@ async function showAccounts(){
         ${studioReportPanel('Outstanding by job',studioReportBars(data.balances.filter(x=>x.balance>0).sort((a,b)=>b.balance-a.balance).map(x=>({label:x.job.title||x.job.id,value:x.balance})),{currency:true,limit:10}),'Current recorded balance')}
       </div>
       ${window.studioWorkflowCapabilities?.finance?studioReportPanel('Receivables and contractual credit',studioReportTable(['Job / client','Stage','Release','Balance'],receivables.map(x=>`<tr><td><button type="button" data-open-job="${esc(x.jobId)}">${esc(x.title)} · ${esc(x.client)}</button></td><td>${esc(x.stage)}</td><td>${x.decision.authorized?'Authorized':'Held'}</td><td>${esc(money(x.decision.balance))}</td></tr>`))):''}
+      ${studioReportPanel('Daily Finance Report','<div data-daily-finance></div>','Date-based operational register')}
       ${studioReportPanel('Transactions — search, filter and export','<div data-finance-filter></div><div data-finance-results></div>','Up to 100 displayed; export includes all matches')}
       ${studioReportPanel('Invoices',studioReportTable(['Invoice','Client','Status','Amount','Actions'],data.invoices.map(i=>`<tr><td><button data-open-job="${esc(i.jobId)}">${esc(i.invoiceNumber)}</button></td><td>${esc(i.clientName)}</td><td>${esc(i.status)}</td><td>${esc(money(i.totalAmount))}</td><td>${i.status==='Draft'?`<button onclick="setInvoiceStatus('${i.id}','Issued')">Issue</button>`:''} <button onclick="issueClientPortal('${i.jobId}')">Client Portal</button></td></tr>`)))}
     </div>`});
     StudioPage.bind(genericView,current);
     studioOrganizeReports('finance');
+    studioMountDailyFinance(data.jobs,data.workspaces);
     studioBindOperations(data,showAccounts);
     const controls=StudioPage.query(genericView,'[data-finance-filter]'),results=StudioPage.query(genericView,'[data-finance-results]');
     controls.innerHTML=`<label>Find transaction<input data-finance-search type="search" placeholder="Client, job, reference or cashier"></label><label>From<input type="date" data-finance-from value="${data.start.toISOString().slice(0,10)}"></label><label>Through<input type="date" data-finance-to value="${data.now.toISOString().slice(0,10)}"></label><label>Workspace<select data-finance-workspace><option value="">All workspaces</option>${data.workspaces.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select></label><label>Type<select data-finance-kind><option value="">All types</option>${[...new Set(data.transactions.map(e=>e.kind))].map(k=>`<option>${esc(k)}</option>`).join('')}</select></label><label>Method<select data-finance-method><option value="">All methods</option>${[...new Set(data.receipts.map(e=>e.paymentMethod||'Unrecorded'))].map(k=>`<option>${esc(k)}</option>`).join('')}</select></label><button data-export-filter>Export matching</button><p data-reconcile></p>`;
