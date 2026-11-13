@@ -11,12 +11,12 @@ const jobs=[{id:'job',workspaceId:'workspace',clientId:'client',title:'Wedding',
 function endpoints(w){w.json=async u=>u==='/api/jobs/access'?{job:{manageProduction:true}}:u==='/api/production/media-summary'?[{jobId:'job',collection:'Selects',assetCount:1,completedCount:0,approvedCount:1,thumbnailVersionIds:[]}]:u==='/api/jobs'?jobs:u==='/api/accounts/invoices'?[{id:'invoice',jobId:'job',invoiceNumber:'001',clientName:'Carter',totalAmount:95,status:'Issued'}]:u==='/api/photographers'?[{userName:'staff',displayName:'Staff',scheduleResourceId:'resource',isActive:true}]:u.startsWith('/api/schedule/entries')?[{id:'session',jobId:'job',title:'Wedding',startsAtUtc:date,endsAtUtc:date,resourceIds:['resource'],status:'Scheduled'}]:u.endsWith('/media')?{assets:[]}:u==='/api/auth/me'?{user:{userName:'staff',isAdministrator:true}}:u==='/api/workspaces'?[{id:'workspace',name:'Weddings'}]:u==='/api/schedule/resources'?[]:u.endsWith('/access')?{permissions:{manageProduction:true}}:[];}
 test('Finance reconciles signed refunds and discounts with the job balance',async()=>{
  const w=setup();endpoints(w);assert.deepEqual(JSON.parse(JSON.stringify(w.studioFinancials(jobs[0]))),{charges:95,received:70,balance:25});await w.showAccounts();
- assert.match(w.genericView.textContent,/JMD 70/);assert.match(w.genericView.textContent,/JMD 25/);assert.equal(w.document.querySelectorAll('.st-dashboard-grid>.op-card').length,4);
+ assert.match(w.genericView.textContent,/JMD 70/);assert.match(w.genericView.textContent,/JMD 25/);assert.equal(w.document.querySelectorAll('.studio-report-view').length,5);assert.equal(w.document.querySelector('[data-report-target="daily"]').getAttribute('aria-current'),'page');
  let opened;w.openWorkspaceJob=async id=>opened=id;w.document.querySelector('[data-open-job]').click();assert.equal(opened,'job');
  const chart=w.studioRevenueChart([{kind:'Refund',amount:-100,createdAt:date}]);const fragment=new JSDOM(chart);assert.ok([...fragment.window.document.querySelectorAll('rect')].every(r=>Number(r.getAttribute('height'))>=0));
 });
 test('Management workload follows the same schedule resource IDs as Pipeline',async()=>{
- const w=setup();endpoints(w);w.pipelineStages=[['Production',['Production']]];await w.showManagement();assert.equal(w.document.querySelectorAll('.st-dashboard-grid>.op-card').length,8);assert.match(w.genericView.textContent,/0 open tasks · 1 sessions/);
+ const w=setup();endpoints(w);w.pipelineStages=[['Production',['Production']]];await w.showManagement();assert.equal(w.document.querySelectorAll('.studio-report-view').length,4);assert.match(w.genericView.textContent,/Sessions & Staffing/);
  let route;w.studioNavigate=v=>route=v;w.document.querySelector('[data-stage]').click();assert.equal(route,'pipeline');assert.equal(w.pipelineSelectedStage,'Production');
 });
 test('Production navigation uses the canonical board and retires the legacy activity page',async()=>{
@@ -49,8 +49,43 @@ test('Finance filters signed records by method and staff without changing their 
 test('Finance retains completed-job receivables and directs approval to Job Details',async()=>{
  const w=setup();endpoints(w);w.studioWorkflowCapabilities={finance:true};const read=w.json;
  w.json=async u=>u==='/api/finance/receivables'?[{jobId:'completed',title:'Delivered wedding',client:'Carter',stage:'Completed',decision:{balance:750,authorized:true},authorizations:[{payment_due_date:'2020-01-01',revoked_at_utc:null}]}]:read(u);
- await w.showAccounts();assert.match(w.genericView.textContent,/Delivered wedding/);assert.match(w.genericView.textContent,/Completed · Finance release authorized/);assert.match(w.genericView.textContent,/Overdue/);
+ await w.showAccounts();assert.match(w.genericView.textContent,/Delivered wedding/);assert.match(w.genericView.textContent,/Authorized/);assert.match(w.genericView.textContent,/Overdue/);
  let opened;w.openWorkspaceJob=async id=>opened=id;w.document.querySelector('[data-open-job="completed"]').click();assert.equal(opened,'completed');w.close();
 });
 
 
+
+
+test('Daily Finance uses Jamaica business dates, signed reversals, cashier and workspace grouping',async()=>{
+ const w=setup();endpoints(w);const original=w.json;
+ const day='2026-11-13';
+ const sameDay=[{kind:'Payment',amount:200,createdAt:'2026-11-13T04:30:00Z',paymentMethod:'Cash',recordedBy:'Alice'}, // Nov 12, 23:30 Jamaica
+  {kind:'Payment',amount:125,createdAt:'2026-11-13T12:00:00Z',paymentMethod:'Card',recordedBy:'Alice'},
+  {kind:'Refund',amount:-25,createdAt:'2026-11-13T15:00:00Z',paymentMethod:'Card',recordedBy:'Bob'},
+  {kind:'Deposit',amount:50,createdAt:'2026-11-13T18:00:00Z',recordedBy:'Bob'}];
+ w.json=async u=>u==='/api/jobs'?[
+  {...jobs[0],financialEvents:sameDay},
+  {id:'other',title:'Other job',clientName:'Other client',workspaceId:'other-workspace',financialEvents:[{kind:'Payment',amount:1000,createdAt:'2026-11-13T17:00:00Z',paymentMethod:'Cash',recordedBy:'Other'}]}
+ ]:u==='/api/workspaces'?[{id:'workspace',name:'Weddings'},{id:'other-workspace',name:'Other'}]:original(u);
+ await w.showAccounts();
+ assert.equal(w.document.querySelector('[data-report-target="daily"]').getAttribute('aria-current'),'page');
+ const dateInput=w.document.querySelector('[data-daily-date]');dateInput.value=day;dateInput.onchange();
+ const workspace=w.document.querySelector('[data-daily-workspace]');workspace.value='workspace';workspace.onchange();
+ const result=w.document.querySelector('[data-daily-result]');
+ assert.match(result.textContent,/JMD 150/); // net: 125 - 25 + 50
+ assert.match(result.textContent,/Bob/);
+ assert.match(result.textContent,/Receipt records/);
+ assert.doesNotMatch(result.textContent,/Other client/);
+ assert.doesNotMatch(result.textContent,/JMD 200/); // midnight UTC is previous Jamaica business date
+ assert.match(result.textContent,/Receipts without payment method/);
+ w.close();
+});
+
+test('Finance report sections show one focused report at a time',async()=>{
+ const w=setup();endpoints(w);await w.showAccounts();
+ const visible=()=>[...w.document.querySelectorAll('[data-report-view]')].filter(x=>!x.hidden);
+ assert.equal(visible().length,1);assert.equal(visible()[0].dataset.reportView,'daily');
+ w.document.querySelector('[data-report-target="invoices"]').click();
+ assert.equal(visible().length,1);assert.equal(visible()[0].dataset.reportView,'invoices');
+ assert.match(visible()[0].textContent,/Invoices/);w.close();
+});
