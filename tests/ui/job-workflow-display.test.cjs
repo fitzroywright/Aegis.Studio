@@ -38,57 +38,47 @@ function makeView(){
  ];
  return {graph,evaluation:{nodes:states},tasks};
 }
-test('Job Details shows one status-colored display and never opens the workflow editor',t=>{
- const w=setup(t),host=w.document.getElementById('host'),view=makeView();let editorOpens=0,canvasCalls=0;
- w.StudioJobGraph={open:()=>{editorOpens++;}};
- w.StudioGraph={canvas:()=>{canvasCalls++;}};
- w.StudioJobWorkflowDisplay.render(host,view);
- const stage=id=>host.querySelector('[aria-label^="'+id+'"]');
- assert.equal(host.querySelector('[data-stage="done"]'),null);
- assert.equal(host.querySelector('.jd-workflow-stage.completed .jd-workflow-status').textContent,'✓');
- assert.ok(host.querySelector('.jd-workflow-stage.inprogress'));
- assert.ok(host.querySelector('.jd-workflow-stage.available'));
- assert.ok(host.querySelector('.jd-workflow-stage.pending'));
- assert.deepEqual(Array.from(host.querySelectorAll('.jd-workflow-stage-label'),label=>label.textContent),view.graph.nodes.filter(node=>!['Start','End'].includes(node.kind)).map(node=>node.label));
- assert.equal(host.querySelector('.jd-workflow-stage.blocked .jd-workflow-status').textContent,'!');
- host.querySelectorAll('.jd-workflow-stage[data-stage-info]').forEach(node=>node.click());
- assert.equal(editorOpens,0);assert.equal(canvasCalls,0);
-});
-test('subflow appears only after its stage is clicked and matches the Start/End curved-route sketch',t=>{
- const w=setup(t),host=w.document.getElementById('host'),view=makeView();let editorOpens=0;
- w.StudioJobGraph={open:()=>{editorOpens++;}};w.StudioJobWorkflowDisplay.render(host,view);
- assert.equal(host.querySelector('.jd-subflow-diagram'),null);
- const stage=host.querySelector('[data-subflow-stage="production"]');assert.ok(stage);
- stage.click();
- const svg=host.querySelector('.jd-subflow-diagram');assert.ok(svg);
- assert.match(host.textContent,/Start Production work/);assert.match(host.textContent,/End Production work/);
- assert.equal(svg.querySelectorAll('.jd-subflow-route').length,3);
- assert.equal(svg.querySelector('.jd-subflow-main-dashes'),null);
- assert.equal(svg.querySelector('rect'),null);
- assert.equal(svg.querySelectorAll('.jd-subflow-label[transform]').length,0);
- assert.equal(editorOpens,0);
- host.querySelector('[data-endpoint="start"]').click();
- assert.equal(host.querySelector('.jd-subflow-diagram'),null);
-});
-
-
-test('workflow pills expose status details without changing tasks or opening an editor',t=>{
+test('horizontal progress reflects completed stages, with no workflow changes',t=>{
  const w=setup(t),host=w.document.getElementById('host'),view=makeView(),before=JSON.stringify(view);let writes=0;
- w.json=()=>{writes++;throw Error('No writes expected');};w.StudioJobGraph={open:()=>writes++};w.StudioJobWorkflowDisplay.render(host,view);
- assert.equal(host.querySelectorAll('.jd-workflow-connector').length,0);
- assert.equal(host.querySelectorAll('button.jd-workflow-stage').length,6);
- assert.equal(host.querySelectorAll('.jd-workflow-stage-icon svg').length,6);
- const blocked=host.querySelector('[data-stage-info="blocked"]');blocked.click();
- assert.equal(host.querySelector('[data-stage-info="blocked"]').getAttribute('aria-expanded'),'true');
- assert.match(host.querySelector('.jd-workflow-info').textContent,/ApprovalBlockedClient approval required/);
- assert.equal(w.document.activeElement.dataset.stageInfo,'blocked');
- host.querySelector('[data-stage-info="blocked"]').click();assert.equal(host.querySelector('.jd-workflow-info').hidden,true);
- assert.equal(JSON.stringify(view),before);assert.equal(writes,0);
+ w.json=()=>writes++;w.StudioJobGraph={open:()=>writes++};w.StudioJobWorkflowDisplay.render(host,view);
+ const bar=host.querySelector('[role=progressbar]');assert.equal(bar.getAttribute('aria-valuenow'),'17');assert.match(bar.getAttribute('aria-valuetext'),/1 of 6 stages completed/);
+ assert.equal(host.querySelector('.jd-workflow-progress-fill').style.width,'17%');assert.match(host.querySelector('.jd-workflow-progress-trigger').textContent,/17% complete.*1 of 6/s);
+ assert.equal(host.querySelector('.jd-workflow-progress-trigger').getAttribute('aria-expanded'),'false');assert.equal(host.querySelector('.jd-workflow-drawer').getAttribute('aria-hidden'),'true');
+ host.querySelector('.jd-workflow-progress-trigger').click();assert.equal(host.querySelector('.jd-workflow-drawer').getAttribute('aria-hidden'),'false');
+ assert.ok(host.querySelector('.jd-workflow-stage.completed'));assert.ok(host.querySelector('.jd-workflow-stage.inprogress'));assert.ok(host.querySelector('.jd-workflow-stage.blocked'));assert.ok(host.querySelectorAll('.jd-workflow-connector').length);
+ assert.equal(writes,0);assert.equal(JSON.stringify(view),before);
 });
-test('icons follow configured stage labels, custom labels are escaped and inactive stages stay hidden',t=>{
- const w=setup(t),host=w.document.getElementById('host'),view={graph:{nodes:[{id:'brief',label:'Brief',kind:'Task'},{id:'camera',label:'Photographs',kind:'Task'},{id:'print',label:'Prints',kind:'Task'},{id:'custom',label:'<img src=x>',kind:'Task'},{id:'hidden',label:'Hidden',kind:'Task'}]},evaluation:{nodes:[{id:'hidden',status:'Inactive'}]}};
- w.StudioJobWorkflowDisplay.render(host,view);assert.equal(host.querySelectorAll('.jd-workflow-stage').length,4);assert.equal(host.querySelector('img'),null);
- assert.notEqual(host.querySelector('[data-stage-info="camera"] svg').innerHTML,host.querySelector('[data-stage-info="print"] svg').innerHTML);
- host.querySelector('[data-stage-info="custom"]').click();assert.match(host.querySelector('.jd-workflow-info').textContent,/<img src=x>/);
- w.StudioJobWorkflowDisplay.render(host,{...view});assert.equal(host.querySelector('.jd-workflow-info').hidden,true);
+test('progress ignores graph endpoints and inactive stages, handles empty and fully completed workflows',t=>{
+ const w=setup(t),host=w.document.getElementById('host');
+ const view={graph:{nodes:[{id:'s',kind:'Start'},{id:'a',label:'A',kind:'Task'},{id:'b',label:'B',kind:'Task'},{id:'x',label:'Hidden',kind:'Task'},{id:'e',kind:'End'}]},evaluation:{nodes:[{id:'a',status:'Completed'},{id:'b',status:'Completed'},{id:'x',status:'Inactive'}]}};
+ w.StudioJobWorkflowDisplay.render(host,view);assert.equal(host.querySelector('[role=progressbar]').getAttribute('aria-valuenow'),'100');assert.match(host.textContent,/2 of 2 stages completed/);
+ w.StudioJobWorkflowDisplay.render(host,{graph:{nodes:[]}});assert.equal(host.querySelector('[role=progressbar]').getAttribute('aria-valuenow'),'0');assert.match(host.textContent,/0 of 0/);
+ const skipped={graph:{nodes:[{id:'done',label:'Done',kind:'Task'},{id:'skip',label:'Skipped',kind:'Task'}]},tasks:[{nodeId:'done',status:'Completed'},{nodeId:'skip',status:'Skipped'}]};
+ w.StudioJobWorkflowDisplay.render(host,skipped);assert.equal(host.querySelector('[role=progressbar]').getAttribute('aria-valuenow'),'50');
+});
+test('hover opens the drawer, leaving hides it, and it also closes after eight seconds',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),timers=new Map();let next=0;
+ w.setTimeout=(callback,delay)=>{assert.equal(delay,8000);timers.set(++next,callback);return next;};w.clearTimeout=id=>timers.delete(id);
+ w.StudioJobWorkflowDisplay.render(host,makeView());const area=host.querySelector('.jd-workflow-summary'),trigger=host.querySelector('.jd-workflow-progress-trigger'),drawer=host.querySelector('.jd-workflow-drawer');
+ area.dispatchEvent(new w.Event('mouseenter'));assert.equal(area.dataset.open,'true');assert.equal(trigger.getAttribute('aria-expanded'),'true');assert.equal(drawer.inert,false);assert.equal(timers.size,1);
+ area.dispatchEvent(new w.Event('mouseleave'));assert.equal(area.dataset.open,'false');assert.equal(drawer.inert,true);assert.equal(timers.size,0);
+ trigger.click();const callback=[...timers.values()][0];callback();assert.equal(area.dataset.open,'false');assert.equal(trigger.getAttribute('aria-expanded'),'false');
+});
+test('keyboard and touch access work and dismissal returns focus from inside the drawer',async t=>{
+ const w=setup(t),host=w.document.getElementById('host');w.StudioJobWorkflowDisplay.render(host,makeView());const trigger=host.querySelector('.jd-workflow-progress-trigger'),area=host.querySelector('.jd-workflow-summary');
+ trigger.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));assert.equal(area.dataset.open,'true');assert.equal(w.document.activeElement,host.querySelector('[data-workflow-close]'));
+ w.document.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(area.dataset.open,'false');assert.equal(w.document.activeElement,trigger);
+ trigger.click();assert.equal(area.dataset.open,'true');host.querySelector('[data-workflow-close]').click();assert.equal(area.dataset.open,'false');
+ trigger.click();const outside=w.document.createElement('button');w.document.body.append(outside);host.querySelector('[data-workflow-close]').focus();outside.focus();await new Promise(r=>setImmediate(r));assert.equal(area.dataset.open,'false');
+});
+test('the original diagram retains subflow expansion inside the drawer',t=>{
+ const w=setup(t),host=w.document.getElementById('host');let edits=0;w.StudioJobGraph={open:()=>edits++};w.StudioJobWorkflowDisplay.render(host,makeView());host.querySelector('.jd-workflow-progress-trigger').click();
+ assert.equal(host.querySelector('.jd-subflow-diagram'),null);host.querySelector('[data-subflow-stage="production"]').click();assert.ok(host.querySelector('.jd-subflow-diagram'));assert.match(host.textContent,/Start Production work/);assert.match(host.textContent,/End Production work/);
+ host.querySelector('[data-endpoint="start"]').click();assert.equal(host.querySelector('.jd-subflow-diagram'),null);assert.equal(edits,0);
+});
+test('replacing a job cancels old timers and escapes configured stage names',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),timers=new Map();let serial=0;
+ w.setTimeout=callback=>{timers.set(++serial,callback);return serial;};w.clearTimeout=id=>timers.delete(id);
+ w.StudioJobWorkflowDisplay.render(host,makeView());host.querySelector('.jd-workflow-progress-trigger').click();const oldCallback=[...timers.values()][0];
+ w.StudioJobWorkflowDisplay.render(host,{graph:{nodes:[{id:'a',label:'<img src=x>',kind:'Task'}]}});assert.equal(timers.size,0);host.querySelector('.jd-workflow-progress-trigger').click();oldCallback();assert.equal(host.querySelector('.jd-workflow-summary').dataset.open,'true');assert.equal(host.querySelector('img'),null);assert.match(host.querySelector('.jd-workflow-stage').getAttribute('aria-label'),/<img src=x>/);
 });

@@ -61,7 +61,7 @@ test('workflow load failure remains visible in the shared attention drawer and R
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,20));
  const drawer=w.document.getElementById('studioAttentionDrawer');assert.match(drawer.textContent,/Workflow unavailable: Workflow offline/);
  const retry=[...drawer.querySelectorAll('button')].find(b=>b.textContent==='Retry workflow →');assert.ok(retry);failed=false;await retry.onclick();
- assert.ok(w.document.querySelector('.jd-workflow-track button.jd-workflow-stage'));assert.doesNotMatch(drawer.textContent,/Workflow unavailable/);
+ assert.ok(w.document.querySelector('.jd-workflow-track [role=progressbar]'));assert.doesNotMatch(drawer.textContent,/Workflow unavailable/);
 });
 
 
