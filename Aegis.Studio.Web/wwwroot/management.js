@@ -103,6 +103,57 @@ function studioReportMethods(receipts){
  return studioReportBars([...groups].map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value),{currency:true});
 }
 
+
+/* Each report is its own view; no giant scrolling dashboard of mixed reports. */
+const studioReportLayouts={
+ finance:[
+  ['overview','Financial Overview',['Net receipts over time','Payment methods','Transaction mix']],
+  ['transactions','Transactions',['Transactions — search, filter and export']],
+  ['receivables','Receivables',['Outstanding by job','Receivables and contractual credit']],
+  ['invoices','Invoices',['Invoice status','Invoices']]
+ ],
+ management:[
+  ['overview','Executive Summary',['Receipt trend','Top clients by receipts','Invoice status']],
+  ['workflow','Jobs & Workflow',['Jobs by stage','Task status','Pipeline summary']],
+  ['schedule','Sessions & Staffing',['Upcoming sessions by day','Photographer workload','Upcoming sessions']],
+  ['exceptions','Exceptions',['Exceptions requiring attention']]
+ ]
+};
+const studioReportActive={finance:'overview',management:'overview'};
+function studioOrganizeReports(type){
+ const root=genericView.querySelector('.studio-report-sheet');
+ if(!root)return;
+ const layout=studioReportLayouts[type],panels=[...root.querySelectorAll('.studio-report-panel')];
+ const strip=root.querySelector('.studio-report-strip');
+ const nav=document.createElement('nav');nav.className='studio-report-nav';nav.setAttribute('aria-label',type==='finance'?'Finance reports':'Management reports');
+ root.prepend(nav);
+ const views=new Map();
+ for(const [id,label,titles] of layout){
+  const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.reportTarget=id;nav.append(button);
+  const view=document.createElement('section');view.className='studio-report-view';view.dataset.reportView=id;view.setAttribute('aria-label',label);
+  root.append(view);views.set(id,view);
+  const chartPanels=panels.filter(panel=>titles.includes(panel.querySelector('header h2')?.textContent));
+  if(chartPanels.length>1){
+   const charts=document.createElement('div');charts.className='studio-report-chart-grid';view.append(charts);
+   chartPanels.forEach(panel=>charts.append(panel));
+  }else chartPanels.forEach(panel=>view.append(panel));
+ }
+ const originalGrid=root.querySelector('.studio-report-chart-grid');
+ const originalDataGrid=root.querySelector('.studio-report-data-grid');
+ // Empty layout wrappers are no longer required once their report panels move.
+ if(originalGrid&&!originalGrid.querySelector('.studio-report-panel'))originalGrid.remove();
+ if(originalDataGrid&&!originalDataGrid.querySelector('.studio-report-panel'))originalDataGrid.remove();
+ if(strip)views.get('overview').prepend(strip);
+ for(const panel of panels.filter(panel=>!panel.closest('[data-report-view]')))views.get('overview').append(panel);
+ const activate=id=>{
+  const chosen=views.has(id)?id:'overview';studioReportActive[type]=chosen;
+  for(const [key,view] of views)view.hidden=key!==chosen;
+  for(const button of nav.querySelectorAll('button')){const on=button.dataset.reportTarget===chosen;button.setAttribute('aria-current',on?'page':'false');button.setAttribute('aria-pressed',String(on));}
+ };
+ nav.querySelectorAll('button').forEach(button=>button.onclick=()=>activate(button.dataset.reportTarget));
+ activate(studioReportActive[type]);
+}
+
 async function showAccounts(){
     const current=StudioPage.begin('finance');
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -126,6 +177,7 @@ async function showAccounts(){
       ${studioReportPanel('Invoices',studioReportTable(['Invoice','Client','Status','Amount','Actions'],data.invoices.map(i=>`<tr><td><button data-open-job="${esc(i.jobId)}">${esc(i.invoiceNumber)}</button></td><td>${esc(i.clientName)}</td><td>${esc(i.status)}</td><td>${esc(money(i.totalAmount))}</td><td>${i.status==='Draft'?`<button onclick="setInvoiceStatus('${i.id}','Issued')">Issue</button>`:''} <button onclick="issueClientPortal('${i.jobId}')">Client Portal</button></td></tr>`)))}
     </div>`});
     StudioPage.bind(genericView,current);
+    studioOrganizeReports('finance');
     studioBindOperations(data,showAccounts);
     const controls=StudioPage.query(genericView,'[data-finance-filter]'),results=StudioPage.query(genericView,'[data-finance-results]');
     controls.innerHTML=`<label>Find transaction<input data-finance-search type="search" placeholder="Client, job, reference or cashier"></label><label>From<input type="date" data-finance-from value="${data.start.toISOString().slice(0,10)}"></label><label>Through<input type="date" data-finance-to value="${data.now.toISOString().slice(0,10)}"></label><label>Workspace<select data-finance-workspace><option value="">All workspaces</option>${data.workspaces.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select></label><label>Type<select data-finance-kind><option value="">All types</option>${[...new Set(data.transactions.map(e=>e.kind))].map(k=>`<option>${esc(k)}</option>`).join('')}</select></label><label>Method<select data-finance-method><option value="">All methods</option>${[...new Set(data.receipts.map(e=>e.paymentMethod||'Unrecorded'))].map(k=>`<option>${esc(k)}</option>`).join('')}</select></label><button data-export-filter>Export matching</button><p data-reconcile></p>`;
@@ -163,6 +215,7 @@ async function showManagement(){
       ${studioReportPanel('Exceptions requiring attention',studioReportTable(['Job task','Status','Responsible','Due / reason'],[...overdue,...blocked].filter((t,i,a)=>a.findIndex(x=>x.id===t.id)===i).slice(0,40).map(t=>`<tr><td><button data-open-job="${esc(t.jobId)}">${esc(t.title)}</button></td><td>${esc(t.status)}</td><td>${esc(t.assignedTo||'Unassigned')}</td><td>${esc(t.blockedReason||t.dueAtUtc&&new Date(t.dueAtUtc).toLocaleDateString()||'Not recorded')}</td></tr>`)),'Overdue and blocked work')}
     </div>`});
     StudioPage.bind(genericView,current);
+    studioOrganizeReports('management');
     studioBindOperations(data,showManagement);
     StudioPage.queryAll(genericView,'[data-stage]').forEach(b=>b.onclick=()=>{pipelineSelectedStage=b.dataset.stage;studioNavigate('pipeline');});
 }
