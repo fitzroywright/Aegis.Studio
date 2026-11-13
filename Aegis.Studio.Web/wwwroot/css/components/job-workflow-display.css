@@ -10,8 +10,8 @@
 .jd-workflow-progress-trigger>small{font-size:11px;color:var(--theme-muted,#637187)}
 .jd-workflow-drawer{position:absolute;z-index:70;top:100%;right:0;width:min(1050px,calc(100vw - 48px));box-sizing:border-box;padding-top:5px;visibility:hidden;opacity:0;transform:translateY(-10px);pointer-events:none;transition:transform .22s ease,opacity .22s ease,visibility .22s}
 .jd-workflow-summary[data-open=true]>.jd-workflow-drawer{visibility:visible;opacity:1;transform:translateY(0);pointer-events:auto}
-.jd-workflow-drawer-surface{border:1px solid var(--theme-border,#cad4dd);border-top:3px solid #d99416;border-radius:7px;background:var(--theme-surface,#fff);box-shadow:0 12px 30px #10243d30;overflow:hidden}
-.jd-workflow-drawer-surface>header{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--theme-border,#e3e7eb);font-size:12px;color:var(--theme-text,#162b50)}
+.jd-workflow-drawer-surface{border:0;background:var(--theme-surface,#fff);overflow:hidden}
+.jd-workflow-drawer-surface>header{display:flex;align-items:center;gap:12px;padding:10px 14px;font-size:12px;color:var(--theme-text,#162b50)}
 .jd-workflow-drawer-surface>header>span{margin-left:auto;font-size:11px;color:var(--theme-muted,#637187)}
 .jd-workflow-drawer-surface>header>button{border:0;border-radius:4px;background:transparent;color:inherit;padding:2px 7px;font-size:20px;cursor:pointer}
 .jd-workflow-diagram-scroll{overflow:auto;max-height:min(320px,55vh)}
