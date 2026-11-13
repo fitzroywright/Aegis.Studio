@@ -9542,3 +9542,16 @@ body[data-studio-view="finance"] .studio-report-strip {display:flex;flex-wrap:wr
 .studio-report-view[hidden]{display:none!important;}
 .studio-report-view>.studio-report-chart-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));}
 @media(max-width:650px){.studio-report-nav button{flex:1 1 45%;text-align:center;padding:8px 6px;}.studio-report-view>.studio-report-chart-grid{grid-template-columns:minmax(0,1fr);}}
+
+
+/* Daily Finance is an individual, date-driven ledger report. */
+.studio-daily-finance-tools{display:flex;flex-wrap:wrap;align-items:end;gap:8px;padding:4px 0 10px;border-bottom:1px solid var(--studio-control-border,#d9e1e8);}
+.studio-daily-finance-tools label{display:grid;gap:3px;font-size:11px;font-weight:650;}
+.studio-daily-finance-tools :is(input,select,button){min-height:31px;border:1px solid var(--studio-control-border,#b9c8d7);border-radius:3px;padding:4px 7px;background:var(--theme-surface,#fff);color:var(--theme-text,#182b40);font-size:12px;}
+.studio-daily-finance-tools [data-daily-export]{background:#234969;border-color:#234969;color:white;font-weight:700;cursor:pointer;}
+.studio-daily-finance-tools [data-daily-status]{margin-left:auto;font-size:11px;color:var(--theme-muted,#687889);}
+[data-daily-result]{display:grid;gap:10px;padding-top:10px;}
+[data-daily-result] .studio-report-chart-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+.studio-report-secondary{display:block;font-size:10px;color:var(--theme-muted,#718092);margin-top:2px;}
+.studio-report-disclaimer{font-size:10px;color:var(--theme-muted,#718092);margin:10px 0 0;line-height:1.5;}
+@media(max-width:750px){[data-daily-result] .studio-report-chart-grid{grid-template-columns:minmax(0,1fr)}.studio-daily-finance-tools [data-daily-status]{margin-left:0;}}
