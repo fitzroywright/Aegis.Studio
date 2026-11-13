@@ -51,6 +51,58 @@ function studioBindOperations(data,refresh){
     StudioPage.query(genericView,'[data-export]').onclick=()=>studioExportTransactions(data.transactions);
     StudioPage.queryAll(genericView,'[data-metric]').forEach(b=>{b.onclick=()=>{const values=b.dataset.metric==='receipts'?data.receipts:data.tasks.filter(t=>b.dataset.metric==='blocked'?t.status==='Blocked':!['Completed','Cancelled'].includes(t.status)&&t.dueAtUtc&&new Date(t.dueAtUtc)<data.now);const d=studioDialog(b.dataset.metric==='receipts'?'Receipt history':'Work requiring attention',b.dataset.metric==='receipts'?studioTransactionsTable(values):values.slice(0,100).map(t=>`<button data-open-job="${t.jobId}">${esc(t.title)} · ${esc(t.blockedReason||t.status)}</button>`).join('')||'<p>No matching work.</p>');d.querySelectorAll('[data-open-job]').forEach(x=>x.onclick=()=>{d.close();openWorkspaceJob(x.dataset.openJob).catch(e=>alert(e.message));});};b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();b.click();}};});
 }
+
+/* Compact reports use the existing authorized Studio projections; no invented totals. */
+function studioReportNumber(value){return Number.isFinite(Number(value))?Number(value):0;}
+function studioReportPanel(title,content,note=''){
+ return `<section class="studio-report-panel"><header><h2>${esc(title)}</h2>${note?`<small>${esc(note)}</small>`:''}</header><div class="studio-report-content">${content}</div></section>`;
+}
+function studioReportStrip(items){
+ return '<div class="studio-report-strip">'+items.map(([label,value])=>`<div><small>${esc(label)}</small><strong>${esc(value)}</strong></div>`).join('')+'</div>';
+}
+function studioReportBars(values,{currency=false,limit=12}={}){
+ const rows=values.slice(0,limit),max=Math.max(1,...rows.map(x=>Math.abs(studioReportNumber(x.value))));
+ return `<div class="studio-report-bars">${rows.map(x=>{const value=studioReportNumber(x.value),width=Math.max(0,Math.abs(value)/max*100);return `<div class="studio-report-bar-row"><span title="${esc(x.label)}">${esc(x.label)}</span><div class="studio-report-track"><i style="width:${width}%" class="${value<0?'is-negative':''}"></i></div><strong>${esc(currency?money(value):value.toLocaleString())}</strong></div>`}).join('')||'<p>No records for this period.</p>'}</div>`;
+}
+function studioReportTable(headings,rows){
+ return `<div class="studio-report-table-scroll"><table class="studio-report-table"><thead><tr>${headings.map(h=>`<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.join('')||`<tr><td colspan="${headings.length}">No matching records.</td></tr>`}</tbody></table></div>`;
+}
+function studioReportJobStages(jobs){
+ const groups=new Map();
+ for(const job of jobs){const name=String(job.status||'Unknown');groups.set(name,(groups.get(name)||0)+1);}
+ return studioReportBars([...groups].map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value));
+}
+function studioReportSessionDays(sessions,now){
+ const days=Array.from({length:14},(_,i)=>{const d=new Date(now);d.setHours(0,0,0,0);d.setDate(d.getDate()+i);return d;});
+ return studioReportBars(days.map(d=>({label:d.toLocaleDateString('en-JM',{weekday:'short',day:'numeric',month:'short'}),value:sessions.filter(s=>String(s.status).toLowerCase()!=='cancelled'&&new Date(s.startsAtUtc).toDateString()===d.toDateString()).length})));
+}
+function studioReportAgeing(balances,now){
+ const buckets=[{label:'Not yet due / no due date',value:0},{label:'1–30 days',value:0},{label:'31–60 days',value:0},{label:'61–90 days',value:0},{label:'Over 90 days',value:0}];
+ for(const row of balances.filter(x=>x.balance>0)){
+  const due=row.job.dueAtUtc||row.job.paymentDueAtUtc;
+  const days=due?Math.floor((now-new Date(due))/86400000):0;
+  const index=!Number.isFinite(days)||days<=0?0:days<=30?1:days<=60?2:days<=90?3:4;
+  buckets[index].value+=row.balance;
+ }
+ return studioReportBars(buckets,{currency:true});
+}
+function studioReportWorkload(photographers,tasks,sessions){
+ const rows=photographers.map(p=>{
+  const assigned=tasks.filter(t=>t.assignedTo===p.userName&&!['Completed','Cancelled'].includes(t.status));
+  const planned=sessions.filter(x=>(x.resourceIds||[]).includes(p.scheduleResourceId)&&String(x.status).toLowerCase()!=='cancelled');
+  return {name:p.displayName||p.userName,open:assigned.length,blocked:assigned.filter(t=>t.status==='Blocked').length,shoots:planned.length};
+ }).sort((a,b)=>b.open-a.open||b.shoots-a.shoots);
+ return studioReportTable(['Photographer','Open tasks','Blocked','Sessions'],rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.open}</td><td>${x.blocked}</td><td>${x.shoots}</td></tr>`));
+}
+function studioReportInvoiceStatuses(invoices){
+ const counts=new Map();for(const x of invoices){const key=x.status||'Unknown';counts.set(key,(counts.get(key)||0)+1);}
+ return studioReportBars([...counts].map(([label,value])=>({label,value})));
+}
+function studioReportMethods(receipts){
+ const groups=new Map();for(const e of receipts){const k=e.paymentMethod||'Not recorded';groups.set(k,(groups.get(k)||0)+studioReportNumber(e.amount));}
+ return studioReportBars([...groups].map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value),{currency:true});
+}
+
 async function showAccounts(){
     const current=StudioPage.begin('finance');
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -60,9 +112,19 @@ async function showAccounts(){
     const net=data.receipts.reduce((n,e)=>n+Number(e.amount),0),charge=data.transactions.filter(e=>e.kind==='Charge').reduce((n,e)=>n+Number(e.amount),0),outstanding=data.balances.reduce((n,x)=>n+x.balance,0);
     const methods=[...new Set(data.receipts.map(e=>e.kind))].map(kind=>({label:kind,value:data.receipts.filter(e=>e.kind===kind).length}));
     genericView.innerHTML=StudioPage.html({title:'Finance',tools:`${studioPeriod()}<button data-export>Export</button><button class="primary" onclick="createInvoiceFromAccounts()">New Invoice</button>`,summary:StudioPage.metrics([['Net receipts',money(net)],['Outstanding',money(outstanding)],['Invoices',data.invoices.length]]),content:`
-    <div class="op-metrics">${studioMetric(money(net),'Net receipts','green','','receipts')}${studioMetric(money(charge),'Charges','blue')}${studioMetric(money(outstanding),'Outstanding balance','purple','All jobs')}${studioMetric(data.invoices.filter(i=>i.status==='Overdue').length,'Overdue invoices','orange')}</div>
-    ${window.studioWorkflowCapabilities?.finance?studioCard('Receivables and contractual credit',receivables.map(r=>`<button type="button" class="op-link-row" data-open-job="${esc(r.jobId)}"><span><strong>${esc(r.title)} · ${esc(r.client)}</strong><small>${esc(r.stage)} · ${r.decision.authorized?'Finance release authorized':'Release held'} · ${(r.authorizations||[]).filter(a=>!a.revoked_at_utc).map(a=>'Due '+esc(a.payment_due_date)+(new Date(a.payment_due_date+'T23:59:59-05:00')<new Date()?' · Overdue':'')).join('; ')}</small></span><b>${esc(money(r.decision.balance))}</b></button>`).join('')||'<p>No outstanding receivables.</p>'):''}
-    <div class="st-dashboard-grid">${studioCard('Revenue Trend',studioRevenueChart(data.receipts))}${studioCard('Transaction Types',studioComposition(methods,'transactions'))}${studioCard('Recent Transactions','<div data-finance-filter></div><div data-finance-results></div>')}${studioCard('Invoices',data.invoices.map(i=>`<article class="job-row"><span><button class="link-button" data-open-job="${i.jobId}">${esc(i.invoiceNumber)}</button><small>${esc(i.clientName)} · ${esc(i.status)} · ${money(i.totalAmount)}</small></span><span>${i.status==='Draft'?`<button onclick="setInvoiceStatus('${i.id}','Issued')">Issue</button>`:''}<button onclick="issueClientPortal('${i.jobId}')">Client Portal</button></span></article>`).join('')||'<p>No invoices.</p>')}</div>`});
+    <div class="studio-report-sheet">
+      ${studioReportStrip([['Net receipts',money(net)],['Charges',money(charge)],['Outstanding',money(outstanding)],['Overdue invoices',data.invoices.filter(i=>i.status==='Overdue').length],['Invoices',data.invoices.length]])}
+      <div class="studio-report-chart-grid">
+        ${studioReportPanel('Net receipts over time',studioRevenueChart(data.receipts),'Signed receipts / refunds')}
+        ${studioReportPanel('Payment methods',studioReportMethods(data.receipts),'Net amount')}
+        ${studioReportPanel('Transaction mix',studioReportBars(methods),'Number of records')}
+        ${studioReportPanel('Invoice status',studioReportInvoiceStatuses(data.invoices),'Invoice count')}
+        ${studioReportPanel('Outstanding by job',studioReportBars(data.balances.filter(x=>x.balance>0).sort((a,b)=>b.balance-a.balance).map(x=>({label:x.job.title||x.job.id,value:x.balance})),{currency:true,limit:10}),'Current recorded balance')}
+      </div>
+      ${window.studioWorkflowCapabilities?.finance?studioReportPanel('Receivables and contractual credit',studioReportTable(['Job / client','Stage','Release','Balance'],receivables.map(x=>`<tr><td><button type="button" data-open-job="${esc(x.jobId)}">${esc(x.title)} · ${esc(x.client)}</button></td><td>${esc(x.stage)}</td><td>${x.decision.authorized?'Authorized':'Held'}</td><td>${esc(money(x.decision.balance))}</td></tr>`))):''}
+      ${studioReportPanel('Transactions — search, filter and export','<div data-finance-filter></div><div data-finance-results></div>','Up to 100 displayed; export includes all matches')}
+      ${studioReportPanel('Invoices',studioReportTable(['Invoice','Client','Status','Amount','Actions'],data.invoices.map(i=>`<tr><td><button data-open-job="${esc(i.jobId)}">${esc(i.invoiceNumber)}</button></td><td>${esc(i.clientName)}</td><td>${esc(i.status)}</td><td>${esc(money(i.totalAmount))}</td><td>${i.status==='Draft'?`<button onclick="setInvoiceStatus('${i.id}','Issued')">Issue</button>`:''} <button onclick="issueClientPortal('${i.jobId}')">Client Portal</button></td></tr>`)))}
+    </div>`});
     StudioPage.bind(genericView,current);
     studioBindOperations(data,showAccounts);
     const controls=StudioPage.query(genericView,'[data-finance-filter]'),results=StudioPage.query(genericView,'[data-finance-results]');
@@ -82,9 +144,24 @@ async function showManagement(){
     const pipeline=pipelineStages.map(([label,statuses])=>({label,value:jobs.filter(j=>statuses.includes(j.status)).length})).filter(x=>x.value);
     const clientTotals=[...new Set(jobs.map(j=>j.clientId||j.clientName))].map(id=>{const related=jobs.filter(j=>(j.clientId||j.clientName)===id);return {job:related[0],amount:data.receipts.filter(e=>related.some(j=>j.id===e.jobId)).reduce((n,e)=>n+Number(e.amount),0)};}).sort((a,b)=>b.amount-a.amount);
     const upcoming=sessions.filter(s=>new Date(s.startsAtUtc)>=now&&s.status!=='Cancelled').sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
-    genericView.innerHTML=StudioPage.html({title:'Management Dashboard',tools:`${studioPeriod()}<button data-export>Export</button>`,summary:StudioPage.metrics([['Jobs',jobs.length],['Sessions today',today.length],['Net receipts',money(net)]]),content:`<div class="op-metrics management-metrics">${studioMetric(money(net),'Net receipts','green','','receipts')}${studioMetric(sessions.filter(s=>new Date(s.startsAtUtc)<=now&&s.status!=='Cancelled').length,'Sessions','blue')}${studioMetric(clientTotals.length,'Unique clients','purple')}${studioMetric(photos,'Photos catalogued','orange')}${studioMetric(overdue.length,'Overdue tasks','red','','overdue')}${studioMetric(blocked.length,'Blocked work','teal','','blocked')}</div>
-    <div class="st-dashboard-grid">${studioCard('Revenue Overview',studioRevenueChart(data.receipts))}${studioCard('Jobs by Stage',studioComposition(pipeline,'jobs'))}${studioCard('Top Clients by Receipts',clientTotals.slice(0,6).map((x,i)=>`<button class="op-link-row" data-open-job="${x.job.id}"><b>${i+1}</b><span>${esc(x.job.clientName)}</span><b>${money(x.amount)}</b></button>`).join(''))}${studioCard('Upcoming Sessions',upcoming.slice(0,8).map(s=>`<button class="op-link-row" data-open-job="${s.jobId}"><span><strong>${esc(s.title)}</strong><small>${esc(new Date(s.startsAtUtc).toLocaleString())} · ${esc(s.location||'')}</small></span><small>${esc(s.status)}</small></button>`).join(''))}
-    ${studioCard('Studio Activity',`${studioMetric(today.length,'Sessions today','blue')}${studioMetric(tasks.filter(t=>t.status==='Completed').length,'Completed tasks','green')}${studioMetric(jobs.filter(j=>j.status==='Completed').length,'Completed jobs','purple')}`)}${studioCard('Team Workload',photographers.map(p=>{const assigned=tasks.filter(t=>t.assignedTo===p.userName&&!['Completed','Cancelled'].includes(t.status));const shoots=sessions.filter(s=>(s.resourceIds||[]).includes(p.scheduleResourceId));return `<div class="op-link-row"><span><strong>${esc(p.displayName)}</strong><small>${assigned.length} open tasks · ${shoots.length} sessions</small></span><b>${assigned.length}</b></div>`;}).join(''))}${studioCard('Pipeline Health',pipeline.map(x=>`<button class="op-link-row" data-stage="${esc(x.label)}"><span>${esc(x.label)}</span><b>${x.value}</b></button>`).join(''))}${studioCard('Alerts & Actions',[...overdue,...blocked].filter((t,i,a)=>a.findIndex(x=>x.id===t.id)===i).slice(0,12).map(t=>`<button class="op-alert" data-open-job="${t.jobId}">${esc(t.title)}<small>${esc(t.blockedReason||'Overdue '+new Date(t.dueAtUtc).toLocaleDateString())}</small></button>`).join('')||'<p>No overdue or blocked work.</p>')}</div>`});
+    genericView.innerHTML=StudioPage.html({title:'Management Dashboard',tools:`${studioPeriod()}<button data-export>Export</button>`,summary:StudioPage.metrics([['Jobs',jobs.length],['Sessions today',today.length],['Net receipts',money(net)]]),content:`
+    <div class="studio-report-sheet">
+      ${studioReportStrip([['Jobs',jobs.length],['Net receipts',money(net)],['Sessions today',today.length],['Upcoming sessions',upcoming.length],['Photos catalogued',photos],['Overdue tasks',overdue.length],['Blocked tasks',blocked.length]])}
+      <div class="studio-report-chart-grid">
+        ${studioReportPanel('Receipt trend',studioRevenueChart(data.receipts),'Selected period')}
+        ${studioReportPanel('Jobs by stage',studioReportJobStages(jobs),'All current jobs')}
+        ${studioReportPanel('Upcoming sessions by day',studioReportSessionDays(sessions,now),'Next 14 days')}
+        ${studioReportPanel('Top clients by receipts',studioReportBars(clientTotals.slice(0,10).map(x=>({label:x.job.clientName||x.job.title,value:x.amount})),{currency:true,limit:10}),'Selected period')}
+        ${studioReportPanel('Task status',studioReportBars([...new Set(tasks.map(t=>t.status||'Unknown'))].map(label=>({label,value:tasks.filter(t=>(t.status||'Unknown')===label).length}))),'Current tasks')}
+        ${studioReportPanel('Invoice status',studioReportInvoiceStatuses(data.invoices),'Current invoices')}
+      </div>
+      <div class="studio-report-data-grid">
+        ${studioReportPanel('Photographer workload',studioReportWorkload(photographers,tasks,sessions),'Scheduled sessions in loaded window')}
+        ${studioReportPanel('Pipeline summary',studioReportTable(['Stage','Jobs'],pipeline.map(x=>`<tr><td><button type="button" data-stage="${esc(x.label)}">${esc(x.label)}</button></td><td>${x.value}</td></tr>`)))}
+      </div>
+      ${studioReportPanel('Upcoming sessions',studioReportTable(['Starts','Session','Location','Status'],upcoming.slice(0,30).map(x=>`<tr><td>${esc(new Date(x.startsAtUtc).toLocaleString())}</td><td><button data-open-job="${esc(x.jobId)}">${esc(x.title)}</button></td><td>${esc(x.location||'Not assigned')}</td><td>${esc(x.status)}</td></tr>`)),'Next 30 scheduled sessions')}
+      ${studioReportPanel('Exceptions requiring attention',studioReportTable(['Job task','Status','Responsible','Due / reason'],[...overdue,...blocked].filter((t,i,a)=>a.findIndex(x=>x.id===t.id)===i).slice(0,40).map(t=>`<tr><td><button data-open-job="${esc(t.jobId)}">${esc(t.title)}</button></td><td>${esc(t.status)}</td><td>${esc(t.assignedTo||'Unassigned')}</td><td>${esc(t.blockedReason||t.dueAtUtc&&new Date(t.dueAtUtc).toLocaleDateString()||'Not recorded')}</td></tr>`)),'Overdue and blocked work')}
+    </div>`});
     StudioPage.bind(genericView,current);
     studioBindOperations(data,showManagement);
     StudioPage.queryAll(genericView,'[data-stage]').forEach(b=>b.onclick=()=>{pipelineSelectedStage=b.dataset.stage;studioNavigate('pipeline');});
