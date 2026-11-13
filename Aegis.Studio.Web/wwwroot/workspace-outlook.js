@@ -172,7 +172,6 @@ function mergeJobMessages(teamMessages, clientMessages) {
                             <div><dt>Current Status</dt><dd><span class="jd-status-pill jd-status-label">${esc(job.status)}</span></dd></div>
                             <div><dt>Time in Stage</dt><dd data-stage-age>Loading…</dd></div>
                             <div><dt>Client</dt><dd>${esc(clientName)}</dd></div>
-                            <div><dt>Responsible Person</dt><dd data-job-responsible>Loading…</dd></div>
                             <div><dt>Owner</dt><dd data-job-owner>${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</dd></div>
                             <div><dt>Job Type</dt><dd>${esc(jobType)}</dd></div>
                             <div><dt>Event Date</dt><dd>${esc(eventDate)}</dd></div>
@@ -183,7 +182,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     </div>
                     </div>
                 </div>
-                <div class="jd-flow-overview"><div class="jd-workflow-track" aria-label="Job workflow" aria-live="polite"></div><div class="jd-next-action" aria-label="Next job action"></div><dl class="jd-action-due" aria-label="Next action due date"><dt>Due date</dt><dd><time data-job-action-due>Loading…</time></dd></dl></div>
+                <div class="jd-flow-overview"><div class="jd-workflow-track" aria-label="Job workflow" aria-live="polite"></div><div class="jd-next-action" aria-label="Next job action"></div><dl class="jd-action-due" aria-label="Next action responsibility and due date"><div><dt>Responsible Person</dt><dd data-job-responsible>Loading…</dd></div><div><dt>Due date</dt><dd><time data-job-action-due>Loading…</time></dd></div></dl></div>
                 <div class="jd-job-status"><small>${job.jobCode||job.code?'Job Code · '+esc(job.jobCode||job.code):''}</small></div>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
             const identityToggle=header.querySelector('.jd-job-name-toggle'),identityMenu=header.querySelector('.jd-job-identity-menu');

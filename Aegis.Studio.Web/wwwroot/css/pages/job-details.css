@@ -64,7 +64,7 @@
 .jd-workflow-caption [data-job-blocked] { color:#bd3040; }
 .jd-flow-overview { grid-column:2; grid-row:1; position:relative; display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(90px,.5fr); align-items:stretch; gap:16px; width:100%; min-height:55px; min-width:0; margin:0; overflow:visible; }
 .jd-next-action { align-self:center; min-width:0; overflow-wrap:anywhere; }
-.jd-action-due { align-self:center; min-width:0; margin:0; }
+.jd-action-due { display:grid; gap:10px; align-self:center; min-width:0; margin:0; }
 .jd-action-due dt { margin-bottom:5px; color:var(--theme-muted,#637187); font-size:10px; font-weight:700; text-transform:uppercase; }
 .jd-action-due dd { margin:0; font-size:12px; font-weight:650; overflow-wrap:anywhere; }
 .jd-action-due .is-overdue { color:#a32739; }
