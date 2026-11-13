@@ -74,7 +74,21 @@
             button.type='button';
             button.className='studio-admin-item';
             button.dataset.studioReportView=view;
-            button.textContent=label;
+            const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');
+            icon.setAttribute('class','studio-navigation-icon');
+            icon.setAttribute('viewBox','0 0 24 24');
+            icon.setAttribute('fill','none');
+            icon.setAttribute('stroke','currentColor');
+            icon.setAttribute('stroke-width','1.6');
+            icon.setAttribute('stroke-linecap','round');
+            icon.setAttribute('stroke-linejoin','round');
+            icon.setAttribute('aria-hidden','true');
+            icon.innerHTML=view==='finance'
+                ? '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 2 5-7"/>'
+                : '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 16v-5m5 5V8m5 8v-4"/>';
+            const caption=document.createElement('span');
+            caption.textContent=label;
+            button.append(icon,caption);
             button.addEventListener('click',()=>{menu.open=false;window.studioNavigate?.(view);});
             body.append(button);
         }
