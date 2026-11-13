@@ -49,3 +49,16 @@ test('Job Details bell requests only current-job messages, including read messag
  panel.querySelector('.studio-message-bell-list button').click();
  assert.deepEqual(opened,['job-123']);
 });
+
+test('Clicking a bell preview opens the exact message, not just the job conversation',async t=>{
+ const dom=new JSDOM('<body data-studio-view="workspaces"><section id="conversationView" class="has-open-job"><div id="detailPane" class="job-detail-page" data-job-id="job-123"></div></section><button id="notificationButton"></button></body>',{runScripts:'outside-only',url:'https://studio.test'}),w=dom.window;t.after(()=>w.close());
+ const opened=[];
+ w.fetch=async()=>({ok:true,json:async()=>({items:[
+  {isUnread:false,thread:{id:'thread-5',kind:'Thread',scopeType:'Job',scopeId:'job-123'},message:{id:'message-42',subject:'Proof approved',body:'Ready to print'}}
+ ]})});
+ w.openStudioInboxMessage=async(...args)=>opened.push(args);
+ w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/notifications.js'),'utf8'));
+ await w.document.getElementById('notificationButton').onclick();
+ w.document.querySelector('.studio-message-bell-list button').click();
+ assert.deepEqual(opened,[['thread-5','message-42','job-123','Thread']]);
+});
