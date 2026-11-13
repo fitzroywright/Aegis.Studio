@@ -163,7 +163,6 @@ function mergeJobMessages(teamMessages, clientMessages) {
             const clientName=job.linkedClientName||job.clientName||'Not linked';
             const jobType=job.jobType||job.type||'Photography';
             const attendingRole=job.attendingJobRole||job.assignedRole||'Photographer';
-            const workerName=job.assignedTo?studioFirstName(job.assignedTo):'Unassigned';
             header.innerHTML=`<div class="job-detail-title jd-job-identity">
                     <div class="jd-job-name-stack">
                     <button type="button" class="jd-job-name-toggle" aria-expanded="false" aria-controls="jobIdentityMenu" title="Show job details"><svg class="jd-job-name-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18m-11 0v2h4v-2"></path></svg><span class="jd-job-name-text">${esc(job.title)}</span><span class="jd-job-name-chevron" aria-hidden="true">⌄</span></button>
@@ -176,7 +175,6 @@ function mergeJobMessages(teamMessages, clientMessages) {
                             <div><dt>Event Date</dt><dd>${esc(eventDate)}</dd></div>
                             <div><dt>Location</dt><dd data-job-location>Loading…</dd></div>
                             <div><dt>Attending Job Role</dt><dd>${esc(attendingRole)}</dd></div>
-                            <div><dt>Name of Worker</dt><dd data-job-photographer>${esc(workerName)}</dd></div>
                         </dl>
                     </div>
                     </div>
@@ -364,10 +362,6 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     header.querySelector('.jd-status-pill').textContent=task?.title||(graphView.tasks?.length?'Workflow complete':'Workflow unavailable');
                     header.querySelector('.jd-status-pill').title=header.querySelector('.jd-status-pill').textContent;
                     header.querySelector('[data-job-owner]').textContent=job.jobLead?studioFirstName(job.jobLead):'Unassigned';
-                    const responsible=graphView.tasks?.find(item=>item.role&&item.assignedTo);
-                    const worker=responsible?.assignedTo||job.assignedTo||'Unassigned';
-                    header.querySelector('[data-job-photographer]').textContent=studioFirstName(worker);
-                    header.querySelector('[data-job-photographer]').title=header.querySelector('[data-job-photographer]').textContent;
                     const blocked=action?.status==='Blocked'?task?.reason||'A workflow prerequisite is blocking this task.':'';
                     header.querySelector('[data-job-blocked]').textContent=blocked?'Blocked: '+blocked:'';
                     header.querySelector('.jd-workflow-caption').hidden=!blocked;
