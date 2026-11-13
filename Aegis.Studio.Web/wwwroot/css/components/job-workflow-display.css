@@ -1,14 +1,15 @@
 /* Canonical horizontal workflow progress and hover drawer. */
 .jd-workflow-summary{position:static;flex:1;width:100%;min-width:0}
-.jd-workflow-progress-trigger{display:flex;flex-direction:column;justify-content:center;gap:7px;width:100%;height:100%;min-width:0;box-sizing:border-box;border:0;border-radius:6px;background:transparent;color:var(--theme-text,#162b50);padding:9px 12px;cursor:pointer;text-align:left;font:inherit}
+.jd-workflow-progress-trigger{display:flex;flex-direction:column;justify-content:flex-start;gap:4px;width:100%;height:100%;min-width:0;box-sizing:border-box;border:0;border-radius:6px;background:transparent;color:var(--theme-text,#162b50);padding:0;cursor:pointer;text-align:left;font:inherit}
 .jd-workflow-progress-trigger:hover{background:var(--theme-surface-alt,#f4f6f8)}
 .jd-workflow-progress-trigger:focus-visible{outline:2px solid #d97827;outline-offset:2px}
-.jd-workflow-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px}
+.jd-workflow-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;line-height:1.2}
+.jd-workflow-progress-heading>strong{font-size:9px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
 .jd-workflow-progress-heading>span{font-weight:650;color:var(--theme-muted,#637187)}
 .jd-workflow-progress-track{display:block;position:relative;width:100%;height:14px;overflow:hidden;border:1px solid var(--theme-border,#cad4dd);border-radius:999px;background:var(--theme-surface-alt,#e8edf2)}
 .jd-workflow-progress-fill{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#398b45,#77b968);transition:width .25s ease}
 .jd-workflow-progress-trigger>small{font-size:11px;color:var(--theme-muted,#637187)}
-.jd-workflow-drawer{position:absolute;z-index:70;top:100%;right:0;width:min(1050px,calc(100vw - 48px));box-sizing:border-box;visibility:hidden;opacity:0;transform:translateY(-10px);pointer-events:none;transition:transform .22s ease,opacity .22s ease,visibility .22s}
+.jd-workflow-drawer{position:absolute;z-index:70;top:calc(100% - var(--jd-workflow-drawer-overlap,0px));right:0;width:min(1050px,calc(100vw - 48px));box-sizing:border-box;visibility:hidden;opacity:0;transform:translateY(-10px);pointer-events:none;transition:transform .22s ease,opacity .22s ease,visibility .22s}
 .jd-workflow-summary[data-open=true]>.jd-workflow-drawer{visibility:visible;opacity:1;transform:translateY(0);pointer-events:auto}
 .jd-workflow-drawer-surface{position:relative;border:1px solid #e6a340;border-radius:6px;background:color-mix(in srgb,var(--theme-surface,#fff) 88%,transparent);backdrop-filter:blur(10px);overflow:hidden}
 .jd-workflow-drawer-surface>[data-workflow-close]{position:absolute;z-index:3;bottom:2px;right:3px;border:0;border-radius:4px;background:var(--theme-surface,#fff);color:var(--theme-text,#162b50);padding:0 4px;font-size:18px;cursor:pointer}

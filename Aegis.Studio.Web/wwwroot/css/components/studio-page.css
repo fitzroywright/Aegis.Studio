@@ -335,7 +335,7 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .studio-next-link{display:inline;padding:0;border:0;background:transparent;color:var(--studio-action-text,#985000);font:inherit;font-size:var(--studio-next-font-size,14px);font-weight:700;text-align:left;white-space:normal;cursor:pointer}
 .studio-next-link:hover{text-decoration:underline}
 .studio-next-link:focus-visible,.studio-next-edit:focus-visible{outline:2px solid #2679c9;outline-offset:3px}
-.studio-next-reason{margin:5px 0 0;font-size:11px;line-height:1.4;color:var(--theme-muted,#69758b);overflow-wrap:anywhere}
+.studio-next-reason{margin:var(--studio-next-reason-margin,5px 0 0);font-size:11px;line-height:var(--studio-next-reason-line-height,1.4);color:var(--theme-muted,#69758b);overflow-wrap:anywhere}
 .studio-next-meta{display:flex;flex-direction:column;align-items:flex-start;gap:5px;font-size:11px}
 .studio-next-edit{padding:0;border:0;background:transparent;color:var(--studio-action-text,#985000);font:inherit;font-size:10px;text-decoration:underline;cursor:pointer}
 .studio-next-due.is-overdue{color:var(--theme-danger,#c3332b);font-weight:700}
@@ -345,7 +345,7 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .studio-next-empty{font-size:11px}
 .studio-next-error{color:var(--theme-danger,#c3332b)}
 .studio-next-error:empty{display:none}
-.studio-next-compact{grid-template-columns:minmax(0,1fr);gap:4px;padding:6px 0}
+.studio-next-compact{grid-template-columns:minmax(0,1fr);gap:var(--studio-next-compact-gap,4px);padding:var(--studio-next-compact-padding,6px 0)}
 .studio-next-compact .studio-next-meta{flex-direction:row;flex-wrap:wrap;gap:5px 12px}
 .studio-next-compact .studio-next-label{margin-bottom:2px}
 .studio-next-form,.studio-enquiry-reply{display:grid;gap:12px}
@@ -475,3 +475,4 @@ dialog.staff-role-management-dialog .staff-compact-role-grid thead{position:stic
 dialog.staff-role-management-dialog .staff-compact-footer{padding-top:8px}
 dialog.staff-role-management-dialog .staff-access-compact{min-height:0;height:auto;align-content:start}
 dialog.staff-role-management-dialog .staff-access-editor{min-height:0;height:auto}
+
