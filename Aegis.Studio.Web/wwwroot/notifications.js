@@ -84,6 +84,12 @@ if(notificationButton){
             await window.openStudioJobMessages(jobId);
         else await window.studioNavigate?.('messages');
     };
+    const openPreview=async(item,jobId)=>{
+        close();
+        if(item.messageId&&item.threadId&&typeof window.openStudioInboxMessage==='function')
+            await window.openStudioInboxMessage(item.threadId,item.messageId,jobId,item.kind);
+        else await openMessages(jobId);
+    };
     const close=()=>{panel.hidden=true;notificationButton.setAttribute('aria-expanded','false');requestRevision++;};
     panel.querySelector('[data-bell-close]').onclick=()=>{close();notificationButton.focus();};
     panel.querySelector('[data-bell-all]').onclick=()=>openMessages(activeJobId());
@@ -107,7 +113,13 @@ if(notificationButton){
             const payload=await messageResponse.json();
             const items=(Array.isArray(payload.items)?payload.items:[])
                 .filter(item=>jobId?item.thread?.scopeType==='Job'&&String(item.thread.scopeId).toLowerCase()===jobId.toLowerCase():item.isUnread===true)
-                .map(item=>({title:item.message?.subject||item.thread?.title||item.message?.senderUserName||'Message',body:item.message?.body||item.message?.text||item.message?.content||''}));
+                .map(item=>({
+                    threadId:item.thread?.id||'',
+                    messageId:item.message?.id||'',
+                    kind:item.thread?.kind||'',
+                    title:item.message?.subject||item.thread?.title||item.message?.senderUserName||'Message',
+                    body:item.message?.body||item.message?.text||item.message?.content||''
+                }));
             if(revision!==requestRevision||panel.hidden||activeJobId()!==jobId)return;
             list.replaceChildren();
             if(!items.length){list.textContent=jobId?'No messages for this job.':'No unread messages.';return;}
@@ -119,7 +131,7 @@ if(notificationButton){
                 const preview=document.createElement('span');
                 preview.textContent=String(item.body).slice(0,170);
                 button.append(title,preview);
-                button.onclick=()=>openMessages(jobId);
+                button.onclick=()=>openPreview(item,jobId);
                 list.append(button);
             }
         }catch(error){if(revision===requestRevision&&!panel.hidden)list.textContent='Messages could not be loaded. Open Messages to try again.';}
