@@ -45,13 +45,13 @@ test('Job Details shows one status-colored display and never opens the workflow 
  w.StudioJobWorkflowDisplay.render(host,view);
  const stage=id=>host.querySelector('[aria-label^="'+id+'"]');
  assert.equal(host.querySelector('[data-stage="done"]'),null);
- assert.equal(host.querySelector('.jd-workflow-stage.completed .jd-workflow-stage-icon').textContent,'✓');
+ assert.equal(host.querySelector('.jd-workflow-stage.completed .jd-workflow-status').textContent,'✓');
  assert.ok(host.querySelector('.jd-workflow-stage.inprogress'));
  assert.ok(host.querySelector('.jd-workflow-stage.available'));
  assert.ok(host.querySelector('.jd-workflow-stage.pending'));
  assert.deepEqual(Array.from(host.querySelectorAll('.jd-workflow-stage-label'),label=>label.textContent),view.graph.nodes.filter(node=>!['Start','End'].includes(node.kind)).map(node=>node.label));
- assert.equal(host.querySelector('.jd-workflow-stage.blocked .jd-workflow-stage-icon').textContent,'!');
- host.querySelectorAll('.jd-workflow-stage[role="listitem"]').forEach(node=>node.click());
+ assert.equal(host.querySelector('.jd-workflow-stage.blocked .jd-workflow-status').textContent,'!');
+ host.querySelectorAll('.jd-workflow-stage[data-stage-info]').forEach(node=>node.click());
  assert.equal(editorOpens,0);assert.equal(canvasCalls,0);
 });
 test('subflow appears only after its stage is clicked and matches the Start/End curved-route sketch',t=>{
@@ -71,3 +71,24 @@ test('subflow appears only after its stage is clicked and matches the Start/End 
  assert.equal(host.querySelector('.jd-subflow-diagram'),null);
 });
 
+
+test('workflow pills expose status details without changing tasks or opening an editor',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),view=makeView(),before=JSON.stringify(view);let writes=0;
+ w.json=()=>{writes++;throw Error('No writes expected');};w.StudioJobGraph={open:()=>writes++};w.StudioJobWorkflowDisplay.render(host,view);
+ assert.equal(host.querySelectorAll('.jd-workflow-connector').length,0);
+ assert.equal(host.querySelectorAll('button.jd-workflow-stage').length,6);
+ assert.equal(host.querySelectorAll('.jd-workflow-stage-icon svg').length,6);
+ const blocked=host.querySelector('[data-stage-info="blocked"]');blocked.click();
+ assert.equal(host.querySelector('[data-stage-info="blocked"]').getAttribute('aria-expanded'),'true');
+ assert.match(host.querySelector('.jd-workflow-info').textContent,/ApprovalBlockedClient approval required/);
+ assert.equal(w.document.activeElement.dataset.stageInfo,'blocked');
+ host.querySelector('[data-stage-info="blocked"]').click();assert.equal(host.querySelector('.jd-workflow-info').hidden,true);
+ assert.equal(JSON.stringify(view),before);assert.equal(writes,0);
+});
+test('icons follow configured stage labels, custom labels are escaped and inactive stages stay hidden',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),view={graph:{nodes:[{id:'brief',label:'Brief',kind:'Task'},{id:'camera',label:'Photographs',kind:'Task'},{id:'print',label:'Prints',kind:'Task'},{id:'custom',label:'<img src=x>',kind:'Task'},{id:'hidden',label:'Hidden',kind:'Task'}]},evaluation:{nodes:[{id:'hidden',status:'Inactive'}]}};
+ w.StudioJobWorkflowDisplay.render(host,view);assert.equal(host.querySelectorAll('.jd-workflow-stage').length,4);assert.equal(host.querySelector('img'),null);
+ assert.notEqual(host.querySelector('[data-stage-info="camera"] svg').innerHTML,host.querySelector('[data-stage-info="print"] svg').innerHTML);
+ host.querySelector('[data-stage-info="custom"]').click();assert.match(host.querySelector('.jd-workflow-info').textContent,/<img src=x>/);
+ w.StudioJobWorkflowDisplay.render(host,{...view});assert.equal(host.querySelector('.jd-workflow-info').hidden,true);
+});

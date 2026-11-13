@@ -34,20 +34,37 @@
   return {taskState,stageState};
  }
  function icon(state){return state==='Completed'||state==='Skipped'?'✓':state==='InProgress'?'●':state==='Blocked'?'!':'›';}
+ const stateLabel=state=>({Completed:'Completed',Skipped:'Skipped',InProgress:'In progress',Available:'Ready',Pending:'Pending',Blocked:'Blocked'})[state]||state;
+ function stageIcon(node){
+  const name=String(node.task?.activityType||'')+' '+String(node.label||''),svg=paths=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
+  if(/photograph|shoot|camera/i.test(name))return svg('<path d="M14 4h-4L8 7H4a2 2 0 0 0-2 2v10h20V9a2 2 0 0 0-2-2h-4z"/><circle cx="12" cy="13" r="4"/>');
+  if(/print/i.test(name))return svg('<path d="M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6zM17 11h1"/>');
+  if(/gallery|image|photo|proof/i.test(name))return svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="2"/><path d="m3 17 5-5 4 4 4-6 5 7"/>');
+  if(/complete|approv|review|quality|qc/i.test(name))return svg('<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>');
+  if(/service/i.test(name))return svg('<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V3h8v4M3 12h18m-11 0v3h4v-3"/>');
+  if(/order|invoice|receipt/i.test(name))return svg('<path d="M6 3h12v19l-3-2-3 2-3-2-3 2zM9 7h6M9 11h6M9 15h4"/>');
+  if(/work|production|edit|retouch/i.test(name))return svg('<path d="m14 6 4 4M4 20l8-8M14 3a6 6 0 0 0-2 9l7 8 2-2-8-7a6 6 0 0 0 8-7l-4 4-3-1z"/>');
+  if(/deliver|archive/i.test(name))return svg('<path d="M3 7h18v14H3zM2 3h20v4H2zM9 11h6"/>');
+  return svg('<rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4V2h6v2M9 10h6M9 15h6"/>');
+ }
+ function pillContents(node,state){return '<span class="jd-workflow-stage-icon">'+stageIcon(node)+'</span><span class="jd-workflow-stage-label">'+esc(node.label)+'</span>'+(['Completed','Skipped','Blocked'].includes(state)?'<span class="jd-workflow-status" aria-hidden="true">'+icon(state)+'</span>':'');}
  function render(host,view){
   const graph=view?.graph;if(!host||!graph?.nodes)return;
-  if(renderedView.get(host)!==view){delete host.dataset.expanded;renderedView.set(host,view);}
+  if(renderedView.get(host)!==view){delete host.dataset.expanded;delete host.dataset.selectedStage;renderedView.set(host,view);}
   const states=statusReader(view),nodes=graph.nodes.filter(n=>!['Start','End'].includes(n.kind)).map(n=>({...n,_displayState:states.stageState(n)})).filter(n=>n._displayState!=='Inactive');
   const expandedId=host.dataset.expanded||'',expandedNode=nodes.find(n=>n.id===expandedId&&n.kind==='Subflow'&&Array.isArray(n.subflow?.nodes));
-  const items=nodes.map((node,index)=>{
-   const label=esc(node.label),state=node._displayState,klass=state.toLowerCase(),before=index?'<span class="jd-workflow-connector" aria-hidden="true"></span>':'';
-   if(node.id===expandedNode?.id)return before+'<div class="jd-workflow-subflow-main '+klass+'" data-expanded-stage="'+esc(node.id)+'" aria-label="Expanded '+label+'"><button type="button" class="jd-workflow-endpoint" data-collapse="'+esc(node.id)+'" data-endpoint="start" aria-expanded="true" aria-label="Start '+label+'"><span class="jd-workflow-stage-icon" aria-hidden="true">›</span><span class="jd-workflow-endpoint-label">Start '+label+'</span></button><span class="jd-workflow-main-dashes" aria-hidden="true"></span><button type="button" class="jd-workflow-endpoint" data-collapse="'+esc(node.id)+'" data-endpoint="end" aria-expanded="true" aria-label="End '+label+'"><span class="jd-workflow-stage-icon" aria-hidden="true">×</span><span class="jd-workflow-endpoint-label">End '+label+'</span></button></div>';
-   if(node.kind==='Subflow'&&Array.isArray(node.subflow?.nodes))return before+'<button type="button" class="jd-workflow-stage '+klass+'" data-subflow-stage="'+esc(node.id)+'" aria-expanded="false" title="'+label+' · '+state+'"><span class="jd-workflow-stage-icon" aria-hidden="true">'+icon(state)+'</span><span class="jd-workflow-stage-label">'+label+'</span></button>';
-   return before+'<div class="jd-workflow-stage '+klass+'" role="listitem" aria-label="'+label+' · '+state+'"><span class="jd-workflow-stage-icon" aria-hidden="true">'+icon(state)+'</span><span class="jd-workflow-stage-label">'+label+'</span></div>';
+  const items=nodes.map(node=>{
+   const label=esc(node.label),state=node._displayState,klass=state.toLowerCase();
+   if(node.id===expandedNode?.id)return '<div class="jd-workflow-subflow-main '+klass+'" data-expanded-stage="'+esc(node.id)+'" aria-label="Expanded '+label+'"><button type="button" class="jd-workflow-endpoint" data-collapse="'+esc(node.id)+'" data-endpoint="start" aria-expanded="true" aria-label="Start '+label+'"><span class="jd-workflow-stage-icon" aria-hidden="true">›</span><span class="jd-workflow-endpoint-label">Start '+label+'</span></button><span class="jd-workflow-main-dashes" aria-hidden="true"></span><button type="button" class="jd-workflow-endpoint" data-collapse="'+esc(node.id)+'" data-endpoint="end" aria-expanded="true" aria-label="End '+label+'"><span class="jd-workflow-stage-icon" aria-hidden="true">×</span><span class="jd-workflow-endpoint-label">End '+label+'</span></button></div>';
+   if(node.kind==='Subflow'&&Array.isArray(node.subflow?.nodes))return '<button type="button" class="jd-workflow-stage '+klass+'" data-subflow-stage="'+esc(node.id)+'" aria-expanded="false" aria-label="'+label+' · '+stateLabel(state)+'" title="'+label+' · '+stateLabel(state)+'">'+pillContents(node,state)+'</button>';
+   return '<button type="button" class="jd-workflow-stage '+klass+'" data-stage-info="'+esc(node.id)+'" aria-expanded="'+(host.dataset.selectedStage===node.id)+'" aria-label="'+label+' · '+stateLabel(state)+'" title="'+label+' · '+stateLabel(state)+'">'+pillContents(node,state)+'</button>';
   }).join('');
-  host.innerHTML='<div class="jd-workflow-display" role="list" aria-label="Job workflow">'+items+'</div><div class="jd-workflow-expansion" hidden></div>';
-  host.querySelectorAll('[data-subflow-stage]').forEach(button=>button.onclick=()=>{host.dataset.expanded=button.dataset.subflowStage;render(host,view);});
-  host.querySelectorAll('[data-collapse]').forEach(button=>button.onclick=()=>{delete host.dataset.expanded;render(host,view);});
+  host.innerHTML='<div class="jd-workflow-display" role="group" aria-label="Job workflow">'+items+'</div><div class="jd-workflow-info" hidden></div><div class="jd-workflow-expansion" hidden></div>';
+  host.querySelectorAll('[data-subflow-stage]').forEach(button=>button.onclick=()=>{delete host.dataset.selectedStage;host.dataset.expanded=button.dataset.subflowStage;render(host,view);host.querySelector('[data-collapse]')?.focus();});
+  host.querySelectorAll('[data-collapse]').forEach(button=>button.onclick=()=>{delete host.dataset.expanded;render(host,view);host.querySelectorAll('[data-subflow-stage]').forEach(next=>{if(next.dataset.subflowStage===button.dataset.collapse)next.focus();});});
+  host.querySelectorAll('[data-stage-info]').forEach(button=>button.onclick=()=>{delete host.dataset.expanded;host.dataset.selectedStage=host.dataset.selectedStage===button.dataset.stageInfo?'':button.dataset.stageInfo;render(host,view);host.querySelectorAll('[data-stage-info]').forEach(next=>{if(next.dataset.stageInfo===button.dataset.stageInfo)next.focus();});});
+  const selected=nodes.find(node=>node.id===host.dataset.selectedStage);
+  if(selected){const info=host.querySelector('.jd-workflow-info'),reason=view.tasks?.find(task=>task.nodeId===selected.id)?.reason||view.evaluation?.nodes?.find(node=>node.id===selected.id)?.reason;info.hidden=false;info.innerHTML='<strong>'+esc(selected.label)+'</strong><span>'+esc(stateLabel(selected._displayState))+'</span>'+(reason?'<small>'+esc(reason)+'</small>':'');}
   if(expandedNode)drawSubflow(host,expandedNode,states);
  }
  function drawSubflow(host,node,states){
