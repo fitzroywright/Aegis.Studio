@@ -20,7 +20,7 @@ test('Job identity opens an overlay and Tasks retains its own dialog without ret
  const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.equal(button(w,'overview'),null);assert.equal(w.document.getElementById('jobDetail-overview'),null);
  const toggle=w.document.querySelector('.jd-job-name-toggle'),facts=w.document.querySelector('#jobIdentityMenu');assert.equal(facts.hidden,true);toggle.click();assert.equal(facts.hidden,false);
- assert.deepEqual([...facts.querySelectorAll('dt')].map(e=>e.textContent),['Current Status','Time in Stage','Client','Owner','Job Type','Event Date','Location','Attending Job Role','Name of Worker']);assert.match(facts.textContent,/Williams & Clarke.*Photography.*Sun Oct 11 2026.*Kingston Studio/s);
+ assert.deepEqual([...facts.querySelectorAll('dt')].map(e=>e.textContent),['Current Status','Time in Stage','Client','Responsible Person','Owner','Job Type','Event Date','Location','Attending Job Role','Name of Worker']);assert.match(facts.textContent,/Williams & Clarke.*Photography.*Sun Oct 11 2026.*Kingston Studio/s);
  facts.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(facts.hidden,true);
  await w.document.querySelector('[data-job-tasks]').onclick();const tasks=w.document.querySelector('.jd-tasks-dialog');assert.equal(tasks.open,true);assert.match(tasks.textContent,/Job tasks are managed in the configured workflow graph/);assert.ok(tasks.querySelector('[data-open-job-workflow]'));tasks.close();
  assert.equal(w.document.querySelector('#studioFooterJobTools'),null);

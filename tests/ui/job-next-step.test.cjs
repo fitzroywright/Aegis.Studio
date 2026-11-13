@@ -48,10 +48,11 @@ test('a completed graph has no outstanding action and leaves no stale action lin
 test('Job Details uses one display workflow and its next action opens the assigned task dialog',async t=>{
  const{environment}=require('./job-detail-fixture.cjs'),{w,fixture}=environment(t);
  w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML='<div class="studio-dialog-body">'+html+'</div>';d.close=()=>d.remove();w.document.body.append(d);return d;};
- const api=w.json;w.json=(url,options)=>url.startsWith('/api/work/next-actions')?Promise.resolve([{kind:'job',entityId:'job',jobId:'job',action:{key:'task:production',title:'Production',reason:'Production is in progress.',route:'task',taskId:'activity-production'}}]):api(url,options);
+ const api=w.json;w.json=(url,options)=>url.startsWith('/api/work/next-actions')?Promise.resolve([{kind:'job',entityId:'job',jobId:'job',assignedTo:'lisa',dueAtUtc:'2026-11-20T15:00:00Z',action:{key:'task:production',title:'Production',reason:'Production is in progress.',route:'task',taskId:'activity-production'}}]):api(url,options);
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,40));
  const next=w.document.querySelector('.job-detail-heading [data-next-activate]');assert.ok(next);assert.match(next.textContent,/Production/);
  const overview=w.document.querySelector('.jd-flow-overview');assert.equal(overview.querySelector('.jd-workflow-track').nextElementSibling,overview.querySelector('.jd-next-action'));assert.ok(overview.contains(next));assert.equal(w.document.querySelector('.jd-job-identity .jd-next-action'),null);
+ assert.equal(overview.querySelector('.jd-next-action').nextElementSibling,overview.querySelector('.jd-action-due'));assert.equal(w.document.querySelector('[data-job-responsible]').textContent,'lisa');assert.match(overview.querySelector('[data-job-action-due]').textContent,/20.*Nov.*2026/);assert.equal(overview.querySelector('[data-job-action-due]').getAttribute('datetime'),'2026-11-20T15:00:00.000Z');assert.doesNotMatch(overview.querySelector('.jd-next-action').textContent,/Responsible:|Due:/);
  assert.ok(fixture.calls.some(c=>c.url.endsWith('/workflow-graph')));assert.equal(fixture.calls.some(c=>c.url.endsWith('/connected-workflow')),true);
  next.click();await new Promise(r=>setTimeout(r,20));assert.match(w.document.querySelector('dialog:not([id])').textContent,/Production/);
  assert.equal(w.document.querySelectorAll('.job-detail-workflow-dialog').length,0);
@@ -60,7 +61,7 @@ test('workflow load failure remains visible in the shared attention drawer and R
  const{environment}=require('./job-detail-fixture.cjs'),{w,fixture}=environment(t),original=w.json;let failed=true;
  w.json=async(url,options)=>{if(url.endsWith('/workflow-graph')&&failed)throw Error('Workflow offline');return original(url,options);};
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,20));
- const drawer=w.document.getElementById('studioAttentionDrawer');assert.match(drawer.textContent,/Workflow unavailable: Workflow offline/);
+ const drawer=w.document.getElementById('studioAttentionDrawer');assert.match(drawer.textContent,/Workflow unavailable: Workflow offline/);assert.equal(w.document.querySelector('[data-job-responsible]').textContent,'Unavailable');assert.equal(w.document.querySelector('[data-job-action-due]').textContent,'Unavailable');
  const retry=[...drawer.querySelectorAll('button')].find(b=>b.textContent==='Retry workflow →');assert.ok(retry);failed=false;await retry.onclick();
  assert.ok(w.document.querySelector('.jd-workflow-track [role=progressbar]'));assert.doesNotMatch(drawer.textContent,/Workflow unavailable/);
 });

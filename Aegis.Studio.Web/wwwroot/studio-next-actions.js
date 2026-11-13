@@ -25,10 +25,10 @@
   const row=values[0]||null;if(row)rows.set(key(kind,id),row);else rows.delete(key(kind,id));return row;
  }
  const peek=(kind,id)=>rows.get(key(kind,id));
- function markup(row,{compact=false}={}){
+ function markup(row,{compact=false,showResponsibility=true,showDue=true}={}){
   if(!row)return '<p class="studio-next-empty">No outstanding action.</p>';
   const d=due(row),action=row.action;
-  return `<section class="studio-next-action${compact?' studio-next-compact':''}" aria-label="Next required action"><div class="studio-next-main"><small class="studio-next-label">Next required action</small><button type="button" class="studio-next-link" data-next-activate>${esc(action.title)} <span aria-hidden="true">→</span></button><p class="studio-next-reason">${esc(action.reason)}</p></div><div class="studio-next-meta"><span>Responsible: <strong>${esc(row.assignedTo||'Unassigned')}</strong></span><span class="studio-next-due${d.overdue?' is-overdue':''}">Due: ${esc(d.label)}</span>${row.canManage?'<button type="button" class="studio-next-edit" data-next-edit>Assign / set due date</button>':''}</div>${row.waitingReason?`<p class="studio-next-waiting">Waiting: ${esc(row.waitingReason)}</p>`:''}${!compact&&action.after?`<p class="studio-next-after">After this: ${esc(action.after)}</p>`:''}<p class="studio-next-error" role="alert" data-next-error></p></section>`;
+  return `<section class="studio-next-action${compact?' studio-next-compact':''}" aria-label="Next required action"><div class="studio-next-main"><small class="studio-next-label">Next required action</small><button type="button" class="studio-next-link" data-next-activate>${esc(action.title)} <span aria-hidden="true">→</span></button><p class="studio-next-reason">${esc(action.reason)}</p></div><div class="studio-next-meta">${showResponsibility?`<span>Responsible: <strong>${esc(row.assignedTo||'Unassigned')}</strong></span>`:''}${showDue?`<span class="studio-next-due${d.overdue?' is-overdue':''}">Due: ${esc(d.label)}</span>`:''}${row.canManage?'<button type="button" class="studio-next-edit" data-next-edit>Assign / set due date</button>':''}</div>${row.waitingReason?`<p class="studio-next-waiting">Waiting: ${esc(row.waitingReason)}</p>`:''}${!compact&&action.after?`<p class="studio-next-after">After this: ${esc(action.after)}</p>`:''}<p class="studio-next-error" role="alert" data-next-error></p></section>`;
  }
  function bind(host,row){
   const fail=error=>{const node=host.querySelector('[data-next-error]');if(node)node.textContent=error.message||String(error);};
@@ -102,3 +102,4 @@
  const workflowEvents=new WeakSet();
  for(const target of [root,document])target.addEventListener('studio-workflow-changed',event=>{if(workflowEvents.has(event))return;workflowEvents.add(event);changed();});
 })(window);
+

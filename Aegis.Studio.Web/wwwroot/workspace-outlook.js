@@ -172,6 +172,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                             <div><dt>Current Status</dt><dd><span class="jd-status-pill jd-status-label">${esc(job.status)}</span></dd></div>
                             <div><dt>Time in Stage</dt><dd data-stage-age>Loading…</dd></div>
                             <div><dt>Client</dt><dd>${esc(clientName)}</dd></div>
+                            <div><dt>Responsible Person</dt><dd data-job-responsible>Loading…</dd></div>
                             <div><dt>Owner</dt><dd data-job-owner>${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</dd></div>
                             <div><dt>Job Type</dt><dd>${esc(jobType)}</dd></div>
                             <div><dt>Event Date</dt><dd>${esc(eventDate)}</dd></div>
@@ -182,7 +183,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     </div>
                     </div>
                 </div>
-                <div class="jd-flow-overview"><div class="jd-workflow-track" aria-label="Job workflow" aria-live="polite"></div><div class="jd-next-action" aria-label="Next job action"></div></div>
+                <div class="jd-flow-overview"><div class="jd-workflow-track" aria-label="Job workflow" aria-live="polite"></div><div class="jd-next-action" aria-label="Next job action"></div><dl class="jd-action-due" aria-label="Next action due date"><dt>Due date</dt><dd><time data-job-action-due>Loading…</time></dd></dl></div>
                 <div class="jd-job-status"><small>${job.jobCode||job.code?'Job Code · '+esc(job.jobCode||job.code):''}</small></div>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
             const identityToggle=header.querySelector('.jd-job-name-toggle'),identityMenu=header.querySelector('.jd-job-identity-menu');
@@ -356,7 +357,12 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     workflow=graphView;
                     const action=window.StudioJobDetails.workflowAction(graphView),task=action?.task;
                     StudioJobWorkflowDisplay.render(header.querySelector('.jd-workflow-track'),graphView);
-                    let nextRow=null;if(window.StudioNextActions){nextRow=await StudioNextActions.get('job',job.id);if(!current()||request!==workflowRequest)return;currentNextAction=nextRow;StudioNextActions.mount(header.querySelector('.jd-next-action'),nextRow,{compact:true});}
+                    let nextRow=null;if(window.StudioNextActions){nextRow=await StudioNextActions.get('job',job.id);if(!current()||request!==workflowRequest)return;currentNextAction=nextRow;StudioNextActions.mount(header.querySelector('.jd-next-action'),nextRow,{compact:true,showResponsibility:false,showDue:false});}
+                    header.querySelector('[data-job-responsible]').textContent=window.StudioNextActions?(nextRow?.assignedTo||'Unassigned'):'Unavailable';
+                    const dueField=header.querySelector('[data-job-action-due]'),dueDate=nextRow?.dueAtUtc?new Date(nextRow.dueAtUtc):null,validDue=dueDate&&Number.isFinite(dueDate.getTime());
+                    dueField.textContent=!window.StudioNextActions?'Unavailable':!nextRow?'Not applicable':validDue?dueDate.toLocaleDateString('en-JM',{timeZone:'America/Jamaica',day:'numeric',month:'short',year:'numeric'}):'No due date';
+                    if(validDue)dueField.setAttribute('datetime',dueDate.toISOString());else dueField.removeAttribute('datetime');
+                    const overdue=validDue&&StudioNextActions.due(nextRow).overdue;dueField.classList.toggle('is-overdue',!!overdue);dueField.title=overdue?'Overdue':'';
                     header.querySelector('.jd-status-pill').textContent=task?.title||(graphView.tasks?.length?'Workflow complete':'Workflow unavailable');
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(task?.assignedTo?studioFirstName(task.assignedTo):job.jobLead?studioFirstName(job.jobLead):'Unassigned');
                     const responsible=graphView.tasks?.find(item=>item.role&&item.assignedTo);
@@ -379,6 +385,8 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(current()&&request===workflowRequest){
                         const message=error?.name==='AbortError'?'Workflow request timed out after 20 seconds.':error?.message||String(error);
                         console.error('[Studio Job Details] Failed to load workflow graph for job '+job.id,error);
+                        header.querySelector('[data-job-responsible]').textContent='Unavailable';
+                        const dueField=header.querySelector('[data-job-action-due]');dueField.textContent='Unavailable';dueField.removeAttribute('datetime');dueField.classList.remove('is-overdue');dueField.title='';
                         header.querySelector('.jd-next-action').innerHTML='<p role="alert">Next action unavailable. <button type="button" data-next-retry>Retry</button></p>';header.querySelector('[data-next-retry]').onclick=refreshWorkflow;
                         updateAge();
                         const overview=document.getElementById('studioPageContext');
