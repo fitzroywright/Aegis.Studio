@@ -51,6 +51,7 @@ test('Job Details uses one display workflow and its next action opens the assign
  const api=w.json;w.json=(url,options)=>url.startsWith('/api/work/next-actions')?Promise.resolve([{kind:'job',entityId:'job',jobId:'job',action:{key:'task:production',title:'Production',reason:'Production is in progress.',route:'task',taskId:'activity-production'}}]):api(url,options);
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,40));
  const next=w.document.querySelector('.job-detail-heading [data-next-activate]');assert.ok(next);assert.match(next.textContent,/Production/);
+ const overview=w.document.querySelector('.jd-flow-overview');assert.equal(overview.querySelector('.jd-workflow-track').nextElementSibling,overview.querySelector('.jd-next-action'));assert.ok(overview.contains(next));assert.equal(w.document.querySelector('.jd-job-identity .jd-next-action'),null);
  assert.ok(fixture.calls.some(c=>c.url.endsWith('/workflow-graph')));assert.equal(fixture.calls.some(c=>c.url.endsWith('/connected-workflow')),true);
  next.click();await new Promise(r=>setTimeout(r,20));assert.match(w.document.querySelector('dialog:not([id])').textContent,/Production/);
  assert.equal(w.document.querySelectorAll('.job-detail-workflow-dialog').length,0);
