@@ -217,7 +217,7 @@ function studioMountDailyFinance(jobs,workspaces){
  if(!host)return;
  const today=studioJamaicaDate(new Date());
  if(!studioDailyFinance.date)studioDailyFinance.date=today;
- const validDate=/^\\d{4}-\\d{2}-\\d{2}$/.test(studioDailyFinance.date)?studioDailyFinance.date:today;
+ const validDate=/^\d{4}-\d{2}-\d{2}$/.test(studioDailyFinance.date)?studioDailyFinance.date:today;
  host.innerHTML=`<div class="studio-daily-finance-tools">
  <label>Business date (Jamaica)<input data-daily-date type="date" max="${today}" value="${esc(validDate)}"></label>
  <label>Workspace<select data-daily-workspace><option value="">All workspaces</option>${(workspaces||[]).map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select></label>
@@ -242,7 +242,7 @@ function studioMountDailyFinance(jobs,workspaces){
   const quote=value=>'"'+String(value??'').replace(/"/g,'""')+'"';
   const records=[['Business date (Jamaica)','Timestamp UTC','Job','Client','Type','Amount (JMD)','Payment method','Recorded by','Note'],
    ...rows.map(e=>[date.value,e.createdAt||e.createdAtUtc,e.title,e.client,e.kind,e.amount,e.paymentMethod,e.recordedBy,e.note])];
-  const csv=records.map(row=>row.map(quote).join(',')).join('\\r\\n');
+  const csv=records.map(row=>row.map(quote).join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
   const link=document.createElement('a');link.href=url;link.download='studio-daily-finance-'+date.value+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  };
