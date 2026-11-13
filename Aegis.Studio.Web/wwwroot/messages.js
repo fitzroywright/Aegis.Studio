@@ -715,6 +715,28 @@
         await openThread(thread.id);
     };
 
+    // Open the exact inbox message from a preview, not merely its containing thread.
+    window.openStudioInboxMessage = async function(threadId,messageId,jobId,kind) {
+        if(!threadId || !messageId) throw new Error('Message reference is unavailable.');
+        await window.studioNavigate('messages');
+        if(jobId) {
+            inboxFilter=jobId;
+            inboxUnreadOnly=false;
+            inboxOffset=0;
+            await loadInbox(true);
+        }
+        inboxSelection=messageId;
+        renderInbox(true);
+        if(kind==='Conversation') await openLegacyConversation(threadId);
+        else await openThread(threadId);
+        const row=[...document.querySelectorAll('#studioInboxRows [data-inbox-message]')]
+            .find(element=>element.dataset.inboxMessage===messageId);
+        row?.scrollIntoView?.({block:'nearest'});
+        const message=[...document.querySelectorAll('#messageConversationPane .studio-chat-message')]
+            .find(element=>element.dataset.messageId===messageId);
+        message?.scrollIntoView?.({block:'nearest'});
+    };
+
     window.openStudioJobMessages = async function(jobId) {
         await window.studioNavigate('messages');
         const thread = await json(`/api/messages/threads/Job/${jobId}`, { method: 'POST' });
