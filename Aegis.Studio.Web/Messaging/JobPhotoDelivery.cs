@@ -44,7 +44,7 @@ public static class JobPhotoDelivery
             || !access.HasPermission(user,jobId,"ReplyRequester")) throw new UnauthorizedAccessException();
         ValidateSelection(request.VersionIds);
         ValidateQuality(request.Quality);
-        if(request.Method is not ("Email" or "Gallery" or "WhatsApp"))throw new ArgumentException("Choose a delivery method.");
+        if(request.Method is not ("Email" or "Gallery" or "WhatsApp" or "Link"))throw new ArgumentException("Choose a delivery method.");
         if(request.RequestId==Guid.Empty || string.IsNullOrWhiteSpace(request.Subject) || request.Subject.Length>200
             || request.Subject.Contains('\r') || request.Subject.Contains('\n') || string.IsNullOrWhiteSpace(request.Body) || request.Body.Length>10000)
             throw new ArgumentException("Supply a subject and message.");
@@ -58,7 +58,7 @@ public static class JobPhotoDelivery
                 if(!r.Read())throw new ArgumentException("Link the Job to a client before sending photographs.");
                 clientId=r.GetGuid(0);email=StudioAddressBook.ValidateAddress(r.GetString(1));
             }
-            if(request.Method=="Email" && request.Quality!="Proof")FinanceReleaseStore.Require(c,null,jobId);
+            if(request.Method=="Link" || (request.Method=="Email" && request.Quality!="Proof"))FinanceReleaseStore.Require(c,null,jobId);
             foreach(var id in request.VersionIds)
             {
                 using var q=new NpgsqlCommand("""
@@ -71,7 +71,7 @@ public static class JobPhotoDelivery
                 q.Parameters.AddWithValue(jobId);q.Parameters.AddWithValue(id);
                 if(q.ExecuteScalar() is not true)throw new ArgumentException("Only approved, active photographs with completed quality checks may be sent.");
             }
-            if(request.Method!="Email")
+            if(request.Method is "Gallery" or "WhatsApp")
             {
                 using var q=new NpgsqlCommand("""
                     select exists(select 1 from studio_gallery_exports e
@@ -94,6 +94,19 @@ public static class JobPhotoDelivery
             throw new ArgumentException("The client email routing does not match the Job's client.");
         var thread=messages.GetOrCreateScoped(user,"Job",jobId);
         router.AssertSendAccess(thread.Id,user);
+        if(request.Method=="Link")
+        {
+            var store=new StudioVersionStore(db,storage);
+            foreach(var id in request.VersionIds)
+            {
+                var photo=store.Get(jobId,id)??throw new KeyNotFoundException();
+                if(photo.ContentType!="image/jpeg"||photo.SizeBytes<1||photo.SizeBytes>100_000_000)throw new ArgumentException("Links support approved JPEG photographs up to 100 MB each.");
+            }
+            string url=JobPhotoLinks.Create(db,configuration,jobId,clientId,request.RequestId,StudioUnifiedMessaging.CurrentUser(user),request.VersionIds);
+            string body=request.Body.Trim()+"\n\nDownload your selected photographs using this private, expiring link. Do not forward it: "+url;
+            var sent=await router.SendAsync(new UnifiedSendRequest(request.RequestId,thread.Id,request.Subject,body,[clientId]),new FormFileCollection(),user,token);
+            return new(sent.MessageId,sent.ThreadId,sent.Status);
+        }
         if(galleryUrl is not null)
         {
             string body=request.Body.Trim()+"\n\nOpen your private gallery and sign in with your verified client account: "+galleryUrl;
