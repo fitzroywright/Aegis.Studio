@@ -33,13 +33,13 @@
    const versions=assets.map(a=>a.approvedVersionId||a.versionId);
    if(!assets.length||assets.length>10||assets.some(a=>!a.approvedVersionId)){onDone('Select one to ten approved photographs.');return;}
    const requestId=crypto.randomUUID();
-   const dialog=studioDialog('Send to Client',`<form class="jd-file-form"><p>Send ${assets.length} approved JPEG photograph(s) to the client linked to this Job. Maximum total: 2.5 MB.</p><ul>${assets.map(a=>'<li>'+escape(a.approvedFileName||a.fileName)+'</li>').join('')}</ul><label>Subject<input name="subject" required maxlength="200" value="Your photographs"></label><label>Message<textarea name="body" required maxlength="10000">Good day, please find your requested photographs attached.</textarea></label><button type="submit" class="jd-save">Queue email to client</button><p role="alert"></p></form>`);
+   const dialog=studioDialog('Send to Client',`<form class="jd-file-form"><p>Send ${assets.length} approved JPEG photograph(s) to the client linked to this Job. Maximum total: 2.5 MB.</p><ul>${assets.map(a=>'<li>'+escape(a.approvedFileName||a.fileName)+'</li>').join('')}</ul><label>Image quality<select name="quality"><option value="Full">Full-resolution JPEG</option><option value="Compressed">Compressed JPEG (2048 px)</option><option value="Proof">Watermarked proof</option></select></label><label>Subject<input name="subject" required maxlength="200" value="Your photographs"></label><label>Message<textarea name="body" required maxlength="10000">Good day, please find your requested photographs attached.</textarea></label><button type="submit" class="jd-save">Queue email to client</button><p role="alert"></p></form>`);
    const form=dialog.querySelector('form'),button=form.querySelector('[type=submit]'),status=form.querySelector('[role=alert]');
    let payload=null;
    form.onsubmit=async event=>{
     event.preventDefault();if(button.disabled)return;
-    if(!payload)payload={requestId,versionIds:versions,subject:form.elements.subject.value,body:form.elements.body.value};
-    button.disabled=true;form.elements.subject.readOnly=true;form.elements.body.readOnly=true;
+    if(!payload)payload={requestId,versionIds:versions,subject:form.elements.subject.value,body:form.elements.body.value,quality:form.elements.quality.value};
+    button.disabled=true;form.elements.subject.readOnly=true;form.elements.body.readOnly=true;form.elements.quality.disabled=true;
     try{
      const result=await json(`/api/messages/jobs/${job.id}/send-photos`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
      status.textContent=result.status==='Queued'?'Email queued. Check Job Messages for delivery status.':'Recorded in Job Messages; delivery requires attention.';
