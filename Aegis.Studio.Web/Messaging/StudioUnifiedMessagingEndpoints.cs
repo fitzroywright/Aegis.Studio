@@ -199,12 +199,12 @@ public static class StudioUnifiedMessagingEndpoints
         }));
         group.MapPost("/jobs/{jobId:guid}/send-photos", async (Guid jobId, JobPhotoSendRequest request, ClaimsPrincipal user,
             StudioDatabase db, JobAccessService access, StudioAddressBook book, StudioUnifiedMessaging router,
-            StudioInAppMessageStore messages, Common.Storage.IFileStorage storage, IWebHostEnvironment environment,
+            StudioInAppMessageStore messages, Common.Storage.IFileStorage storage, IWebHostEnvironment environment, IConfiguration configuration,
             IHubContext<StudioMessageHub> hub, CancellationToken token) =>
         {
             try
             {
-                var result = await JobPhotoDelivery.SendAsync(jobId, request, user, db, access, book, router, messages, storage, environment, token);
+                var result = await JobPhotoDelivery.SendAsync(jobId, request, user, db, access, book, router, messages, storage, environment, configuration, token);
                 foreach(var participant in messages.GetThreadParticipants(result.ThreadId))
                     await hub.Clients.Group(StudioMessageHub.UserGroup(participant)).SendAsync("threadChanged",result.ThreadId,token);
                 return Results.Ok(result);
