@@ -171,6 +171,7 @@ public static class StudioUnifiedMessagingEndpoints
     public static void MapStudioUnifiedMessaging(this WebApplication app)
     {
         app.Services.GetRequiredService<StudioUnifiedMessaging>().EnsureSchema();
+        JobPhotoLinks.Map(app);
         var group=app.MapGroup("/api/messages").RequireAuthorization();
         group.MapGet("/address-book",(ClaimsPrincipal user,StudioAddressBook book)=>Results.Ok(book.GetAll(user)));
         group.MapPost("/contacts",(CreateMessagingContact request,ClaimsPrincipal user,StudioAddressBook book)=>Execute(()=>Results.Ok(book.Get(book.GetOrCreateExternal(request.DisplayName,request.EmailAddress).Id,user))));
