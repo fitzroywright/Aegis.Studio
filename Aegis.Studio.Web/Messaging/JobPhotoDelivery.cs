@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Aegis.Studio.Web.Finance;
+using Aegis.Studio.Web.Galleries;
+using Aegis.Studio.Web.Media;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Versioning;
@@ -9,11 +11,15 @@ using Npgsql;
 
 namespace Aegis.Studio.Web.Messaging;
 
-public sealed record JobPhotoSendRequest(Guid RequestId, Guid[] VersionIds, string Subject, string Body);
+public sealed record JobPhotoSendRequest(Guid RequestId, Guid[] VersionIds, string Subject, string Body, string Quality = "Full");
 
 public static class JobPhotoDelivery
 {
     public const int MaximumBytes = 2_500_000;
+    public static void ValidateQuality(string quality)
+    {
+        if(quality is not ("Full" or "Compressed" or "Proof")) throw new ArgumentException("Choose Full, Compressed or Proof.");
+    }
     public static void ValidateSelection(Guid[]? ids)
     {
         if(ids is null || ids.Length is < 1 or > 10 || ids.Any(id=>id==Guid.Empty) || ids.Distinct().Count()!=ids.Length)
@@ -27,6 +33,7 @@ public static class JobPhotoDelivery
         if(!access.HasPermission(user,jobId,"ManageProduction") || !access.HasPermission(user,jobId,"ViewAttachments")
             || !access.HasPermission(user,jobId,"ReplyRequester")) throw new UnauthorizedAccessException();
         ValidateSelection(request.VersionIds);
+        ValidateQuality(request.Quality);
         if(request.RequestId==Guid.Empty || string.IsNullOrWhiteSpace(request.Subject) || request.Subject.Length>200
             || request.Subject.Contains('\r') || request.Subject.Contains('\n') || string.IsNullOrWhiteSpace(request.Body) || request.Body.Length>10000)
             throw new ArgumentException("Supply a subject and message.");
@@ -40,7 +47,7 @@ public static class JobPhotoDelivery
                 if(!r.Read())throw new ArgumentException("Link the Job to a client before sending photographs.");
                 clientId=r.GetGuid(0);email=StudioAddressBook.ValidateAddress(r.GetString(1));
             }
-            FinanceReleaseStore.Require(c,null,jobId);
+            if(request.Quality!="Proof")FinanceReleaseStore.Require(c,null,jobId);
             foreach(var id in request.VersionIds)
             {
                 using var q=new NpgsqlCommand("""
@@ -71,20 +78,36 @@ public static class JobPhotoDelivery
                 var version=versions.Get(jobId,id)??throw new KeyNotFoundException();
                 if(!string.Equals(version.ContentType,"image/jpeg",StringComparison.OrdinalIgnoreCase))
                     throw new ArgumentException("Only approved JPEG photographs can be emailed.");
-                if(version.SizeBytes<=0 || version.SizeBytes>MaximumBytes-total)
+                long sourceLimit=request.Quality=="Full"?MaximumBytes-total:100_000_000;
+                if(version.SizeBytes<=0 || version.SizeBytes>sourceLimit)
                     throw new ArgumentException("Selected photographs exceed the 2.5 MB email attachment limit.");
                 await using var source=await new StoredVersionRecovery(storage,environment).OpenAsync(version,token);
                 var buffer=new MemoryStream();buffers.Add(buffer);
                 byte[] chunk=new byte[65536];int read;
                 while((read=await source.ReadAsync(chunk.AsMemory(),token))!=0)
                 {
-                    if(read>MaximumBytes-total-buffer.Length)throw new ArgumentException("Selected photographs exceed the email attachment limit.");
+                    if(read>sourceLimit-buffer.Length)throw new ArgumentException("Selected photographs exceed the email attachment limit.");
                     await buffer.WriteAsync(chunk.AsMemory(0,read),token);
                 }
                 if(buffer.Length!=version.SizeBytes || !Convert.ToHexString(SHA256.HashData(buffer.ToArray())).Equals(version.Sha256,StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("Stored photograph integrity check failed.");
+                buffer.Position=0;
+                if(request.Quality!="Full")
+                {
+                    byte[] encoded;
+                    if(request.Quality=="Proof")encoded=GalleryProofs.Render(buffer);
+                    else
+                    {
+                        using var image=StudioImageProcessor.DecodeOriented(buffer);
+                        using var resized=StudioImageProcessor.ResizeMax(image,2048);
+                        encoded=StudioImageProcessor.EncodeJpeg(resized,82);
+                    }
+                    buffer.Dispose();
+                    buffer=new MemoryStream(encoded,writable:false);buffers.Add(buffer);
+                }
+                if(buffer.Length>MaximumBytes-total)throw new ArgumentException("Selected photographs exceed the 2.5 MB email attachment limit. Select fewer photographs.");
                 total+=buffer.Length;buffer.Position=0;
-                files.Add(new FormFile(buffer,0,buffer.Length,"file",id.ToString("N")+"-"+Path.GetFileName(version.FileName))
+                files.Add(new FormFile(buffer,0,buffer.Length,"file",request.Quality.ToLowerInvariant()+"-"+id.ToString("N")+"-"+Path.GetFileName(version.FileName))
                     {Headers=new HeaderDictionary(),ContentType="image/jpeg"});
             }
             return await router.SendAsync(new UnifiedSendRequest(request.RequestId,thread.Id,request.Subject,request.Body,[clientId]),files,user,token);
