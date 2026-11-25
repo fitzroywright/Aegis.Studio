@@ -5,6 +5,21 @@ namespace Aegis.Studio.Web.Tests;
 
 public sealed class JobPhotoDeliveryTests
 {
+    [Theory]
+    [InlineData("Full")]
+    [InlineData("Compressed")]
+    [InlineData("Proof")]
+    public void AcceptsSupportedQuality(string quality)=>JobPhotoDelivery.ValidateQuality(quality);
+
+    [Fact]
+    public void RejectsUnknownQualityAndUnsafeGalleryOrigins()
+    {
+        Assert.Throws<ArgumentException>(()=>JobPhotoDelivery.ValidateQuality("OriginalRaw"));
+        Assert.Throws<ArgumentException>(()=>JobPhotoDelivery.GalleryUrl("http://example.test"));
+        Assert.Throws<ArgumentException>(()=>JobPhotoDelivery.GalleryUrl("https://example.test/private"));
+        Assert.Equal("https://example.test/#galleries",JobPhotoDelivery.GalleryUrl("https://example.test/"));
+    }
+
     [Fact]
     public void AcceptsOneOrTenDistinctVersions()
     {
