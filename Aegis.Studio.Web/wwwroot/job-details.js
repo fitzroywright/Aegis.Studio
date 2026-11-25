@@ -33,15 +33,21 @@
    const versions=assets.map(a=>a.approvedVersionId||a.versionId);
    if(!assets.length||assets.length>10||assets.some(a=>!a.approvedVersionId)){onDone('Select one to ten approved photographs.');return;}
    const requestId=crypto.randomUUID();
-   const dialog=studioDialog('Send to Client',`<form class="jd-file-form"><p>Send ${assets.length} approved JPEG photograph(s) to the client linked to this Job. Maximum total: 2.5 MB.</p><ul>${assets.map(a=>'<li>'+escape(a.approvedFileName||a.fileName)+'</li>').join('')}</ul><label>Image quality<select name="quality"><option value="Full">Full-resolution JPEG</option><option value="Compressed">Compressed JPEG (2048 px)</option><option value="Proof">Watermarked proof</option></select></label><label>Subject<input name="subject" required maxlength="200" value="Your photographs"></label><label>Message<textarea name="body" required maxlength="10000">Good day, please find your requested photographs attached.</textarea></label><button type="submit" class="jd-save">Queue email to client</button><p role="alert"></p></form>`);
+   const dialog=studioDialog('Send to Client',`<form class="jd-file-form"><p>Send ${assets.length} approved JPEG photograph(s) to the client linked to this Job. Maximum total: 2.5 MB.</p><ul>${assets.map(a=>'<li>'+escape(a.approvedFileName||a.fileName)+'</li>').join('')}</ul><label>Delivery method<select name="method"><option value="Email">Email attachments</option><option value="Gallery">Email private gallery sign-in link</option><option value="WhatsApp">Prepare WhatsApp gallery link</option></select></label><label>Image quality<select name="quality"><option value="Full">Full-resolution JPEG</option><option value="Compressed">Compressed JPEG (2048 px)</option><option value="Proof">Watermarked proof</option></select></label><label>Subject<input name="subject" required maxlength="200" value="Your photographs"></label><label>Message<textarea name="body" required maxlength="10000">Good day, please find your requested photographs attached.</textarea></label><button type="submit" class="jd-save">Queue email to client</button><p role="alert"></p></form>`);
    const form=dialog.querySelector('form'),button=form.querySelector('[type=submit]'),status=form.querySelector('[role=alert]');
+   form.elements.method.onchange=()=>{form.elements.quality.disabled=form.elements.method.value!=='Email';button.textContent=form.elements.method.value==='WhatsApp'?'Prepare share link':'Queue email to client';};
    let payload=null;
    form.onsubmit=async event=>{
     event.preventDefault();if(button.disabled)return;
-    if(!payload)payload={requestId,versionIds:versions,subject:form.elements.subject.value,body:form.elements.body.value,quality:form.elements.quality.value};
-    button.disabled=true;form.elements.subject.readOnly=true;form.elements.body.readOnly=true;form.elements.quality.disabled=true;
+    if(!payload)payload={requestId,versionIds:versions,subject:form.elements.subject.value,body:form.elements.body.value,quality:form.elements.quality.value,method:form.elements.method.value};
+    button.disabled=true;form.elements.subject.readOnly=true;form.elements.body.readOnly=true;form.elements.quality.disabled=true;form.elements.method.disabled=true;
     try{
      const result=await json(`/api/messages/jobs/${job.id}/send-photos`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+     if(result.status==='SharePrepared'&&typeof result.shareUrl==='string'&&result.shareUrl.startsWith('https://wa.me/?text=')){
+      status.textContent='Share prepared. Open WhatsApp and select the verified client yourself; Studio has not sent the message.';
+      const link=document.createElement('a');link.href=result.shareUrl;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open WhatsApp';form.append(link);
+      button.textContent='Recorded';onDone(status.textContent);return;
+     }
      status.textContent=result.status==='Queued'?'Email queued. Check Job Messages for delivery status.':'Recorded in Job Messages; delivery requires attention.';
      button.textContent='Recorded';
      onDone(status.textContent);
