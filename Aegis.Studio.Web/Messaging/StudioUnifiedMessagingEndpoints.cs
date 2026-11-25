@@ -197,6 +197,23 @@ public static class StudioUnifiedMessagingEndpoints
             }
             return Results.Ok(recipients);
         }));
+        group.MapPost("/jobs/{jobId:guid}/send-photos", async (Guid jobId, JobPhotoSendRequest request, ClaimsPrincipal user,
+            StudioDatabase db, JobAccessService access, StudioAddressBook book, StudioUnifiedMessaging router,
+            StudioInAppMessageStore messages, Common.Storage.IFileStorage storage, IWebHostEnvironment environment,
+            IHubContext<StudioMessageHub> hub, CancellationToken token) =>
+        {
+            try
+            {
+                var result = await JobPhotoDelivery.SendAsync(jobId, request, user, db, access, book, router, messages, storage, environment, token);
+                foreach(var participant in messages.GetThreadParticipants(result.ThreadId))
+                    await hub.Clients.Group(StudioMessageHub.UserGroup(participant)).SendAsync("threadChanged",result.ThreadId,token);
+                return Results.Ok(result);
+            }
+            catch(UnauthorizedAccessException){return Results.Forbid();}
+            catch(KeyNotFoundException){return Results.NotFound();}
+            catch(ArgumentException ex){return Results.BadRequest(new{error=ex.Message});}
+            catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
+        });
         group.MapPost("/send",async(HttpRequest http,ClaimsPrincipal user,StudioUnifiedMessaging router,StudioInAppMessageStore messages,IHubContext<StudioMessageHub> hub,CancellationToken token)=>
         {
             try
