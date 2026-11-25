@@ -6,6 +6,7 @@ using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Versioning;
 using Common.Storage;
+using Common.Security.Hosting;
 using Npgsql;
 
 namespace Aegis.Studio.Web.Messaging;
@@ -116,7 +117,7 @@ public static class JobPhotoLinks
                 q.Parameters.AddWithValue(link);if(q.ExecuteNonQuery()!=1)return Results.NotFound();
             }
             return Results.File(bytes,"image/jpeg",Path.GetFileName(photo.FileName));
-        }).AllowAnonymous();
+        }).AllowAnonymous().RequireRateLimiting(AccountSecurityHosting.LoginRateLimit);
         var group=app.MapGroup("/api/messages/jobs/{job:guid}/photo-links").RequireAuthorization();
         group.MapGet("",(Guid job,ClaimsPrincipal user,StudioDatabase db,JobAccessService access)=>
         {
